@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sparky's Circuit Adventure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/book.css">
+</head>
+<body data-book="kid" data-chapter="index">
+<main class="chapter">
+  <header class="chapter-head" style="text-align:center">
+    <div class="big-emoji">⚡😄</div>
+    <h1>Sparky's Circuit Adventure</h1>
+    <p class="lede">Hi! I'm <b>Sparky</b>, a tiny electron. Come on a journey through wires, bulbs, magnets and robots with me! Tap a bubble to start a level.</p>
+    <p><label style="font-size:1rem">What's your name, explorer? <input id="kidname" style="font:inherit;padding:6px 12px;border-radius:12px;border:2px solid var(--line);width:180px"></label></p>
+  </header>
+  <div id="levelmap"></div>
+  <aside class="callout tip"><span class="ct">👋 For grown-ups</span>
+    <p>Each level takes 10–15 minutes. Tap 🔊 to have the page read aloud. Most levels end with a <b>"Try it at home"</b> activity using a battery, foil, a bulb or LED, and a magnet. Never let kids play with wall sockets or lithium batteries. The levels gently follow the same path as the grown-up book (<a href="../book/index.html">Sparks &amp; Circuits</a>), so you can learn together.</p>
+  </aside>
+</main>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('kidname');
+  inp.value = Book.state.name || '';
+  inp.addEventListener('input', () => Book.setName(inp.value.trim()));
+});
+</script>
+</body>
+</html>

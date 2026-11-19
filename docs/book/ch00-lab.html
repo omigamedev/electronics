@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0 · Your Lab & How to Use This Book — Sparks & Circuits</title>
+<meta name="description" content="Tools, safety, simulators and a tour of the interactive widgets in Sparks & Circuits.">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/book.css">
+</head>
+<body data-book="adult" data-chapter="ch00-lab">
+<main class="chapter">
+
+<header class="chapter-head">
+  <p class="kicker">Chapter 0</p>
+  <h1>Your Lab & How to Use This Book</h1>
+  <p class="lede">You write software, so you already know how to debug a system you can't see. Electronics works the same way, except the state lives in electric fields instead of memory. This chapter sets up your bench, your simulators and your habits.</p>
+</header>
+
+<section>
+<h2 id="how">How this book works</h2>
+<p>Each chapter mixes four kinds of material:</p>
+<ul>
+  <li><b>Explanations</b> that build intuition first and add the math only where it pays for itself. Optional deep dives sit in collapsible boxes.</li>
+  <li><b>Live widgets</b>: plots, animated circuits and simulators you can poke. Drag every slider. Predict what will happen <em>before</em> you drag it.</li>
+  <li><b>Exercises</b> as you go, Brilliant/Duolingo style. You earn ⚡ XP, and solving at least one per day keeps your 🔥 streak alive. Progress is saved in your browser.</li>
+  <li><b>Lab boxes</b>: real builds on a breadboard, with what to measure.</li>
+</ul>
+<p>Callouts you'll see:</p>
+<aside class="callout physics"><span class="ct">⚛️ Physics</span>What is <em>really</em> going on underneath.</aside>
+<aside class="callout math"><span class="ct">∑ Math</span>A tool you need, explained just in time. The <a href="appA-math.html">Math Toolkit</a> appendix has the full versions.</aside>
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy</span>A mapping from software concepts, plus where the analogy breaks.</aside>
+<aside class="callout warn"><span class="ct">⚠️ Careful</span>Things that start fires, kill parts or waste days.</aside>
+<aside class="callout lab"><span class="ct">🔧 Lab</span>Build it, measure it, compare with your prediction.</aside>
+<aside class="callout ref"><span class="ct">📚 Go deeper</span>Pointers to the classic books and lectures this chapter draws on.</aside>
+
+<div class="ex" data-id="kinds" data-kind="mc">
+  <div class="q">Let's try the exercise engine. What's the best way to use a slider widget in this book?</div>
+  <ol class="opts">
+    <li>Drag it randomly until the plot looks nice</li>
+    <li data-correct>Predict what will change first, then drag it and compare</li>
+    <li>Skip widgets and just read the formulas</li>
+  </ol>
+  <div class="hint">Learning research (and every good lab course) agrees on one habit.</div>
+  <div class="explain">Prediction followed by feedback is how you build intuition. When the widget surprises you, you've found something your mental model was missing.</div>
+</div>
+</section>
+
+<section>
+<h2 id="first-circuit">Your first live circuit</h2>
+<p>Here is the "hello world" of electronics: a battery, a resistor and an LED in a loop. Click the switch. The orange dots are <b>conventional current</b> (positive charge flowing from + to −). We'll unpack what's actually moving in <a href="ch01-physics.html">Chapter 1</a>.</p>
+
+<figure class="widget" id="fig-led">
+  <div id="led-sch"></div>
+  <div class="w-controls" id="led-ctl"></div>
+  <figcaption><b>Figure 0.1</b> An LED circuit solved live. The solver treats the LED as a "red LED: about 1.9 V drop once it conducts". Change the supply and resistor and watch the current. Most indicator LEDs are happiest around 2–20 mA.</figcaption>
+</figure>
+
+<p>The resistor sets the current. The battery voltage minus the LED's forward voltage is what is left across the resistor, so by Ohm's law:</p>
+<div class="formula">
+$$I = \frac{V_{\text{supply}} - V_{F}}{R}$$
+<p>The single most useful formula for driving LEDs from a GPIO pin.</p>
+</div>
+
+<div class="ex" data-id="led-task" data-kind="task">
+  <div class="q">In Figure 0.1, set the LED current between <b>9 mA and 11 mA</b> with a <b>3.3 V</b> supply (like an ESP32 pin), with the switch closed.</div>
+  <div class="explain">\(R \approx (3.3 - 1.9)/0.010 = 140\,\Omega\). In practice you'd pick the standard value 150 Ω. Note how little headroom 3.3 V leaves for a blue or white LED (\(V_F \approx 3\) V).</div>
+</div>
+
+<div class="ex" data-id="led-num" data-kind="num" data-answer="300" data-tol="3%" data-unit="Ω">
+  <div class="q">A 5 V Arduino pin drives a red LED (\(V_F = 2.0\) V) at 10 mA. What resistor do you need?</div>
+  <div class="hint">Voltage left over for the resistor = 5 − 2.0. Then \(R = V/I\), with \(I = 0.010\) A.</div>
+  <div class="explain">\(R = (5 - 2.0)/0.010 = 300\,\Omega\). The nearest standard values are 300 Ω (E24) or 330 Ω (E12). You can type answers like <code>300</code>, <code>0.3k</code> or <code>300 ohm</code>.</div>
+</div>
+</section>
+
+<section>
+<h2 id="plots">Reading plots</h2>
+<p>Plots are interactive too. Hover (or touch) to read values. This one shows how the LED current from Figure 0.1 depends on the resistor for a few supply voltages. Notice the shape: current goes as \(1/R\), so doubling R halves the current.</p>
+<figure class="widget">
+  <div id="plot-led"></div>
+  <figcaption><b>Figure 0.2</b> LED current vs. series resistance (log x-axis). The shaded band is the "comfortable indicator LED" range of 2–20 mA.</figcaption>
+</figure>
+
+<aside class="callout math"><span class="ct">∑ Log axes</span>
+<p>On a log axis each grid decade (10, 100, 1k, 10k) is the same distance apart. Engineers use log axes because component values span many orders of magnitude, and because \(y = k/x\) becomes a <em>straight line</em> on log–log axes. See <a href="appA-math.html">Appendix A</a>.</p>
+</aside>
+</section>
+
+<section>
+<h2 id="tools">Your bench</h2>
+<p>You can learn a lot in simulators, but electronics is an experimental science. These tools pay for themselves quickly:</p>
+<table>
+  <tr><th>Tool</th><th>Why you need it</th><th>Buying notes</th></tr>
+  <tr><td><b>Multimeter</b></td><td>Voltage, current, resistance, continuity (beep), diode test. Your <code>console.log</code>.</td><td>Auto-ranging, with a fused current input. UNI-T UT61E+, Brymen BM235, or any decent mid-range meter.</td></tr>
+  <tr><td><b>Bench power supply</b></td><td>Adjustable voltage <em>with a current limit</em>. A short circuit becomes a number on a display instead of smoke.</td><td>0–30 V, 0–5 A is plenty. Set the current limit low on first power-up.</td></tr>
+  <tr><td><b>Logic analyser</b></td><td>Records digital lines and decodes I²C/SPI/UART into bytes. Your network sniffer.</td><td>A cheap 8-channel 24 MHz clone + PulseView (sigrok) is fine to start.</td></tr>
+  <tr><td><b>Oscilloscope</b></td><td>Shows voltage vs. time: ringing, noise, PWM, rise times. Your profiler and debugger in one.</td><td>A 4-channel, 12-bit entry scope (e.g. Rigol DHO800 series, Siglent SDS800X HD).</td></tr>
+  <tr><td><b>Soldering iron</b></td><td>Temperature-controlled. Through-hole first, SMD later.</td><td>Pinecil or a T12-style station, plus flux, 0.5–0.8 mm leaded or lead-free solder, and a brass tip cleaner.</td></tr>
+  <tr><td><b>Breadboard + kit</b></td><td>Resistors (E12), capacitors, diodes (1N4148, 1N5819), LEDs, BJTs (2N3904/2N3906), logic-level MOSFETs (AO3400/IRLZ44N), an LM358, a 555.</td><td>Get a couple of good-quality breadboards; cheap ones have loose contacts.</td></tr>
+</table>
+
+<div class="ex" data-id="tool-sort" data-kind="sort">
+  <div class="q">Which tool would you reach for first? Sort each problem.</div>
+  <div class="bins">
+    <div data-bin="dmm">🔢 Multimeter</div>
+    <div data-bin="scope">📈 Oscilloscope</div>
+    <div data-bin="la">🔍 Logic analyser</div>
+  </div>
+  <ul class="items">
+    <li data-bin="dmm">Is the 3.3 V rail actually 3.3 V?</li>
+    <li data-bin="la">Which I²C address does the sensor ACK?</li>
+    <li data-bin="scope">Is there ringing on the motor PWM edges?</li>
+    <li data-bin="dmm">Is this wire broken? (continuity)</li>
+    <li data-bin="la">Is SPI sending the bytes my code thinks it sends?</li>
+    <li data-bin="scope">How much ripple is on the buck converter output?</li>
+  </ul>
+  <div class="explain">Rule of thumb: the multimeter is for steady values, the scope is for analog shape over time, and the logic analyser is for many digital lines and protocol decoding.</div>
+</div>
+</section>
+
+<section>
+<h2 id="safety">Safety, the short version</h2>
+<aside class="callout warn"><span class="ct">⚠️ Three rules</span>
+<ol>
+  <li><b>Never work on mains (wall power).</b> Everything in this book runs at under about 30 V DC. That's safe for your body; your <em>parts</em> are what's at risk.</li>
+  <li><b>Lithium batteries store a lot of energy.</b> A shorted LiPo can deliver over 100 A and catch fire. Use proper chargers, never puncture or over-discharge, charge on a non-flammable surface, and fuse your packs.</li>
+  <li><b>Power new circuits from a current-limited supply</b> before you ever connect a battery.</li>
+</ol>
+</aside>
+<p>What actually hurts a human is current through the body. Dry skin has a resistance of maybe tens of kΩ, so at 12 V a few hundred µA flow, which you can't even feel. At 230 V you get milliamps through the chest, which can be lethal. That's Ohm's law, applied to you.</p>
+
+<div class="ex" data-id="safety-multi" data-kind="multi">
+  <div class="q">Which of these are good habits? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>Set the bench supply's current limit to ~100 mA when powering a new board</li>
+    <li>Leave a LiPo charging overnight on the bed</li>
+    <li data-correct>Put a fuse close to the battery in a robot</li>
+    <li data-correct>Double-check polarity before connecting a battery</li>
+    <li>Measure current by putting the multimeter (in A mode) directly across the battery</li>
+  </ol>
+  <div class="explain">An ammeter is nearly a short circuit. Placing it <em>across</em> a battery shorts the battery and usually blows the meter's fuse. Current is measured <em>in series</em>. Chapter 2 explains why.</div>
+</div>
+</section>
+
+<section>
+<h2 id="sim">Simulators</h2>
+<ul>
+  <li><b><a href="https://www.falstad.com/circuit/" target="_blank" rel="noopener">Falstad CircuitJS</a></b> runs in the browser and animates current and voltage. It's perfect for building intuition. Many figures in this book have a Falstad equivalent you can recreate.</li>
+  <li><b>LTspice</b> (free, Analog Devices) is the industry-standard SPICE. Use it for transient and AC analysis and for real part models.</li>
+  <li><b>KiCad</b> (free) handles schematics and PCB layout. We'll use it in Chapter 9.</li>
+  <li><b>Wokwi</b> simulates Arduino/ESP32 code with virtual parts in the browser. Great for testing firmware before hardware arrives.</li>
+</ul>
+
+<div class="ex" data-id="workflow-order" data-kind="order">
+  <div class="q">Put the "engineer's loop" in order.</div>
+  <ol class="items">
+    <li>Predict (math / intuition)</li>
+    <li>Simulate</li>
+    <li>Build on a breadboard</li>
+    <li>Measure</li>
+    <li>Compare and update your mental model</li>
+  </ol>
+  <div class="explain">This is the scientific method, applied to circuits. Bugs hide in the gap between what you predicted and what you measured.</div>
+</div>
+</section>
+
+<section>
+<h2 id="map">The road map</h2>
+<p>Chapters 1–3 are the physics and circuit theory. They're the part most hobbyist tutorials skip, and it's why their readers get stuck when a motor resets the microcontroller. Chapters 4–5 are the components that make robots move and stay powered. Chapters 6–7 cover talking to chips and programming them. Chapter 8 is motion and control, and Chapter 9 puts it all on your own PCB.</p>
+<div class="ex" data-id="dev-analogy" data-kind="mc">
+  <div class="q">Software developers often compare voltage to a "pressure" and current to a "flow rate". In that analogy, what plays the role of a resistor?</div>
+  <ol class="opts">
+    <li>A pump</li>
+    <li data-correct>A narrow section of pipe</li>
+    <li>A water tank</li>
+    <li>The water itself</li>
+  </ol>
+  <div class="explain">A narrow pipe needs more pressure difference to push the same flow through it. A pump is the battery, a tank is roughly a capacitor, and the water is the charge. Chapter 1 shows where this analogy works and where it breaks: water doesn't create magnetic fields!</div>
+</div>
+
+<aside class="callout ref"><span class="ct">📚 The sources behind this book</span>
+<p>This book is an original synthesis written for developers. It follows the arc of the classic references, which you should read alongside it:</p>
+<ul>
+  <li><i>The Art of Electronics</i> (Horowitz &amp; Hill, 3rd ed.) and <i>Learning the Art of Electronics</i> (Hayes &amp; Horowitz)</li>
+  <li><i>Practical Electronics for Inventors</i> (Scherz &amp; Monk)</li>
+  <li>MIT 6.002 <i>Circuits and Electronics</i> (Agarwal) and MIT 8.02 <i>Electricity and Magnetism</i> (Lewin), both on MIT OpenCourseWare</li>
+  <li><i>The Feynman Lectures on Physics, Vol. II</i> (free online)</li>
+  <li><i>Making Embedded Systems</i> (Elecia White)</li>
+  <li><i>Lessons in Electric Circuits</i> (Kuphaldt, free on All About Circuits)</li>
+</ul>
+</aside>
+</section>
+
+</main>
+<script src="../assets/vendor/katex/katex.min.js"></script>
+<script src="../assets/vendor/katex/auto-render.min.js"></script>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/ch00-lab.js"></script>
+</body>
+</html>
