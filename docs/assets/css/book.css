@@ -300,3 +300,6 @@ body.kid main.cards > .card > h2, body.kid main.cards > .card > h3:first-child {
 .w-seg { flex-wrap: wrap; max-width: 100%; }
 main table, .katex-display, .formula { position: relative; }
 main p code, main li code { overflow-wrap: anywhere; }
+.w-grid2 > * { min-width: 0; }
+.w-slider { grid-template-columns: minmax(70px, max-content) minmax(80px, 1fr) minmax(64px, max-content); }
+@media (max-width: 480px) { .w-slider { grid-template-columns: 1fr auto; } .w-slider input { grid-column: 1 / -1; grid-row: 2; } }

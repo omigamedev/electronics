@@ -18,7 +18,7 @@
    * Figure 9.1 — exploded layer stack
    * ===================================================================== */
   (function stackFig() {
-    const c = W.canvas('#w-stack', { height: 380 });
+    const c = W.canvas('#w-stack', { height: 420 });
     const ctl = ctlOf('#w-stack-ctl');
     const info = W.$('#w-stack-info');
     const L = {
@@ -52,9 +52,9 @@
     function draw() {
       clear(c);
       const x = c.ctx, ids = stacks[n];
-      const k = Math.min((c.w * 0.62) / ((BW + BD) * 0.866), 26);
-      const gap = 6 + ex * (n === 2 ? 34 : 22);
+      const gap = 6 + ex * (n === 2 ? 30 : 18);
       const totalH = ids.reduce((s, id) => s + L[id].vt, 0) + gap * (ids.length - 1);
+      const k = Math.max(6, Math.min((c.w * (c.w < 560 ? 0.9 : 0.62)) / ((BW + BD) * 0.866), 26, (c.h - totalH - 30) / ((BW + BD) * 0.5)));
       const ox = c.w * (c.w < 560 ? 0.42 : 0.36), oy = Math.max(30, (c.h - totalH - (BW + BD) * k * 0.5) / 2 + 6);
       const P = (u, v, z) => [ox + (u - v) * k * 0.866, oy + (u + v) * k * 0.5 + z];
       faces = [];
@@ -430,15 +430,15 @@
         { t: 'wire', pts: [[200, 100], [200, 105]] }, { t: 'wire', pts: [[200, 145], [200, 150]] },
         { t: 'wire', pts: [[200, 190], [200, 215]] },
         { t: 'L', a: [230, 50], b: [330, 50], label: 'traces + vias (loop L)' },
-        { t: 'wire', pts: [[330, 50], [470, 50]] },
+        { t: 'wire', pts: [[330, 50], [480, 50]] },
         { t: 'dot', at: [400, 50] },
-        { t: 'C', a: [400, 90], b: [400, 130], label: 'on-die C' },
+        { t: 'C', a: [400, 90], b: [400, 130], label: 'on-die C', side: -1 },
         { t: 'wire', pts: [[400, 50], [400, 90]] }, { t: 'wire', pts: [[400, 130], [400, 215]] },
-        { t: 'I', a: [470, 70], b: [470, 160], label: 'IC current pulses' },
-        { t: 'wire', pts: [[470, 50], [470, 70]] }, { t: 'wire', pts: [[470, 160], [470, 215]] },
-        { t: 'wire', pts: [[40, 175], [40, 215], [470, 215]] },
+        { t: 'I', a: [480, 70], b: [480, 160], label: 'IC current pulses' },
+        { t: 'wire', pts: [[480, 50], [480, 70]] }, { t: 'wire', pts: [[480, 160], [480, 215]] },
+        { t: 'wire', pts: [[40, 175], [40, 215], [480, 215]] },
         { t: 'gnd', at: [260, 215] },
-        { t: 'text', at: [570, 110], text: 'the IC' },
+        { t: 'text', at: [440, 238], text: 'inside the IC package' },
         { t: 'text', at: [200, 238], text: 'decoupling cap' },
       ],
     });
@@ -480,15 +480,15 @@
     }
     function drawBoard() {
       clear(c);
-      const x = c.ctx, sc = Math.min((c.w - 160) / 24, 18), icX = c.w - 90, py = 100;
+      const x = c.ctx, sc = Math.min((c.w - 160) / 24, 18), icX = Math.min(c.w - 90, c.w / 2 + 240), py = 100;
       const capX = icX - 40 - S.d * sc;
       // ic
       x.save(); x.fillStyle = 'rgba(90,95,105,0.85)'; x.fillRect(icX - 10, py - 70, 90, 140); x.restore();
       text(x, 'IC', icX + 35, py, { color: '#fff', bold: true, size: 14 });
       // pins
       x.save(); x.fillStyle = COPPER; x.fillRect(icX - 26, py - 22, 16, 10); x.fillRect(icX - 26, py + 12, 16, 10); x.restore();
-      text(x, 'VDD', icX - 18, py - 32, { size: 10, color: col('muted') });
-      text(x, 'GND', icX - 18, py + 34, { size: 10, color: col('muted') });
+      text(x, 'VDD', icX + 2, py - 17, { size: 10, color: '#fff', align: 'left' });
+      text(x, 'GND', icX + 2, py + 17, { size: 10, color: '#fff', align: 'left' });
       // cap
       const cw = 12 + S.esl * 10, ch = 30;
       x.save(); x.fillStyle = COPPER; x.fillRect(capX - cw / 2, py - 22 - 6, cw, 12); x.fillRect(capX - cw / 2, py + 17 - 6, cw, 12);
@@ -567,7 +567,8 @@
    * ===================================================================== */
   (function floorFig() {
     const BW = 90, BH = 64; // mm
-    const c = W.canvas('#w-floor', { aspect: 90 / 70 });
+    const host = W.$('#w-floor');
+    const c = W.canvas(host, { get height() { return Math.min(460, Math.round((host.clientWidth || 600) / 1.35)); } });
     const rulesEl = W.$('#w-floor-rules');
     const ctl = ctlOf('#w-floor-ctl');
     const fixed = [
@@ -577,7 +578,7 @@
       { id: 'srv', name: 'SERVOS', x: 6, y: 57, w: 22, h: 7, col: 'muted' },
       { id: 'qw', name: 'Qwiic', x: 0, y: 8, w: 6, h: 7, col: 'muted' },
     ];
-    const start = { esp: [36, 22], buck: [14, 40], ldo: [70, 6], drv: [24, 22], imu: [60, 40] };
+    const start = { esp: [36, 22], buck: [14, 40], ldo: [70, 6], drv: [16, 22], imu: [60, 40] };
     const blocks = [
       { id: 'esp', name: 'ESP32-S3 module', w: 18, h: 25.5, col: 'c1' },
       { id: 'buck', name: 'Buck 5 V', w: 12, h: 10, col: 'c2' },
@@ -631,14 +632,14 @@
       x.save(); x.strokeStyle = col('c4'); x.lineWidth = 3; x.globalAlpha = 0.55; x.setLineDash([6, 4]);
       x.beginPath(); x.moveTo(ox + bx * scale, oy + by * scale); x.lineTo(ox + dx * scale, oy + dy * scale); x.lineTo(ox + mx * scale, oy + my * scale); x.stroke(); x.restore();
       // fixed connectors
-      fixed.forEach((b) => { const [X, Y, Wd, Ht] = R(b); x.save(); x.fillStyle = col(b.col); x.globalAlpha = 0.6; x.fillRect(X, Y, Wd, Ht); x.restore(); text(x, b.name, X + Wd / 2, Y + Ht / 2, { size: 10, bold: true, color: '#fff' }); });
+      fixed.forEach((b) => { const [X, Y, Wd, Ht] = R(b); x.save(); x.fillStyle = col(b.col); x.globalAlpha = 0.6; x.fillRect(X, Y, Wd, Ht); x.restore(); text(x, b.name, X + Wd / 2, Y + Ht / 2, { size: scale > 5 ? 10 : 8, bold: true, color: '#fff' }); });
       // blocks
       blocks.forEach((b) => {
         const [X, Y, Wd, Ht] = R(b);
         x.save(); x.fillStyle = col(b.col); x.globalAlpha = drag && drag.b === b ? 0.95 : 0.8; x.fillRect(X, Y, Wd, Ht); x.globalAlpha = 1; x.strokeStyle = col('ink'); x.lineWidth = 1; x.strokeRect(X + 0.5, Y + 0.5, Wd, Ht);
         if (b.id === 'esp') { x.fillStyle = 'rgba(255,255,255,0.25)'; x.fillRect(X, Y, Wd, 6.4 * scale); }
         x.restore();
-        text(x, b.name, X + Wd / 2, Y + Ht / 2 + (b.id === 'esp' ? 6 : 0), { size: scale > 5 ? 11 : 9, bold: true, color: '#fff' });
+        text(x, b.name, X + Wd / 2, Y + Ht / 2 + (b.id === 'esp' ? 6 : 0), { size: scale > 5 ? 11 : 8, bold: true, color: '#fff' });
         if (b.id === 'esp') text(x, 'antenna', X + Wd / 2, Y + 3.2 * scale, { size: 9, color: '#fff' });
       });
     }
@@ -665,7 +666,7 @@
    * ===================================================================== */
   (function xtalkFig() {
     const S = { s: 0.5, w: 0.2 };
-    const p = W.plot('#w-xtalk', { xmin: 0, xmax: 3, ymin: 0, ymax: 100, xlabel: 'Edge-to-edge spacing s (mm)', ylabel: 'Relative crosstalk (%)', hover: true, height: 260, xunit: 'mm', yunit: '' });
+    const p = W.plot('#w-xtalk', { xmin: 0, xmax: 3, ymin: 0, ymax: 100, xlabel: 'Edge-to-edge spacing s (mm)', ylabel: 'Relative crosstalk (%)', hover: true, height: 260, xunit: 'mm', yunit: '', xfmt: (v) => W.fix(v, 1) });
     const ctl = ctlOf('#w-xtalk-ctl');
     W.slider(ctl, { label: 'Spacing \\(s\\)', min: 0.1, max: 3, step: 0.05, value: S.s, format: (v) => v.toFixed(2) + ' mm', onInput: (v) => { S.s = v; upd(); } });
     W.slider(ctl, { label: 'Trace width', min: 0.1, max: 1, step: 0.05, value: S.w, format: (v) => v.toFixed(2) + ' mm', onInput: (v) => { S.w = v; upd(); } });
@@ -734,17 +735,17 @@
    * ===================================================================== */
   (function pwrFig() {
     W.schematic('#w-pwr', {
-      w: 800, h: 300, title: 'Power input: fuse, reverse-polarity P-MOSFET, bulk capacitor and 5 V buck converter',
+      w: 830, h: 320, title: 'Power input: fuse, reverse-polarity P-MOSFET, bulk capacitor and 5 V buck converter',
       items: [
-        { t: 'bat2', id: 'bat', a: [40, 200], b: [40, 260], label: '2S LiPo' },
-        { t: 'gnd', at: [40, 260] },
-        { t: 'fuse', id: 'f1', a: [70, 200], b: [130, 200], label: 'F1 5 A' },
-        { t: 'wire', pts: [[40, 200], [70, 200]] },
+        { t: 'bat2', id: 'bat', a: [40, 230], b: [40, 290], label: '2S LiPo' },
+        { t: 'gnd', at: [40, 290] },
+        { t: 'fuse', id: 'f1', a: [70, 230], b: [130, 230], label: 'F1 5 A' },
+        { t: 'wire', pts: [[40, 230], [70, 230]] },
         { t: 'pmos', id: 'q1', at: [190, 130], label: 'Q1' },
-        { t: 'wire', pts: [[130, 200], [205, 200], 'q1.D'] },
+        { t: 'wire', pts: [[130, 230], [205, 230], 'q1.D'] },
         { t: 'wire', pts: ['q1.G', [145, 130]] },
-        { t: 'R', id: 'rg', a: [145, 130], b: [95, 130], label: 'R1 100k' },
-        { t: 'gnd', at: [95, 130] },
+        { t: 'R', id: 'rg', a: [145, 130], b: [145, 190], label: 'R1 100k', side: -1 },
+        { t: 'gnd', at: [145, 190] },
         { t: 'Z', id: 'zg', a: [145, 130], b: [145, 80], label: 'D1 12 V' },
         { t: 'dot', at: [145, 130] },
         { t: 'wire', pts: [[145, 80], [205, 80]] },
@@ -768,18 +769,17 @@
         { t: 'wire', pts: ['u1.VBST', [555, 95]] },
         { t: 'wire', pts: ['u1.SW', [555, 125], [580, 125]] },
         { t: 'L', id: 'l1', a: [580, 125], b: [645, 125], label: 'L1 3.3 µH' },
-        { t: 'wire', pts: [[645, 125], [790, 125]] },
-        { t: 'C', id: 'cout', a: [680, 125], b: [680, 170] },
+        { t: 'wire', pts: [[645, 125], [820, 125]] },
+        { t: 'C', id: 'cout', a: [680, 125], b: [680, 170], label: '2× 22 µF' },
         { t: 'gnd', at: [680, 170] },
-        { t: 'text', at: [680, 200], text: '2× 22 µF' },
-        { t: 'dot', at: [680, 125] }, { t: 'dot', at: [740, 125] },
-        { t: 'R', id: 'r1', a: [740, 125], b: [740, 190], label: 'R1 56k' },
-        { t: 'R', id: 'r2', a: [740, 210], b: [740, 270], label: 'R2 10k' },
-        { t: 'wire', pts: [[740, 190], [740, 210]] },
-        { t: 'gnd', at: [740, 270] },
-        { t: 'dot', at: [740, 200] },
-        { t: 'wire', pts: [[740, 200], [600, 200], [600, 155], 'u1.VFB'] },
-        { t: 'text', at: [780, 108], text: '5 V' },
+        { t: 'dot', at: [680, 125] }, { t: 'dot', at: [770, 125] },
+        { t: 'R', id: 'r1', a: [770, 125], b: [770, 190], label: 'R3 56k' },
+        { t: 'R', id: 'r2', a: [770, 210], b: [770, 270], label: 'R4 10k' },
+        { t: 'wire', pts: [[770, 190], [770, 210]] },
+        { t: 'gnd', at: [770, 270] },
+        { t: 'dot', at: [770, 200] },
+        { t: 'wire', pts: [[770, 200], [600, 200], [600, 155], 'u1.VFB'] },
+        { t: 'text', at: [808, 108], text: '5 V' },
       ],
     });
   })();
@@ -789,7 +789,7 @@
    * ===================================================================== */
   (function usbFig() {
     W.schematic('#w-usb', {
-      w: 720, h: 270, title: 'USB-C sink with CC pull-downs, Schottky OR-ing and 3.3 V LDO',
+      w: 720, h: 260, title: 'USB-C sink with CC pull-downs, Schottky OR-ing and 3.3 V LDO',
       items: [
         { t: 'ic', id: 'j', at: [80, 145], name: 'USB-C', right: ['VBUS', 'CC1', 'CC2', 'GND', 'D+', 'D−'], w: 80, pitch: 30 },
         { t: 'R', id: 'rc1', a: [160, 100], b: [220, 100], label: 'R1 5.1k' },
@@ -802,7 +802,8 @@
         { t: 'wire', pts: ['j.VBUS', [230, 70]] },
         { t: 'S', id: 'd1', a: [230, 70], b: [290, 70], label: 'D1' },
         { t: 'wire', pts: [[290, 70], [395, 70], [395, 80]] },
-        { t: 'S', id: 'd2', a: [360, 25], b: [360, 70], label: 'D2 (from 5 V buck)' },
+        { t: 'S', id: 'd2', a: [360, 25], b: [360, 70], label: 'D2', side: -1 },
+        { t: 'text', at: [360, 12], text: 'from 5 V buck' },
         { t: 'dot', at: [360, 70] },
         { t: 'C', id: 'ci', a: [325, 70], b: [325, 120], label: '1 µF', side: -1 },
         { t: 'dot', at: [325, 70] },
@@ -820,7 +821,6 @@
         { t: 'ic', id: 'esp', at: [650, 215], name: 'ESP32-S3', left: ['GPIO20', 'GPIO19'], w: 90, pitch: 30 },
         { t: 'wire', pts: ['j.D+', [560, 190], [560, 200], 'esp.GPIO20'] },
         { t: 'wire', pts: ['j.D−', [570, 220], [570, 230], 'esp.GPIO19'] },
-        { t: 'text', at: [380, 182], text: 'D+  (USB data, short and paired)' },
       ],
     });
     W.schematic('#w-usb', {
@@ -843,11 +843,11 @@
         { t: 'wire', pts: ['esp.SCL', 'qw.SCL'] },
         { t: 'wire', pts: ['esp.3V3', 'qw.3V3'] },
         { t: 'wire', pts: ['esp.GND', 'qw.GND'] },
-        { t: 'R', id: 'rp1', a: [460, 110], b: [460, 60], label: '4.7k', side: -1 },
+        { t: 'R', id: 'rp1', a: [460, 110], b: [460, 60], label: 'R5 4.7k' },
         { t: 'dot', at: [460, 110] },
         { t: 'wire', pts: [[510, 150], [510, 100]] },
         { t: 'dot', at: [510, 150] },
-        { t: 'R', id: 'rp2', a: [510, 100], b: [510, 60], label: '4.7k' },
+        { t: 'R', id: 'rp2', a: [510, 100], b: [510, 60], label: 'R6 4.7k', side: -1 },
         { t: 'wire', pts: [[460, 60], [460, 45], [510, 45], [510, 60]] },
         { t: 'vcc', at: [485, 45], label: '3V3' },
       ],
@@ -869,16 +869,16 @@
         { t: 'wire', pts: ['esp.GPIO7', 'drv.BIN2'] },
         { t: 'wire', pts: ['esp.GPIO10', 'drv.nSLEEP'] },
         { t: 'wire', pts: ['esp.GPIO11', 'drv.nFAULT'] },
-        { t: 'wire', pts: ['drv.VM', [505, 75], [505, 30], [650, 30]] },
-        { t: 'C', id: 'cvcp', a: [490, 105], b: [490, 75], label: '10 nF' },
+        { t: 'wire', pts: ['drv.VM', [505, 75], [505, 30], [700, 30]] },
+        { t: 'C', id: 'cvcp', a: [490, 105], b: [490, 75], label: '10 nF', side: -1 },
         { t: 'wire', pts: ['drv.VCP', [490, 105]] },
         { t: 'dot', at: [490, 75] },
-        { t: 'C', id: 'cvm', a: [565, 30], b: [565, 70], label: '10 µF' },
-        { t: 'gnd', at: [565, 70] },
-        { t: 'C', id: 'cvm2', a: [615, 30], b: [615, 70], label: '100 nF' },
-        { t: 'gnd', at: [615, 70] },
-        { t: 'dot', at: [565, 30] }, { t: 'dot', at: [615, 30] },
-        { t: 'vcc', at: [650, 30], label: 'VBAT' },
+        { t: 'C', id: 'cvm', a: [560, 30], b: [560, 70], label: '10 µF' },
+        { t: 'gnd', at: [560, 70] },
+        { t: 'C', id: 'cvm2', a: [640, 30], b: [640, 70], label: '100 nF' },
+        { t: 'gnd', at: [640, 70] },
+        { t: 'dot', at: [560, 30] }, { t: 'dot', at: [640, 30] },
+        { t: 'vcc', at: [700, 30], label: 'VBAT' },
         { t: 'ic', id: 'jm', at: [660, 180], name: 'Motor conn.', left: ['A+', 'A−', 'B+', 'B−'], w: 80, pitch: 30 },
         { t: 'wire', pts: ['drv.AOUT1', 'jm.A+'] },
         { t: 'wire', pts: ['drv.AOUT2', 'jm.A−'] },
@@ -898,7 +898,7 @@
    * ===================================================================== */
   (function z0Fig() {
     const S = { w: 0.35, er: 4.4 };
-    const p = W.plot('#w-z0', { xmin: 0.05, xmax: 4, ymin: 20, ymax: 160, logx: true, xlabel: 'Trace width w (mm, log)', ylabel: 'Z₀ (Ω)', hover: true, height: 270, xunit: 'mm', yunit: 'Ω' });
+    const p = W.plot('#w-z0', { xmin: 0.05, xmax: 4, ymin: 20, ymax: 160, logx: true, xlabel: 'Trace width w (mm, log)', ylabel: 'Z₀ (Ω)', hover: true, height: 270, xunit: 'mm', yunit: 'Ω', xfmt: (v) => W.fix(v, 2) });
     const ctl = ctlOf('#w-z0-ctl');
     W.slider(ctl, { label: 'Width \\(w\\)', min: 0.05, max: 4, log: true, value: S.w, format: (v) => v.toFixed(2) + ' mm', onInput: (v) => { S.w = v; upd(); } });
     W.slider(ctl, { label: '\\(\\varepsilon_r\\)', min: 3.5, max: 4.8, step: 0.05, value: S.er, format: (v) => v.toFixed(2), onInput: (v) => { S.er = v; upd(); } });
