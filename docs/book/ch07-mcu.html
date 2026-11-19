@@ -125,7 +125,7 @@ bool pressed = !(PIND & (1 << PIND2));   // read pin 2 (active low with pull-up)
 <figure class="widget" id="fig-avr">
   <div id="w-avr"></div>
   <div class="w-controls" id="c-avr"></div>
-  <figcaption><b>Figure 7.3</b> A minimal ATmega328P system: the 16 MHz crystal with its load capacitors, a decoupling capacitor, a reset pull-up, the LED on PB5 and a button on PD2 (INT0) using the internal pull-up. Press the button: the INT0 interrupt fires on the falling edge and its ISR toggles the LED. The counter shows how many times the ISR ran.</figcaption>
+  <figcaption><b>Figure 7.3</b> A minimal ATmega328P system: the 16 MHz crystal with its load capacitors, a decoupling capacitor, a reset pull-up, the LED on PB5 and a button on PD2 (INT0) using the internal pull-up. Press the button: the INT0 interrupt fires on the falling edge and its ISR toggles the LED. The counter shows how many times the ISR ran. Now turn on "bouncy contacts" and press a few more times: each press now fires the ISR several times, and the LED ends up in a random state. The next pages explain the fix.</figcaption>
 </figure>
 
 <h3 id="arduino">The Arduino layer vs bare metal</h3>
@@ -784,12 +784,12 @@ void controlTask(void*) {
 
 <figure class="widget" id="fig-lab">
   <div id="w-lab"></div>
-  <figcaption><b>Figure 7.16</b> Lab wiring for the BLE RC car. The buck converter feeds 5 V to the servo and the dev board's 5 V input; the DRV8833 runs its motors straight from the battery; pull-downs keep the driver inputs low while the ESP32 boots; and a 100k/100k divider (with 100 nF) lets ADC1 on GPIO34 watch the battery.</figcaption>
+  <figcaption><b>Figure 7.16</b> Lab wiring for the BLE RC car. The buck converter feeds 5 V to the servo and the dev board's 5 V input; the DRV8833 runs its motor straight from the battery (VBAT); 10 kΩ pull-downs on AIN1/AIN2 (not drawn) keep the motor off while the ESP32 boots; and a 100k/100k divider (with 100 nF) lets ADC1 on GPIO34 watch the battery.</figcaption>
 </figure>
 
 <aside class="callout ref"><span class="ct">📚 Go deeper</span>
 <ul>
-  <li><b>Microchip (Atmel), <i>ATmega328P datasheet</i></b>: the chapters on I/O ports (13 in the 2015 edition), interrupts, the three timer/counters, and the watchdog. Read one chapter a week alongside your code.</li>
+  <li><b>Microchip (Atmel), <i>ATmega328P datasheet</i></b>: the chapters on I/O ports, interrupts, the three timer/counters, and the watchdog. Read one chapter a week alongside your code.</li>
   <li><b>Elecia White, <i>Making Embedded Systems</i></b>, 2nd ed. (O'Reilly, 2024). The chapters on interrupts, timers, "doing more with less" (power) and on design patterns for embedded software are written for exactly the reader of this book.</li>
   <li><b>Jonathan Valvano and Ramesh Yerraballi, <i>Embedded Systems – Shape the World</i></b> (UT Austin, free online, with the companion textbook <i>Embedded Systems: Introduction to ARM Cortex-M Microcontrollers</i>): bare-metal I/O, interrupts, SysTick timers and finite state machines.</li>
   <li><b>Espressif, <i>ESP-IDF Programming Guide</i></b> (docs.espressif.com): API Guides → FreeRTOS (IDF), Sleep Modes, Over The Air Updates, and the Bluetooth LE / NimBLE sections; plus the <i>ESP32 Datasheet</i> and <i>ESP32 Hardware Design Guidelines</i> (strapping pins, antenna keep-out, power).</li>
