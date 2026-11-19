@@ -82,7 +82,7 @@
         { t: 'C', id: 'c', a: [310, 100], b: [310, 160], label: 'C' },
         { t: 'wire', pts: [[310, 160], [310, 210], [50, 210], [50, 170]] },
         { t: 'dot', at: [165, 210] }, { t: 'gnd', at: [240, 210] },
-        { t: 'tag', id: 'tv', at: [385, 130], text: 'vC' },
+        { t: 'tag', id: 'tv', at: [380, 182], text: 'vC' },
       ],
     });
     const fCh = sch.flow([[50, 170], [50, 50], [310, 50], [310, 210], [50, 210], [50, 170]], {});
@@ -95,6 +95,7 @@
       marks(p);
       if (mode === 'charge' || (rec.length && rec.m === 'charge')) p.hline(V * (1 - Math.exp(-1)), { color: 'c3', width: 1 });
       if (rec.length > 1) p.line(rec.map((r) => [r[0], r[1]]), { color: 'c1', width: 2.5, label: 'vC' });
+      else p.text(p.o.xmax / 2, 2.6, 'click the charge switch to start', { color: 'muted', align: 'center' });
     });
     pi.draw((p) => {
       marks(p);
@@ -177,7 +178,7 @@
     });
     const fMain = sch.flow([[50, 170], [50, 50], [300, 50], [300, 210], [50, 210], [50, 170]], {});
     const fD = sch.flow([[300, 50], [300, 210], [390, 210], [390, 50], [300, 50]], { color: 'c3' });
-    const pI = W.plot('#f-rl', { xmin: 0, xmax: tEnd, ymin: 0, ymax: 0.14, ylabel: 'coil current (A)', hover: true, xunit: 's', yunit: 'A', height: 170 });
+    const pI = W.plot('#f-rl', { xmin: 0, xmax: tEnd, ymin: 0, ymax: 0.14, ylabel: 'coil current', hover: true, xunit: 's', yunit: 'A', height: 170, yfmt: (v) => W.si(v, 'A') });
     const pV = W.plot('#f-rl', { xmin: 0, xmax: tEnd, ymin: 0, ymax: 1400, xlabel: 'time', ylabel: 'V across switch', hover: true, xunit: 's', yunit: 'V', height: 190 });
     const upto = (f) => (t) => (t <= cur ? f(t) : NaN);
     pI.draw((p) => { p.vline(t1, { color: 'muted' }); p.text(t1, 0.13, ' switch opens', { color: 'muted', size: 11 }); p.fn(upto(iOf), { color: 'c2', samples: 2500, width: 2.5 }); });
@@ -213,8 +214,8 @@
 
   /* ---------------- Figure 3.4: debouncing ---------------- */
   (function () {
-    const VDD = 3.3, Rpu = 10000, VTp = 1.8, VTm = 1.0, Vth = 1.65, tPress = 2e-3, tEnd = 30e-3, dt = 4e-6;
-    let R = 1000, C = 100e-9, seed = 7, data = null;
+    const VDD = 3.3, Rpu = 10000, VTp = 1.8, VTm = 1.0, Vth = 1.65, tPress = 1e-3, tEnd = 12e-3, dt = 2e-6;
+    let R = 100, C = 4.7e-9, seed = 7, data = null;
     const sch = W.schematic('#f-bounce', {
       w: 480, h: 205, title: 'Button with pull-up, RC filter and Schmitt buffer',
       items: [
@@ -294,9 +295,9 @@
       simulate();
       sch.set('r', { label: 'R ' + W.si(R, 'Ω', 2) }); sch.set('c', { label: 'C ' + W.si(C, 'F', 2) });
       rt.set(fmtT(R * C));
-      rd.set(isFinite(data.delay) ? fmtT(data.delay) : 'never'); rd.setClass(data.ns === 1 && data.delay < 0.02 ? 'good' : 'bad');
+      rd.set(isFinite(data.delay) ? fmtT(data.delay) : 'never'); rd.setClass(data.ns === 1 && data.delay < 0.008 ? 'good' : 'bad');
       pa.update(); pd.update();
-      if (data.ns === 1 && data.delay < 0.02) Book.solve('bounce-task');
+      if (data.ns === 1 && data.delay < 0.008) Book.solve('bounce-task');
     }
     upd();
   })();
@@ -401,8 +402,8 @@
     const p = W.plot('#f-zf', { xmin: 10, xmax: 1e8, ymin: 0.01, ymax: 1e7, logx: true, logy: true, xlabel: 'frequency (Hz)', ylabel: '|Z| (Ω)', hover: true, xunit: 'Hz', yunit: 'Ω', height: 300 });
     p.draw((p) => {
       p.fn(() => R, { color: 'c3', label: 'R', width: 2.5 });
-      p.fn((f) => 1 / (TAU * f * C), { color: 'c1', label: '|Z_C| = 1/2πfC', width: 2.5 });
-      p.fn((f) => TAU * f * L, { color: 'c4', label: '|Z_L| = 2πfL', width: 2.5 });
+      p.fn((f) => 1 / (TAU * f * C), { color: 'c1', label: '|Zc| = 1/(2πfC)', width: 2.5 });
+      p.fn((f) => TAU * f * L, { color: 'c4', label: '|ZL| = 2πfL', width: 2.5 });
       const fRC = 1 / (TAU * R * C), fLC = 1 / (TAU * Math.sqrt(L * C));
       if (fRC > 10 && fRC < 1e8) p.point(fRC, R, { color: 'c1', label: 'RC corner ' + W.si(fRC, 'Hz') });
       if (fLC > 10 && fLC < 1e8) p.point(fLC, Math.sqrt(L / C), { color: 'c5', label: 'LC resonance ' + W.si(fLC, 'Hz'), align: 'right' });
@@ -569,8 +570,8 @@
       const px = p.pw / S.nP;
       if (px > 3) {
         const pts = []; for (let k = 0; k < S.nP; k++) { const t0 = k * S.T; pts.push([t0, 0], [t0, V], [t0 + S.tH, V], [t0 + S.tH, 0]); }
-        p.line(pts, { color: 'c4', width: 1, label: 'PWM' });
-      } else p.area(() => V, 0, S.tw, { color: 'c4', alpha: 0.08 });
+        p.line(pts, { color: 'muted', width: 1, label: 'PWM' });
+      } else p.area(() => V, 0, S.tw, { color: 'muted', alpha: 0.12 });
       p.hline(D * V, { color: 'c3', width: 1.2 });
       p.fn(S.at, { color: 'c1', width: 2.5, label: 'filter output', samples: 2500 });
     });
@@ -609,41 +610,43 @@
 
   /* ---------------- Figure 3.12: decoupling ---------------- */
   (function () {
-    const Vreg = 3.3, Rt = 0.5, Cdie = 1e-9, Cd = 100e-9, ESR = 0.02, ESL0 = 0.7e-9, dt = 0.02e-9, tEnd = 300e-9;
-    let Lt = 30e-9, dist = 2, capOn = false, A = null, B = null;
+    const Vreg = 3.3, Rt = 0.5, Cdie = 1e-9, Rd = 1, Cd = 100e-9, ESR = 0.02, ESL0 = 0.7e-9, dt = 0.02e-9, tEnd = 300e-9;
+    let Lt = 30e-9, dist = 1, capOn = false, A = null, B = null;
     const iload = (t) => {
       if (t < 20e-9) return 0;
       const s = (t - 20e-9) % 50e-9;
       return s < 5e-9 ? 0.1 * s / 5e-9 : s < 10e-9 ? 0.1 * (10e-9 - s) / 5e-9 : 0;
     };
     function sim(cap) {
-      const Lc = ESL0 + dist * 1e-9, N = Math.round(tEnd / dt), out = []; let it = 0, v = Vreg, ic = 0, vc = Vreg;
+      // states: trace current it, on-die capacitance voltage vd (with 1 Ω damping Rd), cap branch current ic, cap voltage vc
+      const Lc = ESL0 + dist * 1e-9, N = Math.round(tEnd / dt), out = []; let it = 0, vd = Vreg, v = Vreg, ic = 0, vc = Vreg;
       for (let i = 0; i <= N; i++) {
-        const t = i * dt;
+        const t = i * dt, id = it - (cap ? ic : 0) - iload(t);
+        v = vd + Rd * id;
         if (i % 10 === 0) out.push([t, v]);
         it += dt / Lt * (Vreg - Rt * it - v);
         if (cap) ic += dt / Lc * (v - vc - ESR * ic);
-        v += dt / Cdie * (it - (cap ? ic : 0) - iload(t));
+        vd += dt / Cdie * id;
         if (cap) vc += dt / Cd * ic;
       }
       return out;
     }
     const sch = W.schematic('#f-decouple', {
-      w: 470, h: 190, title: 'Regulator, inductive trace, decoupling capacitor and chip',
+      w: 470, h: 200, title: 'Regulator, inductive trace, decoupling capacitor and chip',
       items: [
         { t: 'Vdc', a: [50, 75], b: [50, 135], label: '3.3 V reg' },
         { t: 'wire', pts: [[50, 75], [50, 45], [80, 45]] },
         { t: 'R', a: [80, 45], b: [140, 45], label: '0.5 Ω' },
         { t: 'L', id: 'lt', a: [150, 45], b: [230, 45], label: 'trace L' },
         { t: 'wire', pts: [[140, 45], [150, 45]] },
-        { t: 'wire', pts: [[230, 45], [362, 45], [362, 72]] },
-        { t: 'wire', id: 'cw1', pts: [[300, 45], [300, 80]] }, { t: 'dot', id: 'cd', at: [300, 45] },
-        { t: 'C', id: 'c', a: [300, 80], b: [300, 130], label: '100 nF', side: -1 },
-        { t: 'wire', id: 'cw2', pts: [[300, 130], [300, 160]] },
-        { t: 'ic', at: [380, 105], name: 'chip', top: ['VDD'], bottom: ['GND'], w: 70, h: 30 },
-        { t: 'wire', pts: [[50, 135], [50, 160], [380, 160], [380, 138]] },
-        { t: 'gnd', at: [180, 160] },
-        { t: 'text', at: [380, 180], text: '100 mA spikes', cls: '' },
+        { t: 'wire', pts: [[230, 45], [330, 45], [330, 100], [342, 100]] },
+        { t: 'wire', id: 'cw1', pts: [[290, 45], [290, 80]] }, { t: 'dot', id: 'cd', at: [290, 45] },
+        { t: 'C', id: 'c', a: [290, 80], b: [290, 130], label: '100 nF', side: -1 },
+        { t: 'wire', id: 'cw2', pts: [[290, 130], [290, 165]] },
+        { t: 'ic', at: [400, 100], name: 'chip', left: ['VDD'], bottom: ['GND'], w: 80, h: 50 },
+        { t: 'wire', pts: [[50, 135], [50, 165], [400, 165], [400, 143]] },
+        { t: 'gnd', at: [180, 165] },
+        { t: 'text', at: [400, 185], text: '100 mA spikes' },
       ],
     });
     const pv = W.plot('#f-decouple', { xmin: 0, xmax: tEnd * 1e9, ymin: 2.6, ymax: 3.8, ylabel: 'VDD at chip (V)', hover: true, xunit: ' ns', yunit: 'V', height: 230, xfmt: (v) => v.toFixed(0) });
@@ -651,7 +654,7 @@
     pv.draw((p) => {
       if (!A) return;
       p.area(() => Vreg * 1.05, 0, tEnd * 1e9, { color: 'c3', alpha: 0.1 }, () => Vreg * 0.95);
-      const other = capOn ? B : A, cur = capOn ? A : B;
+      const cur = A, other = B;
       p.line(other.map(([t, v]) => [t * 1e9, v]), { color: 'muted', width: 1.2, label: capOn ? 'without cap' : 'with 100 nF' });
       p.line(cur.map(([t, v]) => [t * 1e9, v]), { color: capOn ? 'c1' : 'c4', width: 2.2, label: capOn ? 'with 100 nF' : 'no decoupling' });
     });
@@ -787,7 +790,7 @@
       rail: { name: '3.3 V rail from a buck converter', P: 2e-6, mean: 3.3 },
       edge: { name: 'Fast edge: 1 MHz clock, 0–3.3 V', P: 1e-6, mean: 1.65 },
     };
-    const seq = (lo, hi) => { const out = []; for (let d = lo; d <= hi * 1.001; d *= 10) for (const m of [1, 2, 5]) { const v = +(d * m).toPrecision(3); if (v >= lo * 0.999 && v <= hi * 1.001) out.push(v); } return out; };
+    const seq = (lo, hi) => { const out = []; for (let d = Math.pow(10, Math.floor(Math.log10(lo) + 1e-9)); d <= hi * 1.001; d *= 10) for (const m of [1, 2, 5]) { const v = +(d * m).toPrecision(3); if (v >= lo * 0.999 && v <= hi * 1.001) out.push(v); } return out; };
     const VD = seq(5e-3, 5), TD = seq(2e-9, 10e-3);
     let sig = 'sine', vdiv = 1, tdiv = 200e-6, pos = 0, lvl = 3, mode = 'auto', coup = 'dc', probe = 10, chan = 10, lead = 'long';
     let last = null, status = '', frame = 0, nz = rng(99);
@@ -863,8 +866,8 @@
     }
     const ctl = W.controls('#f-scope');
     W.select(ctl, { label: 'Signal', options: Object.keys(SIG).map((k) => [k, SIG[k].name]), value: sig, onChange: (x) => { sig = x; last = null; } });
-    W.select(ctl, { label: 'V/div', options: VD.map((x) => [x, W.si(x, 'V', 3)]), value: vdiv, onChange: (x) => { vdiv = +x; } });
-    W.select(ctl, { label: 'Time/div', options: TD.map((x) => [x, W.si(x, 's', 3)]), value: tdiv, onChange: (x) => { tdiv = +x; } });
+    W.select(ctl, { label: 'V/div', options: VD.map((x) => [x, W.si(x, 'V', 3)]), value: vdiv, onChange: (x) => { if (+x > 0) vdiv = +x; } });
+    W.select(ctl, { label: 'Time/div', options: TD.map((x) => [x, W.si(x, 's', 3)]), value: tdiv, onChange: (x) => { if (+x > 0) tdiv = +x; } });
     const ctl2 = W.controls('#f-scope');
     W.slider(ctl2, { label: 'position', min: -4, max: 4, step: 0.1, value: pos, format: (x) => x.toFixed(1) + ' div', onInput: (x) => { pos = x; } });
     W.slider(ctl2, { label: 'trigger level', min: -6, max: 6, step: 0.01, value: lvl, unit: 'V', format: (x) => x.toFixed(2) + ' V', onInput: (x) => { lvl = x; } });

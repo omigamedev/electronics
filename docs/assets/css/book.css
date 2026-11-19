@@ -295,3 +295,7 @@ body.kid .sort-pool li, body.kid .bin-drop li, body.kid .ord-line li, body.kid .
 .levelmap .lvl { transform: none; width: calc(100% - 100px); margin-left: calc(50px + var(--off) * 24px); }
 @media (max-width: 560px) { .levelmap .lvl { width: calc(100% - 30px); margin-left: calc(15px + var(--off) * 7px); } }
 body.kid main.cards > .card > h2, body.kid main.cards > .card > h3:first-child { padding-right: 52px; }
+.w-select select { max-width: 100%; }
+.w-select { max-width: 100%; flex-wrap: wrap; }
+.w-seg { flex-wrap: wrap; max-width: 100%; }
+main table, .katex-display, .formula { position: relative; }

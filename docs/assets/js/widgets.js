@@ -187,9 +187,10 @@
       cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
       cv.style.width = w + 'px'; cv.style.height = h + 'px';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (o.onResize) o.onResize(st);
+      if (o.onResize && st.ready) o.onResize(st);
     };
     fit();
+    if (o.onResize) queueMicrotask(() => { st.ready = true; o.onResize(st); });
     if (window.ResizeObserver) new ResizeObserver(() => { if (wrap.clientWidth && wrap.clientWidth !== st.w) fit(); }).observe(wrap);
     return st;
   };

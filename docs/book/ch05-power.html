@@ -13,6 +13,8 @@
   .w-status.bad { background: var(--bad-bg); color: var(--bad); }
   .w-status.good { background: var(--good-bg); color: var(--good); }
   figure .w-seg { flex-wrap: wrap; max-width: 100%; }
+  figure .w-select { max-width: 100%; min-width: 0; }
+  figure .w-select select { max-width: 100%; min-width: 0; text-overflow: ellipsis; }
   .budget { width: 100%; font-size: .9rem; }
   .budget td, .budget th { padding: 5px 6px; vertical-align: middle; }
   .budget input[type=number] { width: 4.2em; font: inherit; padding: 2px 4px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
@@ -44,8 +46,8 @@
 <h3>mAh is charge, Wh is energy</h3>
 <p>Battery labels quote <b>capacity</b> in milliamp-hours. One mAh is the charge carried by 1 mA flowing for an hour: \(0.001 \times 3600 = 3.6\) coulombs. A 2200 mAh pack can deliver 2.2 A for one hour, or 220 mA for ten hours (approximately; more on that shortly). But mAh alone does not tell you the energy, because it ignores voltage. Multiply by the nominal voltage to get <b>watt-hours</b>:</p>
 <div class="formula">
-$$E\,[\text{Wh}] = \text{capacity}\,[\text{Ah}] \times V_{\text{nominal}}, \qquad 1\ \text{Wh} = 3600\ \text{J}$$
-<p>A 1S 2200 mAh LiPo (3.7 V) stores 8.1 Wh. A 2S 2200 mAh pack (7.4 V) stores 16.3 Wh: same mAh, twice the energy.</p>
+$$E\,[\text{Wh}] = \text{capacity}\,[\text{Ah}] \times V_{\text{nom}}$$
+<p>One Wh is 3600 J. A 1S 2200 mAh LiPo (3.7 V) stores 8.1 Wh. A 2S 2200 mAh pack (7.4 V) stores 16.3 Wh: same mAh, twice the energy.</p>
 </div>
 
 <aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: mAh is a request count, Wh is bytes</span>
@@ -183,7 +185,8 @@ $$V_{term} = V_{OC} - I\,R_{int}, \qquad P_{heat} = I^2 R_{int}$$
 
 <p>The series transistor has to drop the difference between input and output, and it carries the whole load current. So it burns:</p>
 <div class="formula">
-$$P_{reg} = (V_{in} - V_{out})\, I_{out} + V_{in} I_q, \qquad \eta = \frac{V_{out} I_{out}}{V_{in}(I_{out} + I_q)} \approx \frac{V_{out}}{V_{in}}$$
+$$P_{reg} = (V_{in} - V_{out})\, I_{out} + V_{in} I_q$$
+$$\eta = \frac{V_{out} I_{out}}{V_{in}(I_{out} + I_q)} \approx \frac{V_{out}}{V_{in}}$$
 <p>\(I_q\): quiescent current, what the regulator itself consumes (from about 1 µA to 10 mA depending on the part).</p>
 </div>
 <p>A linear regulator cannot do better than \(V_{out}/V_{in}\). From 8.4 V to 3.3 V that is 39 %: 61 % of the energy becomes heat.</p>

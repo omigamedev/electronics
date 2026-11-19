@@ -151,8 +151,8 @@ $$\tau = \frac{L}{R}, \qquad i(t) = \frac{V}{R}\left(1 - e^{-t/\tau}\right), \qq
 </figure>
 
 <div class="ex" data-id="bounce-task" data-kind="task">
-  <div class="q">In Figure 3.4, choose \(R\) and \(C\) so that the <b>Schmitt output switches exactly once</b>, within <b>20 ms</b> of the press. Check that it still works for a few different "New press" patterns.</div>
-  <div class="explain">A time constant of roughly 1–5 ms works well here (e.g. 10 kΩ × 220 nF = 2.2 ms): long enough that the brief bounce-openings barely lift the filtered voltage, short enough to respond quickly. Notice that the plain threshold input may still chatter as the slow, slightly noisy edge drifts through its single threshold. Many MCU inputs (the AVR in the Uno, for example) include a Schmitt trigger; otherwise use a 74HC14 or 74LVC1G17.</div>
+  <div class="q">In Figure 3.4, choose \(R\) and \(C\) so that the <b>Schmitt output switches exactly once</b>, within <b>8 ms</b> of the press. Check that it still works for a few different "New press" patterns.</div>
+  <div class="explain">A time constant of roughly 0.5–3 ms works well here (e.g. 10 kΩ × 100 nF = 1 ms): long enough that the brief bounce-openings barely lift the filtered voltage, short enough to respond quickly. Notice that the plain threshold input may still chatter as the slow, slightly noisy edge drifts through its single threshold. Many MCU inputs (the AVR in the Uno, for example) include a Schmitt trigger; otherwise use a 74HC14 or 74LVC1G17.</div>
 </div>
 
 <h3>Power-on reset</h3>
