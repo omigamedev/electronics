@@ -8,6 +8,9 @@
 <link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
 <link rel="stylesheet" href="../assets/css/book.css">
 <style>
+  main p code, main li code { overflow-wrap: anywhere; }
+  .w-select select { max-width: 100%; }
+  .w-select { max-width: 100%; }
   .ch7-info { background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 10px; font-size: .92rem; min-height: 4.5em; }
   .ch7-info b { color: var(--accent); }
   .ch7-regs { display: grid; gap: 8px; font: .9rem var(--mono); }
@@ -22,6 +25,7 @@
   .ch7-hdr span { width: 30px; text-align: center; }
   .ch7-led { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface2); display: inline-block; box-sizing: border-box; }
   .ch7-led.lit { background: #ff4d4d; border-color: #ff8787; box-shadow: 0 0 12px #ff4d4d; }
+  @media (max-width: 520px) { .ch7-bit, .ch7-led { width: 24px; height: 24px; } .ch7-hdr span { width: 24px; } .ch7-row .nm, .ch7-hdr { width: auto; } .ch7-row .nm { width: 3.6em; } .ch7-hdr { margin-left: 3.6em; } .ch7-regs { font-size: .8rem; } }
   .ch7-code { font: .85rem var(--mono); background: var(--surface2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; min-height: 3.2em; color: var(--ink); }
   .ch7-tree { font-size: .92rem; line-height: 1.5; }
   .ch7-tree ul { list-style: none; margin: 0; padding-left: 18px; border-left: 1px dashed var(--line); }
@@ -92,17 +96,17 @@
   <tr><td><code>PINB</code></td><td>0x23</td><td><b>Read</b> the actual pin level. Writing a 1 toggles the corresponding PORTB bit</td></tr>
 </table>
 <p>Arduino pin 13, the one with the on-board LED, is <b>PB5</b>: bit 5 of port B. So "turn the LED on" is: set bit 5 of DDRB (make it an output), then set bit 5 of PORTB (drive it high). In C you manipulate individual bits with masks and the bitwise operators you already know:</p>
-<pre><code class="raw">DDRB  |=  (1 << DDB5);       // set bit 5: PB5 is an output
-PORTB |=  (1 << PORTB5);     // set bit 5: drive high, LED on
-PORTB &= ~(1 << PORTB5);     // clear bit 5: drive low, LED off
-PORTB ^=  (1 << PORTB5);     // flip bit 5 (read-modify-write)
-PINB   =  (1 << PINB5);      // hardware toggle: one write, no read needed
-bool pressed = !(PIND & (1 << PIND2));   // read pin 2 (active low with pull-up)</code></pre>
+<pre><code>DDRB  |=  (1 &lt;&lt; DDB5);       // set bit 5: PB5 is an output
+PORTB |=  (1 &lt;&lt; PORTB5);     // set bit 5: drive high, LED on
+PORTB &amp;= ~(1 &lt;&lt; PORTB5);     // clear bit 5: drive low, LED off
+PORTB ^=  (1 &lt;&lt; PORTB5);     // flip bit 5 (read-modify-write)
+PINB   =  (1 &lt;&lt; PINB5);      // hardware toggle: one write, no read needed
+bool pressed = !(PIND &amp; (1 &lt;&lt; PIND2));   // read pin 2 (active low with pull-up)</code></pre>
 <p>Each of those set/clear lines compiles to a single 2-cycle <code>SBI</code> or <code>CBI</code> instruction: 125 ns at 16 MHz. By comparison, Arduino's <code>digitalWrite(13, HIGH)</code> takes a few microseconds, because it looks up the pin number in tables (pin → port, pin → bit mask, pin → timer), turns off any PWM on that pin, and disables interrupts briefly around the write. It's about 30–50 times slower, which almost never matters and occasionally matters a lot (bit-banging a protocol, toggling a pin in a fast ISR).</p>
 
 <figure class="widget" id="fig-regs">
   <div id="w-regs"></div>
-  <figcaption><b>Figure 7.2</b> The ATmega328P's port B registers. Click bits to set them, or build a statement in the bottom row and press Apply. The LEDs show what each pin does: lit when it's an output driving high. The PINB row is read-only: it shows the pin's real level, including <code>?</code> for floating inputs (an input with its pull-up off). PB6 and PB7 are wired to the 16 MHz crystal on an Uno, so they're greyed out.</figcaption>
+  <figcaption><b>Figure 7.2</b> The ATmega328P's port B registers. Click bits to set them, or build a statement in the bottom row and press Apply. The LEDs show what each pin does: lit when it's an output driving high. The PINB row shows each pin's real level, including <code>?</code> for floating inputs (an input with its pull-up off). Clicking a PINB bit writes a 1 to it, which on this chip toggles the matching PORTB bit. PB6 and PB7 are wired to the 16 MHz crystal on an Uno, so they're greyed out.</figcaption>
 </figure>
 
 <div class="ex" data-id="reg-task" data-kind="task">
@@ -125,7 +129,7 @@ bool pressed = !(PIND & (1 << PIND2));   // read pin 2 (active low with pull-up)
 <figure class="widget" id="fig-avr">
   <div id="w-avr"></div>
   <div class="w-controls" id="c-avr"></div>
-  <figcaption><b>Figure 7.3</b> A minimal ATmega328P system: the 16 MHz crystal with its load capacitors, a decoupling capacitor, a reset pull-up, the LED on PB5 and a button on PD2 (INT0) using the internal pull-up. Press the button: the INT0 interrupt fires on the falling edge and its ISR toggles the LED. The counter shows how many times the ISR ran. Now turn on "bouncy contacts" and press a few more times: each press now fires the ISR several times, and the LED ends up in a random state. The next pages explain the fix.</figcaption>
+  <figcaption><b>Figure 7.3</b> A minimal ATmega328P system: the 16 MHz crystal (its two 22 pF load capacitors are omitted for clarity), a decoupling capacitor, a reset pull-up, the LED on PB5 and a button on PD2 (INT0) using the internal pull-up. Press the button: the INT0 interrupt fires on the falling edge and its ISR toggles the LED. The counter shows how many times the ISR ran. Now turn on "bouncy contacts" and press a few more times: each press now fires the ISR several times, and the LED ends up in a random state. The next pages explain the fix.</figcaption>
 </figure>
 
 <h3 id="arduino">The Arduino layer vs bare metal</h3>
@@ -151,7 +155,7 @@ bool pressed = !(PIND & (1 << PIND2));   // read pin 2 (active low with pull-up)
 </ol>
 <p>The time from event to the first line of your ISR is the <b>interrupt latency</b>: a handful of cycles in hardware plus the prologue, so roughly 1–2 µs on a 16 MHz AVR, and on the order of a couple of microseconds through ESP-IDF's interrupt dispatcher on an ESP32. Latency grows whenever interrupts are disabled (inside another ISR on the AVR, or in a critical section) because the new interrupt has to wait.</p>
 
-<pre><code class="raw">// Arduino (AVR): count button presses on pin 2 (INT0)
+<pre><code>// Arduino (AVR): count button presses on pin 2 (INT0)
 volatile uint16_t presses = 0;          // shared with the ISR: must be volatile
 
 void onPress() {                        // runs in interrupt context
@@ -216,13 +220,13 @@ void loop() {
   <figcaption><b>Figure 7.5</b> A bouncing button and an RC debouncer. The thin trace is the raw contact; the thick trace is the voltage after the RC filter; dashed lines are the Schmitt input's thresholds. The readouts count how many falling edges a plain input and a Schmitt input would see. Increase \(\tau\) until the Schmitt input sees exactly one press, then notice how much delay you've added.</figcaption>
 </figure>
 
-<pre><code class="raw">// Software debounce: accept a press only if 30 ms have passed since the last one
+<pre><code>// Software debounce: accept a press only if 30 ms have passed since the last one
 volatile uint32_t lastEdgeMs = 0;
 volatile bool pressEvent = false;
 
 void IRAM_ATTR onButton() {             // IRAM_ATTR: ESP32 ISRs must live in RAM
     uint32_t now = millis();
-    if (now - lastEdgeMs > 30) {        // unsigned subtraction handles millis() wrap-around
+    if (now - lastEdgeMs &gt; 30) {        // unsigned subtraction handles millis() wrap-around
         pressEvent = true;
     }
     lastEdgeMs = now;
@@ -255,14 +259,14 @@ $$f_{\text{interrupt}} = \frac{f_{clk}}{N\,(1 + \text{OCR})} \qquad f_{\text{tog
   <div class="explain">\(1 + \text{OCR} = 16\,000\,000/(2 \times 8 \times 8000) = 125\), so OCR = 124. The compare interrupt itself runs at 16 kHz; the pin needs two toggles per cycle.</div>
 </div>
 
-<pre><code class="raw">// AVR Timer2: 1 kHz interrupt in CTC mode
+<pre><code>// AVR Timer2: 1 kHz interrupt in CTC mode
 volatile uint32_t ticks = 0;
 void setup() {
     cli();
-    TCCR2A = (1 << WGM21);       // CTC: clear on compare match A
-    TCCR2B = (1 << CS22);        // Timer2 prescaler 64
+    TCCR2A = (1 &lt;&lt; WGM21);       // CTC: clear on compare match A
+    TCCR2B = (1 &lt;&lt; CS22);        // Timer2 prescaler 64
     OCR2A  = 249;                // 16 MHz / 64 / 250 = 1000 Hz
-    TIMSK2 = (1 << OCIE2A);      // enable the compare-match-A interrupt
+    TIMSK2 = (1 &lt;&lt; OCIE2A);      // enable the compare-match-A interrupt
     sei();
 }
 ISR(TIMER2_COMPA_vect) { ticks++; }
@@ -271,14 +275,14 @@ ISR(TIMER2_COMPA_vect) { ticks++; }
 static void control_cb(void *arg) { /* runs every 1 ms in the esp_timer task */ }
 const esp_timer_create_args_t args = { .callback = control_cb, .name = "ctl" };
 esp_timer_handle_t t;
-esp_timer_create(&args, &t);
+esp_timer_create(&amp;args, &amp;t);
 esp_timer_start_periodic(t, 1000);   // period in microseconds</code></pre>
 
 <p>PWM (Chapter 6) is the same machinery with the counter running freely from 0 to TOP and a pin that is set at 0 and cleared when the counter passes the compare value. Timers also <b>capture</b>: on an input edge they copy the counter into a register, timestamping the edge with clock-cycle precision and no software latency. That's how you measure RC receiver pulse widths or an ultrasonic sensor's echo properly.</p>
 
 <h3 id="watchdog">The watchdog</h3>
 <p>Firmware hangs. An I²C bus locks up (Chapter 6), a loop waits for a flag that never comes, a stack overflow corrupts a return address. A <b>watchdog timer</b> (WDT) is an independent countdown, clocked from its own oscillator, that resets the chip if the firmware doesn't "kick" (reset) it in time. You kick it from one place in your main loop that's only reached when everything is healthy, never from a timer ISR (which would keep running while the main loop is stuck).</p>
-<pre><code class="raw">#include <avr/wdt.h>
+<pre><code>#include &lt;avr/wdt.h&gt;
 void setup() { wdt_enable(WDTO_250MS); }   // reset if not kicked within ~250 ms
 void loop()  { readSensors(); updateMotors(); wdt_reset(); }
 
@@ -405,7 +409,7 @@ while (true) { do_work(); esp_task_wdt_reset(); vTaskDelay(pdMS_TO_TICKS(10)); }
   <figcaption><b>Figure 7.9</b> A FreeRTOS schedule on one core, 100 ms. The motor task needs 2 ms every 10 ms; the comms task 4 ms every 20 ms; a button ISR at 37 ms wakes the comms task early. Red marks are motor deadlines missed. Now misbehave: give the logger a <b>higher priority</b>, then make it <b>busy-wait</b> instead of blocking, and see who starves.</figcaption>
 </figure>
 
-<pre><code class="raw">// ESP-IDF: an ISR feeds a queue; a task does the work
+<pre><code>// ESP-IDF: an ISR feeds a queue; a task does the work
 static QueueHandle_t cmd_q;
 
 typedef struct { int16_t throttle, steering; } cmd_t;
@@ -415,9 +419,9 @@ static void motor_task(void *arg) {
     TickType_t last = xTaskGetTickCount();
     for (;;) {
         cmd_t c;
-        while (xQueueReceive(cmd_q, &c, 0) == pdTRUE) cmd = c;   // drain: keep the newest
+        while (xQueueReceive(cmd_q, &amp;c, 0) == pdTRUE) cmd = c;   // drain: keep the newest
         apply_motors(cmd.throttle, cmd.steering);
-        vTaskDelayUntil(&last, pdMS_TO_TICKS(10));              // exact 100 Hz, no drift
+        vTaskDelayUntil(&amp;last, pdMS_TO_TICKS(10));              // exact 100 Hz, no drift
     }
 }
 
@@ -427,7 +431,7 @@ void app_main(void) {
     xTaskCreatePinnedToCore(motor_task, "motor", 4096, NULL, 10, NULL, 1);
 }
 
-// Elsewhere (a BLE callback, a UART task...):  xQueueSend(cmd_q, &c, 0);</code></pre>
+// Elsewhere (a BLE callback, a UART task...):  xQueueSend(cmd_q, &amp;c, 0);</code></pre>
 
 <aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: tasks are threads, queues are channels</span>
 <p>A FreeRTOS task is a thread with a fixed-size stack you choose up front (too small and it overflows silently, unless you enable stack checking). A queue is a bounded, thread-safe channel that copies items by value, just like a Go channel or a <code>BlockingQueue</code>. Semaphores, mutexes (with priority inheritance) and event groups are what you'd expect. Two differences from desktop threads: priorities are strict (there's no fairness; a ready high-priority task always wins), and there's no virtual memory, so every stack is real RAM you pay for. <code>uxTaskGetStackHighWaterMark()</code> tells you how close each task came to overflowing.</p>
@@ -473,7 +477,7 @@ $$\bar I = \frac{I_a t_a + I_s (T - t_a)}{T} \qquad \text{life} \approx \frac{\t
   <div class="explain">\(\bar I = (160 + 5.98)/600 = 0.2766\) mA, so life \(= 1000/0.2766 \approx 3614\) h ≈ 150 days. With a realistic 25% derating, plan on about 110 days.</div>
 </div>
 
-<pre><code class="raw">// ESP-IDF deep sleep: wake every 10 minutes; RTC memory survives
+<pre><code>// ESP-IDF deep sleep: wake every 10 minutes; RTC memory survives
 RTC_DATA_ATTR static uint32_t boot_count;     // kept in RTC slow memory
 
 void app_main(void) {
@@ -486,10 +490,10 @@ void app_main(void) {
 
 <h3 id="ota">Over-the-air updates</h3>
 <p>Once the robot is assembled, the USB port is buried. <b>OTA</b> (over-the-air) updates let the firmware download and install a new version of itself. The ESP32's partition table reserves two application slots, <code>ota_0</code> and <code>ota_1</code>, plus a small <code>otadata</code> partition recording which one to boot. The running firmware writes the new image into the <em>other</em> slot, verifies it, flips <code>otadata</code> and reboots. With <b>rollback</b> enabled, the new image must call <code>esp_ota_mark_app_valid_cancel_rollback()</code> after it has proved itself (connected to Wi-Fi, passed a self-test); if it crashes before that, the bootloader reverts to the old slot. It's the same blue/green deployment pattern you'd use for a web service.</p>
-<pre><code class="raw">// ESP-IDF: download and install firmware over HTTPS
+<pre><code>// ESP-IDF: download and install firmware over HTTPS
 esp_http_client_config_t http = { .url = "https://example.com/rc-car.bin", .cert_pem = server_cert };
-esp_https_ota_config_t ota = { .http_config = &http };
-if (esp_https_ota(&ota) == ESP_OK) esp_restart();
+esp_https_ota_config_t ota = { .http_config = &amp;http };
+if (esp_https_ota(&amp;ota) == ESP_OK) esp_restart();
 
 // Arduino-ESP32: OTA from the Arduino IDE / PlatformIO over the local network
 ArduinoOTA.setPassword("change-me");
@@ -514,7 +518,7 @@ ArduinoOTA.handle();         // call regularly in loop()</code></pre>
 <figure class="widget wide" id="fig-adv">
   <div id="w-adv"></div>
   <div class="w-controls" id="c-adv"></div>
-  <figcaption><b>Figure 7.11</b> Advertising and scanning, slowed down. Each advertising event (orange ticks) sends one packet on channels 37, 38 and 39; the shaded bars are the scanner's listening windows, which rotate through the three channels. A packet that lands inside a window is heard (green flash). Shorten the advertising interval or widen the scan window and watch discovery speed up, then look at what each costs.</figcaption>
+  <figcaption><b>Figure 7.11</b> Advertising and scanning, slowed down. Each advertising event (orange ticks) sends one packet on channels 37, 38 and 39; the shaded bars are the scanner's listening windows (scan interval 100 ms; the duty slider sets the window), which rotate through the three channels. A packet that lands inside a window is heard (green flash). Shorten the advertising interval or widen the scan window and watch discovery speed up, then look at what each costs. (*Currents are rough figures for an nRF52-class chip at 0 dBm.)</figcaption>
 </figure>
 
 <h3 id="gap">GAP: who does what</h3>
@@ -587,7 +591,7 @@ $$t_{\text{supervision}} \gt 2\,(1 + \text{latency}) \times t_{\text{interval}}$
 
 <h3 id="nimble">An RC control service with NimBLE</h3>
 <p>On the ESP32 you have two BLE host stacks: Bluedroid (the default in older Arduino-ESP32 versions, large) and <b>NimBLE</b> (from Apache Mynewt; much smaller in flash and RAM). The <b>NimBLE-Arduino</b> library wraps NimBLE in a friendly C++ API. Here is the core of an RC car's GATT server: a write-without-response characteristic for drive commands, a notify characteristic for telemetry, and callbacks that stop the motors on disconnect. The code targets NimBLE-Arduino 2.x; version 1.x has slightly different callback signatures.</p>
-<pre><code class="raw">#include <NimBLEDevice.h>
+<pre><code>#include &lt;NimBLEDevice.h&gt;
 
 static const char* SVC_UUID   = "c0de0001-7a1e-4d1b-9b6b-5c0ffee00001";
 static const char* DRIVE_UUID = "c0de0002-7a1e-4d1b-9b6b-5c0ffee00001";
@@ -600,10 +604,10 @@ volatile DriveCmd cmd = {0, 0};
 NimBLECharacteristic* telem;
 
 class DriveCallbacks : public NimBLECharacteristicCallbacks {
-    void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& info) override {
-        NimBLEAttValue v = c->getValue();
+    void onWrite(NimBLECharacteristic* c, NimBLEConnInfo&amp; info) override {
+        NimBLEAttValue v = c-&gt;getValue();
         if (v.size() != sizeof(DriveCmd)) return;          // validate everything from the air
-        DriveCmd d; memcpy(&d, v.data(), sizeof d);
+        DriveCmd d; memcpy(&amp;d, v.data(), sizeof d);
         cmd.throttle = constrain(d.throttle, -1000, 1000);
         cmd.steering = constrain(d.steering, -1000, 1000);
         lastCmdMs = millis();
@@ -611,12 +615,12 @@ class DriveCallbacks : public NimBLECharacteristicCallbacks {
 };
 
 class ServerCallbacks : public NimBLEServerCallbacks {
-    void onConnect(NimBLEServer* s, NimBLEConnInfo& info) override {
+    void onConnect(NimBLEServer* s, NimBLEConnInfo&amp; info) override {
         // ask for 15 ms interval, no latency, 250 ms supervision timeout
         // (units: 1.25 ms, 1.25 ms, events, 10 ms)
-        s->updateConnParams(info.getConnHandle(), 12, 12, 0, 25);
+        s-&gt;updateConnParams(info.getConnHandle(), 12, 12, 0, 25);
     }
-    void onDisconnect(NimBLEServer* s, NimBLEConnInfo& info, int reason) override {
+    void onDisconnect(NimBLEServer* s, NimBLEConnInfo&amp; info, int reason) override {
         cmd.throttle = 0; cmd.steering = 0;                 // failsafe on link loss
         NimBLEDevice::startAdvertising();                   // let the phone reconnect
     }
@@ -625,16 +629,16 @@ class ServerCallbacks : public NimBLEServerCallbacks {
 void setup() {
     NimBLEDevice::init("RC-Car");
     NimBLEServer* server = NimBLEDevice::createServer();
-    server->setCallbacks(new ServerCallbacks());
-    NimBLEService* svc = server->createService(SVC_UUID);
-    svc->createCharacteristic(DRIVE_UUID, NIMBLE_PROPERTY::WRITE_NR)
-       ->setCallbacks(new DriveCallbacks());
-    telem = svc->createCharacteristic(TELEM_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-    svc->start();
+    server-&gt;setCallbacks(new ServerCallbacks());
+    NimBLEService* svc = server-&gt;createService(SVC_UUID);
+    svc-&gt;createCharacteristic(DRIVE_UUID, NIMBLE_PROPERTY::WRITE_NR)
+       -&gt;setCallbacks(new DriveCallbacks());
+    telem = svc-&gt;createCharacteristic(TELEM_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+    svc-&gt;start();
     NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
-    adv->addServiceUUID(SVC_UUID);
-    adv->setName("RC-Car");
-    adv->start();
+    adv-&gt;addServiceUUID(SVC_UUID);
+    adv-&gt;setName("RC-Car");
+    adv-&gt;start();
 }</code></pre>
 <p>Write-without-response is the right property for control: a lost command is better replaced by the next one 20 ms later than retried, and unacknowledged writes can be sent several per connection event. Telemetry uses notify for the same reason.</p>
 
@@ -736,7 +740,7 @@ $$P_{rx} = P_{tx} + G_{tx} + G_{rx} - \underbrace{\left(PL_0 + 10\,n\log_{10}\fr
   <div class="explain">At 20% loss and 50 packets per second, you need about nine consecutive losses before a false trip is rare enough: \(180\,000 \times 0.8 \times 0.2^9 \approx 0.07\) per hour at 180 ms. The 0.5 m limit at 2 m/s caps the timeout at 250 ms. Anything from 180 to 250 ms works. If you can't find a window (say at 40% loss), the right fix is the link, not the timeout: send commands more often, move the antenna, or change radio.</div>
 </div>
 
-<pre><code class="raw">// Control task: 100 Hz, independent of the radio
+<pre><code>// Control task: 100 Hz, independent of the radio
 const uint32_t FAILSAFE_MS = 200;
 
 void controlTask(void*) {
@@ -744,11 +748,11 @@ void controlTask(void*) {
     for (;;) {
         uint32_t age = millis() - lastCmdMs;         // lastCmdMs written by the BLE callback
         int16_t thr = cmd.throttle, steer = cmd.steering;
-        if (age > FAILSAFE_MS) { thr = 0; steer = 0; }   // safe state
+        if (age &gt; FAILSAFE_MS) { thr = 0; steer = 0; }   // safe state
         setMotor(rampLimit(thr));                     // limit acceleration even when healthy
         setServo(1500 + steer / 2);                   // µs: 1000..2000
         esp_task_wdt_reset();                         // only reached if this loop is alive
-        vTaskDelayUntil(&last, pdMS_TO_TICKS(10));
+        vTaskDelayUntil(&amp;last, pdMS_TO_TICKS(10));
     }
 }</code></pre>
 

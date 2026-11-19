@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>9 · Designing Your Own PCB — Sparks & Circuits</title>
+<meta name="description" content="From breadboard to printed circuit board: board anatomy, the KiCad workflow, packages and parts, return currents and ground planes, decoupling, trace widths, layout, DFM, bring-up, and a complete ESP32-S3 robot controller.">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+  .chapter .w-seg { flex-wrap: wrap; max-width: 100%; }
+  .w-grid2 > * { min-width: 0; }
+  .ch9-info { font-size: .92rem; background: var(--surface2); border-radius: 10px; padding: 10px 14px; margin-top: 10px; min-height: 3.2em; }
+  .ch9-info b { color: var(--ink); }
+  .ch9-rules { list-style: none; padding: 0; margin: 10px 0 0; font-size: .92rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 4px 16px; }
+  .ch9-rules li { padding-left: 1.6em; text-indent: -1.6em; max-width: none; }
+  .ch9-rules li.ok { color: var(--good); }
+  .ch9-rules li.no { color: var(--bad); }
+  .ch9-check { list-style: none; padding-left: 0; }
+  .ch9-check li::before { content: "☐ "; color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body data-book="adult" data-chapter="ch09-pcb">
+<main class="chapter">
+
+<header class="chapter-head">
+  <p class="kicker">Chapter 9</p>
+  <h1>Designing Your Own PCB</h1>
+  <p class="lede">A printed circuit board is where everything in this book becomes physical: fields, return currents, inductance and heat stop being abstractions and become copper you draw. This chapter takes you from breadboard to a board you order, assemble and bring up, and finishes with a complete ESP32-S3 robot controller.</p>
+</header>
+
+<section>
+<h2 id="anatomy">From breadboard to PCB: anatomy of a board</h2>
+
+<p>A breadboard is wonderful for learning and terrible for robots. Its spring contacts loosen and add tens of milliohms of resistance that drifts when the robot vibrates. Each row of contacts has a few picofarads of capacitance to its neighbours. The jumper wires form big loops (inductors and antennas) and every wire is a potential intermittent fault. A circuit that works on the bench and resets the ESP32 when the motors start is very often a breadboard problem rather than a circuit problem.</p>
+
+<p>A <b>printed circuit board</b> fixes all of that. Conductors are etched copper bonded to a rigid insulator, so the geometry is fixed, reproducible and, most importantly, <em>designed</em>. You choose how wide a trace is (its resistance and current capacity), how far it is from its return path (its inductance and how much it radiates), and what it runs next to (crosstalk). On a breadboard these things are accidents; on a PCB they're decisions.</p>
+
+<div class="ex" data-id="bb-why" data-kind="mc">
+  <div class="q">Your breadboarded robot works on the bench but the ESP32 occasionally resets when the drive motors start. Which breadboard property is the most likely culprit?</div>
+  <ol class="opts">
+    <li>The breadboard's plastic is slightly conductive</li>
+    <li data-correct>Long jumper wires and spring contacts add resistance and inductance to the shared power and ground paths, so the motor's current surge drops the MCU's supply</li>
+    <li>Breadboards can't carry signals above 1 kHz</li>
+    <li>The contacts generate thermoelectric voltages</li>
+  </ol>
+  <div class="explain">Motor start-up current (stall current, <a href="ch08-robotics.html">Chapter 8</a>) flowing through a few hundred milliohms and a few hundred nanohenries of shared wiring easily makes a few hundred millivolts of drop and spikes, enough to trip the brown-out detector. A PCB with a solid ground plane and separate high-current paths fixes it.</div>
+</div>
+
+<h3>The layer stack</h3>
+<p>A standard two-layer board is a sandwich, from top to bottom:</p>
+<ul>
+  <li><b>Silkscreen</b>: white (usually) ink with reference designators (R1, U3), polarity marks, pin-1 dots and logos. Cosmetic and informational, but you'll be glad of it during assembly and debugging.</li>
+  <li><b>Soldermask</b>: the green (or black, blue, red…) lacquer, roughly 10–30 µm thick, covering all copper except where you want solder: the pads. It stops solder bridging between pads and protects traces from oxidation and scratches.</li>
+  <li><b>Top copper</b>: traces, pads and copper pours, etched from a copper foil. Thickness is specified as <b>weight</b>: 1 oz/ft² ≈ 35 µm is standard; 2 oz (70 µm) is common for power boards.</li>
+  <li><b>Core</b>: the insulating substrate, almost always <b>FR-4</b>: woven fibreglass cloth in flame-retardant epoxy. Standard total thickness is 1.6 mm. FR-4 has a relative permittivity \(\varepsilon_r \approx 4.2\)–\(4.7\), which sets how fast signals travel and the capacitance between layers, and a glass-transition temperature (Tg) of around 130–140 °C for standard grades.</li>
+  <li><b>Bottom copper</b>, <b>soldermask</b> and <b>silkscreen</b>, mirrored.</li>
+</ul>
+<p>Holes join layers. A <b>plated through-hole</b> (PTH) is drilled and then copper-plated inside the barrel, so it's both a mechanical hole for a component lead and an electrical connection between layers. A <b>via</b> is the same thing, but small and used only to change layers. A typical budget-fab via is a 0.3 mm drill with a 0.6 mm pad. Multilayer boards can also have <b>blind</b> vias (outer layer to an inner layer), <b>buried</b> vias (between inner layers only) and laser-drilled <b>microvias</b>, at extra cost. Exposed copper gets a <b>surface finish</b> so it stays solderable: HASL (hot-air solder levelling; cheap, slightly bumpy) or ENIG (electroless nickel, immersion gold; flat, better for fine-pitch parts and QFNs).</p>
+
+<figure class="widget wide" id="fig-stack">
+  <div id="w-stack"></div>
+  <div id="w-stack-ctl"></div>
+  <div class="ch9-info" id="w-stack-info"></div>
+  <figcaption><b>Figure 9.1</b> The layer stack of a PCB, exploded. Drag the slider to pull the layers apart; click a layer (or pick it from the menu) to read what it is. The vertical cylinder is a plated via connecting all copper layers. Try switching to <b>4 layers</b>: two inner copper planes appear, separated from the outer layers by thin <em>prepreg</em> (pre-impregnated glass-epoxy that bonds the stack together).</figcaption>
+</figure>
+
+<h3>Copper resistance: the number you'll use most</h3>
+<p>A trace is a resistor. With resistivity \(\rho_{\text{Cu}} = 1.72\times10^{-8}\,\Omega\,\mathrm{m}\) at 20 °C (it rises about 0.39% per °C), a trace of length \(\ell\), width \(w\) and thickness \(t\) has</p>
+<div class="formula">
+$$R = \frac{\rho\,\ell}{w\,t} \qquad\Longrightarrow\qquad R_\square = \frac{\rho}{t} \approx 0.5\ \text{m}\Omega \text{ per square (1 oz copper)}$$
+<p>"Ohms per square": a trace \(n\) times longer than it is wide has resistance \(n\,R_\square\), whatever its absolute size.</p>
+</div>
+<p>The "per square" idea is a handy mental shortcut. A 0.25 mm wide, 25 mm long trace is 100 squares, so about 50 mΩ. That's nothing for a 10 mA signal, but at 3 A of motor current it drops 150 mV and dissipates 0.45 W.</p>
+
+<div class="ex" data-id="trace-r" data-kind="num" data-answer="0.0197" data-tol="3%" data-unit="Ω">
+  <div class="q">What is the resistance of a 10 mm long, 0.25 mm wide trace in 1 oz (35 µm) copper at 20 °C? (\(\rho = 1.72\times10^{-8}\,\Omega\,\mathrm{m}\))</div>
+  <div class="hint">\(R = \rho\ell/(wt)\) with everything in metres. Or count squares: 10/0.25 = 40 squares × ~0.49 mΩ.</div>
+  <div class="explain">\(R = 1.72\times10^{-8} \times 0.010 / (0.25\times10^{-3} \times 35\times10^{-6}) = 0.0197\,\Omega\), about 20 mΩ. Equivalently, 40 squares × 0.49 mΩ/□.</div>
+</div>
+
+<div class="ex" data-id="stack-sort" data-kind="sort">
+  <div class="q">Sort these board features by what they mainly do.</div>
+  <div class="bins">
+    <div data-bin="cond">Conducts current</div>
+    <div data-bin="ins">Insulates / structure</div>
+    <div data-bin="prot">Protects or marks</div>
+  </div>
+  <ul class="items">
+    <li data-bin="cond">1 oz copper pour</li>
+    <li data-bin="ins">FR-4 core</li>
+    <li data-bin="prot">Soldermask</li>
+    <li data-bin="cond">Plated via barrel</li>
+    <li data-bin="ins">Prepreg</li>
+    <li data-bin="prot">Silkscreen</li>
+  </ul>
+  <div class="explain">Copper (pours, traces, plated barrels) carries current. FR-4 core and prepreg are the glass-epoxy insulators that also set the layer spacing. Soldermask protects copper and prevents bridges; silkscreen marks the board.</div>
+</div>
+</section>
+
+<section>
+<h2 id="kicad">The KiCad workflow</h2>
+
+<p><b>KiCad</b> is free, open-source, cross-platform and fully professional: CERN uses it, and so do plenty of companies shipping real products. The workflow is the same in every EDA tool, and it maps neatly onto software development.</p>
+
+<ol>
+  <li><b>Schematic capture.</b> In the Schematic Editor you place <b>symbols</b> (the logical view of a part: pins with names and electrical types) and connect them with wires and net labels. The schematic is your source code: the single source of truth for what connects to what.</li>
+  <li><b>Assign footprints.</b> Each symbol gets a <b>footprint</b>: the physical copper pads, holes, courtyard and silkscreen for a specific package (an 0603 resistor, a SOT-23-5 regulator). The same symbol (a 10 kΩ resistor) can map to different footprints. KiCad's libraries cover most standard packages; for unusual parts you draw the footprint from the datasheet's "recommended land pattern" drawing, or download one from the manufacturer or a library service.</li>
+  <li><b>Electrical Rules Check (ERC).</b> A static analyser for the schematic: unconnected pins, two outputs driving one net, power inputs with no source ("power pin not driven" usually means a missing <code>PWR_FLAG</code>), and so on.</li>
+  <li><b>Update the PCB from the schematic</b> (F8). The netlist, a compiled list of parts and the nets between their pins, is pushed into the PCB editor. Footprints appear in a heap, connected by thin "ratsnest" lines showing what must eventually be wired.</li>
+  <li><b>Layout.</b> Set the board outline and design rules, place the parts (placement is 70% of the work, and it's where the physics in this chapter is decided), pour planes, route traces.</li>
+  <li><b>Design Rules Check (DRC).</b> A linter for geometry: clearance violations, unrouted nets, traces too thin for the fab, silkscreen on pads, courtyards overlapping. Zero DRC errors before ordering is non-negotiable.</li>
+  <li><b>Fabrication outputs.</b> <b>Gerber</b> files (one per layer: copper, mask, silk, paste, outline), <b>Excellon</b> drill files, and for assembly a <b>BOM</b> (bill of materials) and a <b>CPL</b> (component placement list, a.k.a. pick-and-place or position file: each part's X, Y, rotation and side).</li>
+</ol>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: hardware has a build pipeline too</span>
+<p>Schematic = source code. Netlist = intermediate representation. ERC = type checker. Layout = the hand-optimised assembly the compiler can't do for you. DRC = linter plus unit tests against the fab's constraints. Gerbers = the release binary, and the fab is the deployment target. KiCad's files are plain text (S-expressions), so <b>put the project in git</b>, commit before every big change, and tag the exact revision you send to the fab:</p>
+<pre><code># .gitignore for a KiCad project
+*-backups/
+*.kicad_prl          # per-user UI state
+fp-info-cache
+~*.lck
+production/          # regenerate Gerbers from the tagged commit instead
+
+git tag -a v1.0-fab -m "Ordered from JLCPCB 2026-11-19"</code></pre>
+<p>Where the analogy breaks: there's no hot reload. A bug costs a week and a new order, so review like it's a production deploy. Print the schematic, check every net against the datasheets, and ask someone else to look.</p>
+</aside>
+
+<div class="ex" data-id="kicad-order" data-kind="order">
+  <div class="q">Put the KiCad design flow in order.</div>
+  <ol class="items">
+    <li>Draw the schematic with symbols</li>
+    <li>Assign footprints to symbols</li>
+    <li>Run ERC and fix the errors</li>
+    <li>Update the PCB from the schematic</li>
+    <li>Place parts and route the board</li>
+    <li>Run DRC and fix the violations</li>
+    <li>Export Gerbers, drill files, BOM and CPL</li>
+  </ol>
+  <div class="explain">In practice you'll loop: layout often reveals a pin swap or a missing part, which you fix in the schematic and push forward again. The schematic always stays the source of truth: never "fix" connectivity only in the PCB.</div>
+</div>
+</section>
+
+<section>
+<h2 id="parts">Packages and choosing parts</h2>
+
+<p>Every component comes in one or more <b>packages</b>. Through-hole (THT) parts have leads that go through plated holes: robust, easy to hand-solder, and good for connectors that take mechanical stress. Surface-mount (SMD) parts sit on pads on the surface. They're smaller, cheaper, better electrically (shorter leads, less inductance), and the only option for most modern ICs.</p>
+
+<table>
+  <tr><th>Package</th><th>Size</th><th>Notes</th></tr>
+  <tr><td>Chip resistor/capacitor 1206 / 0805 / 0603 / 0402</td><td>3.2×1.6 / 2.0×1.25 / 1.6×0.8 / 1.0×0.5 mm</td><td>The four-digit code is length × width in hundredths of an <em>inch</em> (0805 = 0.08″ × 0.05″). <b>0805 or 0603</b> is the sweet spot for hand soldering; 0402 needs good tweezers and magnification.</td></tr>
+  <tr><td>SOT-23 (-3, -5, -6)</td><td>2.9×1.3 mm body</td><td>Small transistors, MOSFETs, LDOs, small regulators. 0.95 mm pitch: easy.</td></tr>
+  <tr><td>SOIC-8 / -16</td><td>4.9×3.9 mm body (8 pins)</td><td>1.27 mm pitch gull-wing leads. Beginner-friendly ICs.</td></tr>
+  <tr><td>TSSOP / MSOP</td><td>0.65 / 0.5 mm pitch</td><td>Fine pitch but visible leads: drag-solderable with flux.</td></tr>
+  <tr><td>QFN / DFN</td><td>e.g. 5×5 mm, 0.5 mm pitch</td><td>No leads, just pads underneath plus a large thermal/ground pad. Excellent electrically and thermally; needs paste and hot air or reflow.</td></tr>
+  <tr><td>BGA</td><td>ball grid</td><td>Balls under the package. Reflow only; usually needs a 4+ layer board to escape the signals.</td></tr>
+</table>
+
+<figure class="widget wide" id="fig-pkg">
+  <div id="w-pkg"></div>
+  <div id="w-pkg-ctl"></div>
+  <figcaption><b>Figure 9.2</b> Common packages at true relative scale, with their copper land patterns (orange) and bodies (grey) on a 1 mm grid. Zoom in and out. Try: compare an 0402 with the 1.6 mm chisel tip of a typical soldering iron, then look at how much board area the ESP32-S3 module takes compared with everything else.</figcaption>
+</figure>
+
+<h3>Choosing parts you can actually buy and assemble</h3>
+<p>If you'll have the board assembled by a budget fab such as <b>JLCPCB</b>, choose parts from its in-house catalogue, which is stocked by its sister distributor <b>LCSC</b>. Each part has an LCSC number (C plus digits) that goes in a column of your BOM. JLC divides the catalogue into <b>Basic</b> parts (common resistors, capacitors, diodes and some ICs permanently loaded on the pick-and-place machines, with no setup fee) and <b>Extended</b> parts (loaded on demand, historically for a few dollars' setup fee per unique part). Designing with Basic parts for all the passives keeps a small run cheap. Prices and rules change, so check the current parts library when you design.</p>
+<p>More general part-selection habits:</p>
+<ul>
+  <li><b>Check stock and lifecycle</b> before you design a part in: "Active", several distributors, thousands in stock. A part that's "NRND" (not recommended for new designs) will bite you on the next revision.</li>
+  <li><b>Standardise values.</b> Use 10 kΩ, 4.7 kΩ, 100 nF and 10 µF wherever they'll do. Fewer unique parts mean cheaper assembly and fewer chances of a swap.</li>
+  <li><b>Read the capacitor derating.</b> A 10 µF 6.3 V X5R ceramic in 0603 might give only 3–4 µF at 5 V because of DC-bias effects. Pick a higher voltage rating or a larger package for bulk capacitance.</li>
+  <li><b>Match footprints carefully.</b> The same chip often comes in several packages with different pinouts (SOT-23-5 vs SC-70-5, SOIC vs TSSOP). Always confirm the exact orderable part number against the footprint.</li>
+</ul>
+
+<div class="ex" data-id="pkg-mc" data-kind="mc">
+  <div class="q">You're hand-soldering your first SMD board with a regular chisel-tip iron and no microscope. Which passive size should you choose?</div>
+  <ol class="opts grid2">
+    <li>0201</li>
+    <li>0402</li>
+    <li data-correct>0805</li>
+    <li>Only through-hole is possible by hand</li>
+  </ol>
+  <div class="explain">0805 (2.0 × 1.25 mm) is comfortable with tweezers and a 1–2 mm tip; 0603 is fine with a bit of practice. 0402 is doable but fiddly, and 0201 is really for machines.</div>
+</div>
+
+<div class="ex" data-id="jlc-multi" data-kind="multi">
+  <div class="q">You want a cheap, low-risk assembled prototype run from a budget fab. Which choices help? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>Use the fab's "basic" catalogue parts for resistors and capacitors</li>
+    <li data-correct>Reuse the same values (e.g. 10 kΩ, 100 nF) wherever possible</li>
+    <li>Pick the cheapest regulator you can find without checking its package variant</li>
+    <li data-correct>Check that every part is in stock and active before finalising the layout</li>
+    <li>Use 0201 passives to save board space on a 50 × 50 mm board</li>
+  </ol>
+  <div class="explain">Basic parts and fewer unique values cut setup fees and mistakes; checking stock avoids redesigns. The same regulator part number with a different suffix can be a different package or pinout. 0201 adds yield risk and gains nothing on a roomy board.</div>
+</div>
+</section>
+
+<section>
+<h2 id="return">Return currents, revisited</h2>
+
+<p>In <a href="ch01-physics.html">Chapter 1</a> you met the rule that current always flows in a closed loop and always returns to its source. On a PCB the return path is rarely drawn: it's "ground", a plane that the schematic treats as one ideal node. But physics doesn't care about your schematic. The return current takes a <em>specific</em> path through that plane, and which path depends on frequency.</p>
+
+<ul>
+  <li><b>At DC and low frequency</b>, current takes the path of <b>least resistance</b>. In a ground plane it spreads out widely and flows more or less in a straight line from the load back to the source, wherever the signal trace went.</li>
+  <li><b>At high frequency</b> (above roughly 10–100 kHz on a typical board), current takes the path of <b>least impedance</b>, which means least <em>inductance</em>. Inductance is proportional to the area enclosed by the current loop (<a href="ch03-ac.html">Chapter 3</a>), so the return current flows in the plane <b>directly underneath the signal trace</b>, mirroring its route. The current density under the trace falls off roughly as \(1/(1+(d/h)^2)\), where \(d\) is the sideways distance and \(h\) the height of the trace above the plane.</li>
+</ul>
+
+<aside class="callout physics"><span class="ct">⚛️ Why "least inductance" means "right underneath"</span>
+<p>The signal current and its return create magnetic fields. When the return flows directly beneath the trace, the two opposite currents are close together and their fields largely cancel outside the narrow gap between them. Less field means less stored magnetic energy, \(\tfrac12 LI^2\), which by definition means lower inductance. Nature picks the distribution that minimises the total impedance, and at high frequency the \(j\omega L\) term dominates the \(R\) term, so it minimises the loop area. The fields live in the dielectric between trace and plane; that's where the signal's energy actually travels.</p>
+</aside>
+
+<figure class="widget wide" id="fig-ret">
+  <div id="w-ret"></div>
+  <div id="w-ret-ctl"></div>
+  <figcaption><b>Figure 9.3</b> A 64 × 36 mm board seen from above. The orange trace on the top layer runs from a driver (left via) to a load (right via) on a detour. The colour map is the return current density in the solid ground plane beneath, solved live on a resistor grid; the dashed line is the return current's average path, and the readout estimates the loop area between signal and return. Try: (1) slide the frequency from 100 Hz to 10 MHz and watch the return move from a straight line to directly under the trace; (2) cut a <b>slot</b> in the plane and watch the high-frequency return detour around it; (3) move the trace so it no longer crosses the slot.</figcaption>
+</figure>
+
+<p>This is the single most important idea in PCB layout. Since the high-frequency return follows the trace, the loop area is set by the <b>distance between the trace and its reference plane</b>, as long as the plane is unbroken under the trace. Break the plane (a slot, a split, a row of vias whose clearances merge into a slot, a gap between two pours) and the return current has to go around the break. The loop area, and with it the inductance, the radiated emissions and the susceptibility to interference, can grow by an order of magnitude.</p>
+
+<div class="ex" data-id="ret-mc" data-kind="mc">
+  <div class="q">A 20 MHz SPI clock runs on the top layer over a solid ground plane. Where does most of its return current flow?</div>
+  <ol class="opts">
+    <li>Spread evenly over the whole ground plane</li>
+    <li>Along the straightest line between the two chips' ground pins</li>
+    <li data-correct>In the plane directly underneath the clock trace, following its route</li>
+    <li>Back through the power plane</li>
+  </ol>
+  <div class="explain">At 20 MHz inductance dominates, so the return hugs the trace to minimise loop area. That's why you never route a fast signal over a gap in its reference plane.</div>
+</div>
+
+<div class="ex" data-id="ret-task" data-kind="task">
+  <div class="q">In Figure 9.3, turn the <b>slot on</b>, set the frequency to <b>1 MHz or higher</b>, and reroute the trace so the estimated loop area drops <b>below 40 mm²</b>.</div>
+  <div class="explain">Run the trace below the end of the slot, so it never crosses the break and its return can stay underneath it. On a real board the better fix is not to make the slot at all, or, if you must cross a split between two reference planes, to put a stitching capacitor or via right next to the crossing.</div>
+</div>
+</section>
+
+<section>
+<h2 id="grounding">Ground planes, splits and star grounds</h2>
+
+<p>The practical conclusion of the last section is the most common advice in PCB design: <b>give every signal an unbroken reference plane</b>. On a two-layer board, make the bottom layer an almost solid ground pour, route signals on top, and when you must route on the bottom keep those traces short and perpendicular, so they cut the plane as little as possible. On a four-layer board, dedicate a whole inner layer to ground.</p>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "split the ground plane into analog and digital halves"</span>
+<p>This advice dates from an era of separate analog and digital supplies and slow logic, and it's still repeated in app notes. For almost every hobby and small-robot board it does harm: any signal that crosses from one half to the other (and the ADC's SPI or I²C lines always do) loses its return path at the split, so its loop area explodes. Use <b>one solid ground plane</b> and get the separation you want by <b>placement</b>: put analog parts in one region and digital or noisy parts in another, and route each region's signals only within its region. Return currents then stay local, because they follow their traces.</p>
+</aside>
+
+<div class="ex" data-id="split-mc" data-kind="mc">
+  <div class="q">An IMU's I²C lines run from the "analog" half of a split ground plane to the ESP32 on the "digital" half. What happens to the I²C edges' return current at the split?</div>
+  <ol class="opts">
+    <li>Nothing: I²C is too slow to matter</li>
+    <li data-correct>It must detour to wherever the two grounds join, creating a large loop that radiates and picks up noise</li>
+    <li>It flows through the air gap as displacement current with no side effects</li>
+    <li>The split blocks it, so the I²C bus stops working</li>
+  </ol>
+  <div class="explain">I²C edges are slow-ish but still have harmonics in the MHz range, and the bus is open-drain with pull-ups, which is sensitive to coupled noise. The return finds a way (it always does), just through a big loop. One solid plane plus careful placement is better.</div>
+</div>
+
+<h3>High-current paths: where "star grounding" still matters</h3>
+<p>There's one place where the <em>DC</em> path of ground current really does need deliberate routing: high, varying currents such as motor and servo currents. A ground conductor is still a resistor. If a 3 A PWM motor current shares a stretch of ground with your microcontroller and sensors, every PWM edge moves their ground up and down by \(I\,R_{\text{shared}}\). An analog reading referred to a "different ground" becomes a measurement of your motor current. This is a common-impedance coupling problem, and the fix is to make sure <b>high currents don't share a path with sensitive references</b>.</p>
+<ul>
+  <li>Bring the battery in at one point (the <b>star point</b>, usually at the battery connector and bulk capacitor).</li>
+  <li>Route the motor-driver supply and ground as a wide, short pair directly from that point to the driver, with the driver's bulk capacitor right at the driver.</li>
+  <li>Let the logic section take its power from the star point through its regulator, and keep motor currents out of the region of the plane under the logic. On a single plane you do this by placement: the motor current loop runs between the connector and the driver along one edge, far from the MCU and sensors.</li>
+</ul>
+
+<figure class="widget" id="fig-star">
+  <div id="w-star"></div>
+  <div id="w-star-ctl"></div>
+  <figcaption><b>Figure 9.4</b> Common-impedance coupling, solved live. In <b>daisy-chain</b> wiring the motor's return current flows through a 20 mΩ stretch of ground trace (about 4 cm of 0.5 mm trace) that the ESP32 also uses as its ground, so the ESP32's "0 V" rises with motor current. In <b>star</b> wiring each load has its own return to the battery. Try: raise the motor current and compare the two. The task below needs the offset under 5 mV at 3 A or more.</figcaption>
+</figure>
+
+<div class="ex" data-id="star-task" data-kind="task">
+  <div class="q">In Figure 9.4, set the motor current to <b>at least 3 A</b> and choose a wiring that keeps the ESP32's ground offset <b>below 5 mV</b>.</div>
+  <div class="explain">Daisy-chained, the offset is \((3 + 0.1)\,\text{A} \times 20\,\text{m}\Omega = 62\) mV, and it switches at the PWM frequency, which is plenty to corrupt ADC readings. Star wiring leaves only the ESP32's own 0.1 A in its return path: 2 mV.</div>
+</div>
+</section>
+
+<section>
+<h2 id="decoupling">Decoupling capacitors: placement is everything</h2>
+
+<p>Every digital IC draws its current in sharp gulps. When a few thousand transistors switch together on a clock edge, the chip may want an extra 100 mA within a nanosecond. The regulator is centimetres away, behind tens of nanohenries of trace inductance, and \(V = L\,di/dt\) says that 20 nH × 100 mA / 1 ns = 2 V. The regulator simply can't deliver that edge. A <b>decoupling capacitor</b> right at the power pin is a local charge reservoir that supplies the fast part of the current, while the regulator refills it slowly.</p>
+
+<p>"Right at the pin" is the key phrase. The capacitor, its traces and its vias form a loop with the chip's power and ground pins, and that loop has inductance. Once that inductance is a few nanohenries, it doesn't matter much whether the capacitor is 100 nF or 1 µF: the loop inductance limits how fast charge can flow. The capacitor's own <b>ESL</b> (equivalent series inductance, about 0.3–1 nH for small ceramics) is fixed, but the layout inductance is yours to minimise:</p>
+<ul>
+  <li>Place the cap as close as possible to the power pin it serves, on the same side of the board.</li>
+  <li>Put the cap's ground via right at the cap's ground pad, and the IC's ground pad via right at the IC, so the ground return goes straight into the plane.</li>
+  <li>Use short, wide connections, and avoid "thin trace to a far-away via".</li>
+  <li>Keep the plane close: on a 4-layer board the ground plane is about 0.2 mm under the top layer instead of 1.5 mm, which cuts both the via length and the loop height.</li>
+</ul>
+
+<figure class="widget" id="fig-decsch">
+  <div id="w-decsch"></div>
+  <figcaption><b>Figure 9.5</b> What a decoupling capacitor really looks like electrically. The capacitor has ESR and ESL; the traces and vias between it and the chip add more inductance. The chip is a fast current pulse plus a little on-die capacitance. The regulator, behind a much larger inductance, only supplies the slow average.</figcaption>
+</figure>
+
+<div class="formula">
+$$\Delta V \approx L_{\text{loop}}\,\frac{di}{dt} \qquad\text{or, for a step load,}\qquad \Delta V \approx \Delta I\sqrt{\frac{L_{\text{loop}}}{C_{\text{local}}}}$$
+<p>The first form is the voltage across the loop while current ramps; the second is the size of the dip when the loop inductance rings with the capacitance at the chip.</p>
+</div>
+
+<figure class="widget wide" id="fig-dec">
+  <div id="w-dec"></div>
+  <div id="w-dec-plot"></div>
+  <div id="w-dec-ctl"></div>
+  <figcaption><b>Figure 9.6</b> A decoupling capacitor next to an IC's power pin (top view, with the loop area shaded), and the simulated voltage at the pin when the chip draws a 100 mA step with a 1 ns edge. Try: move the cap further away; move its ground via to the end of a thin trace; switch from a 2-layer to a 4-layer stack-up. Watch the loop inductance and the droop. The task below needs a droop under 80 mV.</figcaption>
+</figure>
+
+<div class="ex" data-id="dec-task" data-kind="task">
+  <div class="q">In Figure 9.6, find a layout that keeps the supply droop at the pin <b>below 80 mV</b>.</div>
+  <div class="explain">On a 2-layer board you need the cap within about a millimetre with vias at the pads, which is hard to do in practice. A 4-layer board gets there easily, because the plane is 0.2 mm away. That margin is one of the best reasons to pay for four layers.</div>
+</div>
+
+<div class="ex" data-id="dec-num" data-kind="num" data-answer="0.1" data-tol="3%" data-unit="V">
+  <div class="q">A chip's current rises by 100 mA in 2 ns. The loop from its decoupling cap through the traces and vias has 2 nH of inductance. Roughly how much does the supply dip across that inductance during the edge?</div>
+  <div class="hint">\(V = L\,di/dt\), with \(di/dt = 0.1\,\text{A}/2\,\text{ns}\).</div>
+  <div class="explain">\(V = 2\times10^{-9} \times 0.1/(2\times10^{-9}) = 0.1\) V. That's 3% of a 3.3 V rail from just 2 nH, the inductance of about 3 mm of trace over a distant plane.</div>
+</div>
+
+<aside class="callout tip"><span class="ct">💡 Decoupling recipe for small boards</span>
+<ul>
+  <li>One 100 nF (0402 or 0603) per power pin, as close as possible, with vias at the pads.</li>
+  <li>One 1–10 µF per IC or per small cluster, nearby.</li>
+  <li>Bulk capacitance (tens to hundreds of µF, electrolytic or polymer) where power enters the board and at each motor driver.</li>
+  <li>Follow the datasheet. The ESP32-S3's hardware design guidelines specify the capacitors on its power pins and on the EN reset line.</li>
+</ul>
+</aside>
+</section>
+
+<section>
+<h2 id="traces">Trace width, current and heat</h2>
+
+<p>A trace carrying current heats up by \(I^2R\) and sheds heat into the board and the air. The question you actually ask is "how wide must this trace be so it doesn't get more than \(\Delta T\) hotter than the board?" The classic answer is the chart in IPC-2221, based on measurements from the 1950s. It's usually used as a curve fit:</p>
+<div class="formula">
+$$I = k\,\Delta T^{0.44}\,A^{0.725}, \qquad k = 0.048 \text{ (outer layers)},\ 0.024 \text{ (inner layers)}$$
+<p>\(I\) in amps, \(\Delta T\) in °C, \(A\) the cross-section in square mils (1 mil = 0.0254 mm; 1 oz copper ≈ 1.38 mil thick).</p>
+</div>
+<p>The newer standard, <b>IPC-2152</b> (2009), was based on fresh measurements. It found that the 2221 curves are conservative for inner layers (which conduct heat into the planes around them better than thought) and that board thickness, nearby copper planes and mounting all matter a lot. Use the curve fit below for a first estimate, then add margin; for anything near the limit, use an IPC-2152-based calculator (KiCad's PCB Calculator, Saturn PCB Toolkit) or simply make the trace wider. Copper is free.</p>
+
+<figure class="widget wide" id="fig-trace">
+  <div id="w-trace"></div>
+  <div id="w-trace-ctl"></div>
+  <figcaption><b>Figure 9.7</b> A trace-width calculator using the IPC-2221 curve fit. The curves show the required width against current for three temperature rises; the dot is your design point. The readouts give the width, the resistance and voltage drop over the trace length, and the number of standard vias to carry the current. Try: a 3 A motor feed with a 20 °C rise on 1 oz copper, then on 2 oz; then switch to an inner layer.</figcaption>
+</figure>
+
+<div class="ex" data-id="trace-num" data-kind="num" data-answer="0.78" data-tol="4%" data-unit="mm">
+  <div class="q">Using the IPC-2221 fit, how wide must an <b>outer-layer</b>, 1 oz trace be to carry <b>2 A</b> with a <b>10 °C</b> rise? (Answer in mm; Figure 9.7 can check you.)</div>
+  <div class="hint">\(A = \big(I/(k\,\Delta T^{0.44})\big)^{1/0.725}\) in mil², then width = \(A/1.378\) mil, and 1 mil = 0.0254 mm.</div>
+  <div class="explain">\(\Delta T^{0.44} = 10^{0.44} = 2.75\); \(I/(0.048\times2.75) = 15.1\); \(15.1^{1.379} = 42.4\) mil²; width \(= 42.4/1.378 = 30.8\) mil \(= 0.78\) mm. In practice you'd draw 1 mm or a pour.</div>
+</div>
+
+<h3>Vias, thermal reliefs and motor paths</h3>
+<p>A via is a short copper tube. Its plating is thin (about 20–25 µm), so a standard 0.3 mm via carries only an amp or so before it warms noticeably. For a 3 A motor path that changes layers, use a <b>cluster</b> of vias (four or more), placed so the current spreads through them evenly.</p>
+<p>When a pad connects to a big copper pour, the pour acts as a heat sink and makes the pad hard to solder. KiCad's default is a <b>thermal relief</b>: the pad joins the pour through two to four narrow spokes. That's good for hand-soldered pads and through-hole pins on ground. For high-current pads (battery connector, motor driver output, the MOSFET source) the spokes are a bottleneck, so use a solid connection, or at least wide spokes, and accept that you'll need a hotter iron.</p>
+
+<div class="ex" data-id="thermal-multi" data-kind="multi">
+  <div class="q">Which statements about thermal-relief spokes on a pad connected to a ground pour are true? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>They make the pad easier to solder because less heat leaks into the pour</li>
+    <li data-correct>They add resistance and inductance between the pad and the plane</li>
+    <li>They're required for every pad by the IPC standards</li>
+    <li data-correct>A battery-connector pad carrying 10 A should use a solid connection or wide spokes</li>
+    <li>They reduce the board's EMI</li>
+  </ol>
+  <div class="explain">Spokes trade electrical and thermal conductivity for solderability. Use them where soldering is the problem; use solid connections where current (or heat sinking a regulator's thermal pad) is the priority.</div>
+</div>
+
+<h3>Laying out the motor power path</h3>
+<p>A motor-driver section has two current loops that matter. The first is the obvious one: battery → driver → motor → driver → battery, carrying the average motor current. The second is the <b>switching loop</b>: every PWM edge, current switches between the motor and the driver's supply pins, and the fast part of that change comes from the <b>local bulk and ceramic capacitors</b> at the driver's VM pin. That loop has high \(di/dt\), so it must be tiny: the driver's VM and GND pins, a 100 nF ceramic and a 10–100 µF bulk capacitor all within a few millimetres, on a solid ground. The long run back to the battery then carries mostly smooth DC. Make the power traces wide and short, and keep this whole region along one edge of the board, away from the MCU, the IMU and the antenna.</p>
+</section>
+
+<section>
+<h2 id="layout">Floorplanning, crosstalk and EMC</h2>
+
+<p>Good layouts are decided before the first trace is routed. <b>Floorplanning</b> means placing functional blocks so that the physics works out by default:</p>
+<ul>
+  <li><b>Connectors at the edges</b>, grouped by function: power and motors on one side, USB and programming on another.</li>
+  <li><b>Power flows in one direction</b>: battery connector → protection → bulk caps → regulators and drivers. High-current loops are short and stay in their own region.</li>
+  <li><b>Noisy next to noisy, quiet next to quiet.</b> Bucks and motor drivers (fast \(di/dt\), hot) cluster together. The IMU, the ADC inputs and analog sensors sit far from them, near the MCU.</li>
+  <li><b>The antenna owns its corner.</b> A module like the ESP32-S3-WROOM-1 has a PCB trace antenna at one end. Place it so the antenna sits at the board edge (ideally overhanging it), with <b>no copper on any layer, no components and no traces</b> under or near the antenna area. Espressif's hardware design guidelines and the module datasheet show the keep-out; give it roughly 15 mm clearance where you can. Metal enclosures, batteries and motors near the antenna detune it too.</li>
+  <li><b>The crystal and its traces</b> (on bare-chip designs) sit right next to the MCU, surrounded by ground, with nothing else routed nearby.</li>
+</ul>
+
+<figure class="widget wide" id="fig-floor">
+  <div id="w-floor"></div>
+  <ul class="ch9-rules" id="w-floor-rules"></ul>
+  <div id="w-floor-ctl"></div>
+  <figcaption><b>Figure 9.8</b> Floorplan for a 90 × 64 mm ESP32-S3 robot controller. The connectors are fixed at the edges; drag the five blocks (ESP32 module, buck converter, LDO, motor drivers, IMU) to satisfy all the rules. The hatched area is the antenna keep-out. The red loop shows the motor current path from the battery connector through the drivers to the motor connectors.</figcaption>
+</figure>
+
+<div class="ex" data-id="floor-task" data-kind="task">
+  <div class="q">In Figure 9.8, arrange the blocks so that <b>every floorplan rule is satisfied</b>.</div>
+  <div class="explain">A good solution: ESP32 module at the top edge with its antenna overhanging, LDO next to it, buck near the battery connector on the right, motor drivers at the bottom right next to the motor connectors, and the IMU on the left, far from both the buck and the drivers. That's essentially the floorplan of the worked example below.</div>
+</div>
+
+<h3>Crosstalk</h3>
+<p>Two traces running side by side are coupled through their mutual capacitance (electric field) and mutual inductance (magnetic field). A fast edge on the <em>aggressor</em> induces a pulse on the <em>victim</em>. The coupling falls off roughly as \(1/\big(1+(s/h)^2\big)\), where \(s\) is the spacing between them and \(h\) their height above the reference plane: the plane "soaks up" the fields, so traces close to a plane couple less. Practical rules:</p>
+<ul>
+  <li>Increase spacing for fast or sensitive signals. The <b>3W rule</b>, centre-to-centre spacing of at least three trace widths, is a decent default.</li>
+  <li>Keep traces close to an unbroken plane. This is another reason 4-layer boards are quieter: \(h\) is about 0.2 mm instead of 1.5 mm.</li>
+  <li>Don't run sensitive lines (analog, I²C, reset, the crystal) parallel to clocks, PWM or switch nodes for long distances. Cross them at right angles if you must.</li>
+</ul>
+
+<figure class="widget" id="fig-xtalk">
+  <div id="w-xtalk"></div>
+  <div id="w-xtalk-ctl"></div>
+  <figcaption><b>Figure 9.9</b> Relative crosstalk between two parallel traces as a function of their spacing, using the \(1/(1+(s/h)^2)\) approximation, for a trace 1.5 mm above its plane (2-layer) and 0.2 mm above it (4-layer). The dashed line marks the 3W spacing for the chosen trace width. Try: at the same 0.5 mm spacing, compare the two stack-ups; then find the spacing a 2-layer board needs to match the 4-layer coupling.</figcaption>
+</figure>
+
+<div class="ex" data-id="ant-multi" data-kind="multi">
+  <div class="q">Which of these must stay out of the ESP32-S3-WROOM-1's antenna keep-out area? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>The ground pour on the bottom layer</li>
+    <li data-correct>A trace carrying the I²C bus</li>
+    <li data-correct>A mounting screw and standoff</li>
+    <li>Air</li>
+    <li data-correct>The silkscreen-labelled power LED and its resistor</li>
+  </ol>
+  <div class="explain">Copper on <em>any</em> layer, components and metal hardware all detune the antenna and absorb its power. Silkscreen ink alone is fine, but the LED and resistor are copper and metal. The keep-out applies through the whole board stack.</div>
+</div>
+
+<h3>EMC in one page</h3>
+<p>Electromagnetic compatibility is about not interfering with other things (emissions) and not being disturbed by them (immunity). A board radiates mainly in two ways. <b>Differential-mode</b> radiation comes from current loops on the board; it's proportional to loop area × current × frequency², which is why fast edges in big loops are the problem. <b>Common-mode</b> radiation comes from cables: a few millivolts of noise between your board's ground and a cable's ground drives the cable as an antenna, and cables are excellent antennas. The habits that keep a hobby board quiet are the ones in this chapter:</p>
+<ol>
+  <li>A solid ground plane under everything, with no slots under signals.</li>
+  <li>Small high-\(di/dt\) loops (switching regulators, motor drivers, decoupling).</li>
+  <li>Slow edges where speed isn't needed: a 22–33 Ω series resistor at a fast output, or the MCU's lower drive-strength setting.</li>
+  <li>Connectors grouped on one edge, so cables don't have a potential difference between them, and filtering (ferrite, RC, TVS) where cables enter.</li>
+  <li>Stitching vias around the board edge and between top and bottom ground pours, and no floating copper islands.</li>
+</ol>
+</section>
+
+<section>
+<h2 id="dfm">Designing for manufacture, assembly and bring-up</h2>
+
+<h3>Design rules</h3>
+<p>Every fab publishes its capabilities. Set your DRC rules to them, ideally with margin, before you route. For a standard 2-layer board at a budget fab, typical comfortable values are:</p>
+<table>
+  <tr><th>Rule</th><th>Fab minimum (typical)</th><th>Comfortable default</th></tr>
+  <tr><td>Trace width / spacing</td><td>0.127 mm (5 mil)</td><td>0.2 mm signals, wider for power</td></tr>
+  <tr><td>Via drill / pad</td><td>0.3 mm / 0.5 mm</td><td>0.3 mm / 0.6 mm</td></tr>
+  <tr><td>Annular ring</td><td>about 0.13 mm</td><td>0.15 mm or more</td></tr>
+  <tr><td>Copper to board edge</td><td>0.2–0.3 mm</td><td>0.5 mm</td></tr>
+  <tr><td>Silkscreen text</td><td>about 0.8 mm tall, 0.15 mm stroke</td><td>1 mm tall</td></tr>
+</table>
+<p>The <b>annular ring</b> is the copper left around a drilled hole. Drills wander a little, so if the ring is too thin the hole can break out of the pad.</p>
+
+<h3>Panels, fiducials and stencils</h3>
+<p>Fabs build boards on large panels. If your board is small, or you want several designs at once, you can <b>panelise</b>: tile copies of the board with breakaway <b>tabs</b> (perforated "mouse bites") or <b>V-score</b> grooves, plus rails along the edges for the assembly machines to grip. For machine assembly you add <b>fiducials</b>: bare copper dots (typically 1 mm, with a 2–3 mm soldermask opening) in at least three corners, which the pick-and-place camera uses to find the board's exact position and rotation. For reflow you need a <b>stencil</b>: a laser-cut stainless steel sheet (about 0.1–0.15 mm thick) with an aperture for every SMD pad. Solder paste is squeegeed through it, parts are placed into the paste, and the board goes through a reflow oven whose temperature profile (preheat, soak, reflow peak about 30 °C above the solder's melting point, cool) melts the paste into joints.</p>
+
+<div class="ex" data-id="fid-text" data-kind="text" data-answer="fiducial|fiducials|fiducial mark|fiducial marks">
+  <div class="q">What are the small bare-copper dots in the corners of a board or panel, used by pick-and-place cameras for alignment, called?</div>
+  <div class="explain">Fiducials (fiducial marks). Global fiducials locate the board; local fiducials near a fine-pitch part help place that part precisely.</div>
+</div>
+
+<h3>Soldering SMD parts by hand</h3>
+<ul>
+  <li><b>Two-terminal parts</b>: tin one pad, hold the part with tweezers, reflow that pad to tack it, then solder the other pad, then touch up the first.</li>
+  <li><b>Fine-pitch ICs</b>: tack two opposite corner pins, check alignment under magnification, add plenty of flux, then <b>drag-solder</b> a whole row with a loaded tip. Bridges are normal: more flux and solder wick remove them.</li>
+  <li><b>QFNs and parts with thermal pads</b>: use solder paste and a hot-air station or a hot plate. Too much paste on the centre pad floats the chip and bridges the edges; a window-pane pattern of paste on the pad helps.</li>
+  <li><b>Flux is the secret.</b> Most "bad soldering" is not enough flux. Clean the residue with isopropyl alcohol afterwards.</li>
+</ul>
+
+<h3>Bring-up: powering a new board for the first time</h3>
+<p>A new board is untested code running on untested hardware. Bring it up in stages, and stop at the first surprise.</p>
+<ol class="ch9-check">
+  <li><b>Visual inspection</b> under magnification: solder bridges, tombstoned parts, polarity of diodes, electrolytics and ICs (pin 1!).</li>
+  <li><b>Unpowered resistance checks</b>: measure from every supply rail to ground. A dead short (under a few ohms) means a bridge or a part on backwards; find it before applying power.</li>
+  <li><b>Current-limited power-up</b>: from a bench supply, start with a low current limit (50–100 mA) and the input voltage you expect. Watch the current. A board that draws the limit immediately has a fault.</li>
+  <li><b>Check the rails</b>: is 5 V really 5 V, and 3.3 V really 3.3 V? Scope them for ripple and oscillation.</li>
+  <li><b>Then firmware</b>: blink an LED, print over USB serial, scan the I²C bus, read each sensor, then drive the motors one at a time at low duty, with the wheels off the ground.</li>
+  <li><b>Finally the battery</b>, once everything works from the current-limited supply.</li>
+</ol>
+
+<div class="ex" data-id="bringup-order" data-kind="order">
+  <div class="q">Put the first-board bring-up steps in order.</div>
+  <ol class="items">
+    <li>Inspect under magnification for bridges and polarity</li>
+    <li>Measure rail-to-ground resistance with no power</li>
+    <li>Power up from a bench supply with a low current limit</li>
+    <li>Measure and scope each regulator output</li>
+    <li>Flash firmware: blink, serial, I²C scan</li>
+    <li>Test motors at low duty with wheels lifted</li>
+    <li>Connect the real battery</li>
+  </ol>
+  <div class="explain">Each step protects the next: you don't power a board with a short, you don't flash firmware onto a board with a wrong rail, and you don't connect a battery that can deliver 100 A until everything works on a current-limited supply.</div>
+</div>
+</section>
+
+<section>
+<h2 id="example">Worked example: an ESP32-S3 robot controller</h2>
+
+<p>Let's pull the chapter together into a real board, the kind of controller you'd design for a small two-wheeled robot or a balancing robot. Requirements:</p>
+<ul>
+  <li>Runs from a <b>2S LiPo</b> (6.0–8.4 V), with a fuse and reverse-polarity protection, and from <b>USB-C</b> for programming.</li>
+  <li><b>ESP32-S3-WROOM-1</b> module: Wi-Fi and BLE, native USB, plenty of GPIO.</li>
+  <li><b>Two DRV8833</b> dual H-bridges: four DC motors, or two motors with spare channels.</li>
+  <li><b>Four servo headers</b> on a 5 V, 3 A rail.</li>
+  <li>A <b>Qwiic</b> (JST-SH 4-pin, 3.3 V I²C) connector for sensors, plus an on-board IMU.</li>
+  <li>A <b>battery monitor</b> on an ADC pin.</li>
+</ul>
+
+<figure class="widget wide" id="fig-block">
+  <div id="w-block"></div>
+  <figcaption><b>Figure 9.10</b> Block diagram. Two power domains share one ground: the battery (VBAT) feeds the motor drivers directly and a 5 V buck for the servos; the 3.3 V logic comes from an LDO that's fed from the buck or from USB through Schottky diodes (whichever is higher), so the board can be programmed over USB with no battery.</figcaption>
+</figure>
+
+<h3>Power input</h3>
+<p>The battery enters through a fuse (a 3–5 A polyfuse or blade fuse) and a <b>P-channel MOSFET</b> for reverse-polarity protection. With the battery connected correctly, the MOSFET's body diode conducts first, pulling the source up; the gate is held at ground, so \(V_{GS}\approx -V_{\text{bat}}\) and the MOSFET turns fully on, bypassing its own diode with milliohms of \(R_{DS(on)}\). With the battery reversed, the gate-source voltage is positive and the body diode is reverse-biased, so nothing conducts. A Zener from gate to source clamps \(V_{GS}\) within its rating. Then a <b>synchronous buck</b> (here a TPS563201-class 17 V, 3 A part) makes 5 V for the servos, with its input capacitor, bootstrap capacitor, inductor and output capacitors placed tightly around it as its datasheet's layout example shows. The buck's switching loop (input cap → high-side switch → low-side switch → back to the input cap's ground) is the highest \(di/dt\) loop on the board and must be the smallest.</p>
+
+<figure class="widget wide" id="fig-pwr">
+  <div id="w-pwr"></div>
+  <figcaption><b>Figure 9.11</b> Power input: fuse, P-MOSFET reverse-polarity protection with gate Zener, bulk capacitance, and the 5 V buck. The feedback divider sets \(V_{\text{out}} = V_{\text{ref}}(1 + R_1/R_2)\); with a 0.768 V reference, 56 kΩ / 10 kΩ gives about 5.1 V. Check the reference voltage and recommended inductor in the datasheet of the exact part you choose.</figcaption>
+</figure>
+
+<h3>USB-C, logic power, battery monitor and Qwiic</h3>
+<p>For a USB-C <em>sink</em> that only needs the default 5 V, the essential trick is two <b>separate 5.1 kΩ pull-down resistors</b>, one on CC1 and one on CC2. They tell the charger or computer that a device is attached; without them, a compliant USB-C source supplies no VBUS at all. (Sharing one resistor between both CC pins is a classic mistake.) The S3's native USB pins (GPIO19 = D−, GPIO20 = D+) connect straight to the connector, ideally through a small ESD protection array. The 3.3 V LDO (an AP2112K-3.3 or similar, 600 mA) is fed through Schottky diodes from VBUS and from the 5 V buck. The ESP32's Wi-Fi transmit bursts pull several hundred mA, so the LDO needs good input and output capacitors and the 3.3 V rail a 10–22 µF bulk cap near the module.</p>
+<p>The battery monitor is a divider from VBAT: 100 kΩ over 47 kΩ maps 8.4 V to 2.69 V, inside the range the S3's ADC handles well with 11–12 dB attenuation. The 100 nF across the lower resistor gives the ADC's sampling capacitor a low-impedance source. Use an ADC1 channel (GPIO1–GPIO10 on the S3), since ADC2 is shared with the Wi-Fi radio. The divider draws 8.4 V / 147 kΩ = 57 µA all the time. That's fine for a robot, but use a MOSFET switch to disconnect it if the board must sleep for months. The Qwiic connector carries GND, 3.3 V, SDA and SCL (in that order), with 2.2–4.7 kΩ pull-ups to 3.3 V on the board.</p>
+
+<figure class="widget wide" id="fig-usb">
+  <div id="w-usb"></div>
+  <figcaption><b>Figure 9.12</b> USB-C sink with separate CC pull-downs, Schottky OR-ing into the 3.3 V LDO, the battery-voltage divider into an ADC1 pin, and the Qwiic I²C connector with pull-ups. Also needed (not drawn): the 10 kΩ + 1 µF RC on the module's EN pin, and a BOOT button on GPIO0 (a strapping pin, as are GPIO3, GPIO45 and GPIO46, so keep them free or check their boot-time levels).</figcaption>
+</figure>
+
+<div class="ex" data-id="div-num" data-kind="num" data-answer="2.686" data-tol="1%" data-unit="V">
+  <div class="q">With the battery monitor's 100 kΩ (top) / 47 kΩ (bottom) divider and a full 2S pack at 8.4 V, what voltage does the ADC pin see?</div>
+  <div class="hint">\(V_{\text{out}} = V_{\text{in}}\,R_2/(R_1+R_2)\).</div>
+  <div class="explain">\(8.4 \times 47/147 = 2.69\) V. In firmware, multiply the ADC reading by \(147/47 = 3.128\), and calibrate with a multimeter: the resistors' 1% tolerance and the ADC's gain error both matter.</div>
+</div>
+
+<h3>Motor drivers</h3>
+<p>Each DRV8833 gets VBAT on VM with a 10 µF ceramic plus 0.1 µF at the pin and a shared 100–220 µF bulk capacitor nearby, a 10 nF charge-pump capacitor from VCP to VM, and a 2.2 µF capacitor on its internal regulator pin VINT. AISEN and BISEN go to ground (or through sense resistors if you want current limiting). nSLEEP gets a pull-up (or a GPIO, to save power), and nFAULT, which is open-drain, gets a pull-up to 3.3 V and goes to a spare GPIO so firmware knows when the driver trips. Four PWM-capable GPIOs per driver drive the inputs. The DRV8833's VM range is 2.7–10.8 V, so 2S LiPo (8.4 V full) is fine, but <b>3S (12.6 V) would destroy it</b>. If you want 3S, choose a different driver (TB6612FNG for 15 V, or DRV8871 / DRV8874 for higher voltage and current).</p>
+
+<figure class="widget wide" id="fig-drv">
+  <div id="w-drv"></div>
+  <figcaption><b>Figure 9.13</b> One DRV8833 channel pair. Decoupling sits right at VM, the charge-pump and VINT capacitors at their pins, and the motor outputs go straight to a connector at the board edge. Both drivers sit side by side on the high-current edge of the board.</figcaption>
+</figure>
+
+<h3>Layout of the example</h3>
+<p>The floorplan is the solution to Figure 9.8. The module sits at the top edge with its antenna overhanging, and the LDO and its caps sit beside it. The USB-C connector is on the left edge with the ESD array right behind it. The battery connector, fuse, reverse-protection MOSFET, bulk capacitor and buck are along the right edge, and the two DRV8833s along the bottom right with the motor connectors directly below them. Servo headers go along the bottom left, fed by a wide 5 V pour, and the IMU sits on the left side, near the module and away from the buck and drivers. The bottom layer is a solid ground pour, with stitching vias around the edge and around the power section; top-layer pours are used for VBAT and 5 V. Signals from the module to the drivers run on top over the unbroken plane, and the few bottom-layer jumpers are short and perpendicular.</p>
+
+<h3>Next steps: four layers and controlled impedance</h3>
+<p>Once you've built a two-layer board or two, a <b>four-layer</b> board is the single biggest upgrade, and at budget fabs it now costs only a little more than two layers. The classic stack-up for a mixed board is <b>Signal / GND / Power / Signal</b>, or better for EMC, <b>Signal / GND / GND / Signal</b> with power routed as pours on the outer layers. Every signal layer then sits about 0.2 mm above a solid ground plane, so loop areas, crosstalk and decoupling inductance all shrink several-fold, as Figures 9.6 and 9.9 showed.</p>
+<p>Some signals need a specific <b>characteristic impedance</b>: USB 2.0 data pairs (90 Ω differential), RF feeds to an external antenna (50 Ω), and fast links like HDMI or Ethernet. A trace over a plane is a transmission line whose impedance depends on its width, its height above the plane and the dielectric constant. For an outer-layer microstrip, IPC-2141 gives a rough formula:</p>
+<div class="formula">
+$$Z_0 \approx \frac{87}{\sqrt{\varepsilon_r + 1.41}}\,\ln\!\left(\frac{5.98\,h}{0.8\,w + t}\right)\ \Omega$$
+<p>Valid roughly for \(0.1 &lt; w/h &lt; 2\). Fabs offer impedance calculators matched to their exact stack-ups; use those for production.</p>
+</div>
+
+<figure class="widget" id="fig-z0">
+  <div id="w-z0"></div>
+  <div id="w-z0-ctl"></div>
+  <figcaption><b>Figure 9.14</b> Microstrip impedance against trace width for a 2-layer board (dielectric about 1.5 mm) and a 4-layer board (prepreg about 0.21 mm). Try: find the width for 50 Ω on each. On a 2-layer board it's about 2.8 mm, wider than most parts' pads; on a 4-layer board it's about 0.35 mm, a normal trace. That's why RF and USB layouts love four layers.</figcaption>
+</figure>
+
+<div class="ex" data-id="stack-mc" data-kind="mc">
+  <div class="q">For a 4-layer robot controller with an ESP32, motor drivers and a buck converter, which stack-up gives the best signal integrity and EMC?</div>
+  <ol class="opts">
+    <li>Signal / Signal / GND / Power</li>
+    <li data-correct>Signal / GND / GND (or Power) / Signal, with signals routed on the outer layers next to a ground plane</li>
+    <li>GND / Signal / Signal / GND, with all parts on the ground layers</li>
+    <li>Power / Signal / Signal / GND</li>
+  </ol>
+  <div class="explain">Every signal layer should be adjacent to a solid reference plane, preferably ground. With L2 = GND, all top-layer signals have a return 0.2 mm away. Putting two signal layers next to each other with no plane between them maximises crosstalk.</div>
+</div>
+
+<aside class="callout lab"><span class="ct">🔧 Lab: design and order your board</span>
+<ol>
+  <li><b>Schematic.</b> Draw the controller in KiCad from Figures 9.10–9.13. For each IC, open its datasheet next to the schematic and copy the "typical application" circuit exactly, including every capacitor. Add test points (a pad or a loop) on every rail and on SDA, SCL and a spare GPIO. Run ERC until it's clean.</li>
+  <li><b>Parts.</b> Assign footprints (0603 passives are a good compromise between size and hand-reworkability), and add LCSC part numbers for every part in a BOM column. Prefer Basic parts.</li>
+  <li><b>Floorplan.</b> Set a board outline (90 × 64 mm with M3 holes in the corners), then place the blocks as in Figure 9.8 before routing anything: antenna at the edge, power along one side, motors along another, the IMU far from noise.</li>
+  <li><b>Route.</b> Power first (wide, short, with via clusters), then the buck's loop exactly as in its datasheet, then decoupling (caps at pins, vias at pads), then signals. Pour ground on the bottom, stitch, and check that no signal crosses a gap in it.</li>
+  <li><b>Check.</b> DRC with the fab's rules, then a 3D-viewer look, then print the layout 1:1 on paper and set the real parts on it to check footprints.</li>
+  <li><b>Order.</b> Export Gerbers, drill files, BOM and CPL (KiCad's plot dialog, or a JLC export plugin such as the Fabrication Toolkit), upload them, check the fab's rendering and part rotations carefully, and order five boards, with assembly of the SMD parts if you like.</li>
+  <li><b>Bring-up.</b> Follow the checklist above. Keep a log: every measurement, every bodge wire. That log is the start of revision B.</li>
+</ol>
+</aside>
+
+<aside class="callout ref"><span class="ct">📚 Go deeper</span>
+<ul>
+  <li><b>KiCad documentation</b> (docs.kicad.org), especially <i>Getting Started in KiCad</i> and the Schematic Editor and PCB Editor manuals. They walk through the complete flow from new project to Gerbers.</li>
+  <li><b>Phil's Lab</b> (YouTube, Phil Salmony): complete KiCad hardware-design walkthroughs (STM32 and ESP32 boards, buck converters, 4-layer stack-ups), always ending with a JLCPCB order and bring-up.</li>
+  <li><b>Rick Hartley, "How to Achieve Proper Grounding"</b> (talk with Robert Feranec, 2020) and his PCB West talk <b>"The Extreme Importance of PC Board Stack-Up"</b>. The clearest explanation of return currents and fields in boards.</li>
+  <li><b>Eric Bogatin, <i>Signal and Power Integrity — Simplified</i></b> (3rd ed., Prentice Hall, 2018): inductance, return paths, transmission lines, crosstalk and power distribution, with rules of thumb for estimating everything.</li>
+  <li><b>Henry Ott, <i>Electromagnetic Compatibility Engineering</i></b> (Wiley, 2009): the chapters on grounding, digital circuit power distribution and PCB layout and stack-up are the standard references for EMC-aware layout.</li>
+  <li><b>Howard Johnson &amp; Martin Graham, <i>High-Speed Digital Design: A Handbook of Black Magic</i></b> (1993): the origin of many layout rules of thumb, including the crosstalk approximation used in Figure 9.9.</li>
+  <li><b>IPC-2152</b>, <i>Standard for Determining Current Carrying Capacity in Printed Board Design</i> (2009), and <b>IPC-2221</b>, <i>Generic Standard on Printed Board Design</i>.</li>
+  <li><b>Espressif, <i>ESP32-S3 Hardware Design Guidelines</i></b> and the <b>ESP32-S3-WROOM-1 datasheet</b>: power, strapping pins, USB, and the antenna keep-out drawing.</li>
+  <li>Your fab's capabilities page and its KiCad/Gerber export instructions (e.g. JLCPCB's "How to generate Gerber and drill files in KiCad").</li>
+</ul>
+</aside>
+</section>
+
+</main>
+<script src="../assets/vendor/katex/katex.min.js"></script>
+<script src="../assets/vendor/katex/auto-render.min.js"></script>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/ch09-pcb.js"></script>
+</body>
+</html>
