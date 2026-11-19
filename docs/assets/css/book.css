@@ -299,3 +299,4 @@ body.kid main.cards > .card > h2, body.kid main.cards > .card > h3:first-child {
 .w-select { max-width: 100%; flex-wrap: wrap; }
 .w-seg { flex-wrap: wrap; max-width: 100%; }
 main table, .katex-display, .formula { position: relative; }
+main p code, main li code { overflow-wrap: anywhere; }

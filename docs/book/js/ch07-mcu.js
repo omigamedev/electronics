@@ -370,17 +370,35 @@
     const DT = 0.002, N = Math.round(24 / DT);
     let filt = new Float32Array(N + 1), sch = new Uint8Array(N + 1), res = {};
     function sim() {
-      let v = 3.3, st = 1, fRaw = 0, fS = 0, prevRaw = 1, firstS = null;
+      let v = 3.3, st = 1, fRaw = 0, fS = 0, prevRaw = 1, firstS = null, relS = null;
       for (let i = 0; i <= N; i++) {
         const t = i * DT, r = raw(t);
-        v += (r - v) * (1 - Math.exp(-DT / tau));
+        // closed contact shorts the capacitor (fast); open contact lets the pull-up recharge it (tau)
+        v += (r - v) * (1 - Math.exp(-DT / (r < 1 ? 0.004 : tau)));
         filt[i] = v;
-        if (st && v < 1.0) { st = 0; fS++; if (firstS == null) firstS = t; } else if (!st && v > 2.0) st = 1;
+        if (st && v < 1.0) { st = 0; fS++; if (firstS == null) firstS = t; } else if (!st && v > 2.0) { st = 1; if (t > 15) relS = t; }
         sch[i] = st;
         const rb = r > 1.65 ? 1 : 0; if (prevRaw && !rb) fRaw++; prevRaw = rb;
       }
-      res = { fRaw, fS, delay: firstS == null ? null : firstS - 6.0 };
+      res = { fRaw, fS, delay: relS == null ? null : relS - 16.0 };
     }
+    const bsch = W.schematic('#w-bounce-sch', {
+      w: 460, h: 170, title: 'RC debounce circuit with a Schmitt-trigger inverter',
+      items: [
+        { t: 'vcc', at: [80, 30], label: '3.3 V' },
+        { t: 'R', id: 'r', a: [80, 30], b: [80, 80], label: '10 kΩ' },
+        { t: 'wire', pts: [[80, 80], [80, 95], [190, 95]] }, { t: 'dot', at: [80, 95] }, { t: 'dot', at: [150, 95] },
+        { t: 'PB', id: 'pb', a: [80, 105], b: [80, 145], label: 'button', side: -1 },
+        { t: 'wire', pts: [[80, 95], [80, 105]] }, { t: 'gnd', at: [80, 145] },
+        { t: 'C', id: 'c', a: [150, 105], b: [150, 140], label: 'C' },
+        { t: 'wire', pts: [[150, 95], [150, 105]] }, { t: 'gnd', at: [150, 140] },
+        { t: 'ic', id: 'u', at: [250, 95], name: '74HC14', left: ['A'], right: ['Y'], w: 70 },
+        { t: 'wire', pts: [[190, 95], 'u.A'] },
+        { t: 'wire', pts: ['u.Y', [360, 95]] },
+        { t: 'text', at: [366, 95], text: '→ MCU pin', anchor: 'start' },
+        { t: 'tag', id: 'tau', at: [250, 150], text: '' },
+      ],
+    });
     const p = W.plot('#w-bounce', { xmin: 0, xmax: 22, ymin: -0.3, ymax: 4.2, height: 240, xlabel: 'time (ms)', ylabel: 'volts', xfmt: (v) => String(v) });
     p.draw((p) => {
       p.hline(2.0, { color: 'c4', width: 1 }); p.hline(1.0, { color: 'c4', width: 1 });
@@ -391,8 +409,9 @@
     });
     const ctl = W.$('#c-bounce');
     W.slider(ctl, { label: 'RC time constant \\(\\tau\\)', min: 0.01, max: 5, log: true, value: tau, format: (v) => W.si(v / 1000, 's', 2), onInput: (v) => { tau = v; upd(); } });
-    const rR = W.readout(ctl, { label: 'Presses seen (plain input on raw)' }), rS = W.readout(ctl, { label: 'Presses seen (RC + Schmitt)' }), rD = W.readout(ctl, { label: 'Added delay' });
+    const rR = W.readout(ctl, { label: 'Presses seen (plain input on raw)' }), rS = W.readout(ctl, { label: 'Presses seen (RC + Schmitt)' }), rD = W.readout(ctl, { label: 'Release seen after' });
     function upd() {
+      bsch.set('c', { label: W.si(tau / 1000 / 10000, 'F', 2) }); bsch.set('tau', { text: 'τ = 10 kΩ × ' + W.si(tau / 1000 / 10000, 'F', 2) + ' = ' + W.si(tau / 1000, 's', 2) });
       sim(); p.update();
       rR.set(String(res.fRaw)); rR.setClass(res.fRaw === 1 ? 'good' : 'bad');
       rS.set(String(res.fS)); rS.setClass(res.fS === 1 ? 'good' : 'bad');

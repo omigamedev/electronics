@@ -520,7 +520,7 @@
           break;
         case 'vcc':
           g.append(S('line', { x1: x, y1: y, x2: x, y2: y - 10 }), S('line', { x1: x - 9, y1: y - 10, x2: x + 9, y2: y - 10 }));
-          rec.text = label(x, y - 20, it.label || 'VCC');
+          rec.text = label(x, y - 20, it.label ?? 'VCC');
           break;
         case 'dot': g.append(S('circle', { cx: x, cy: y, r: 3.2, class: 'fill' })); break;
         case 'text': rec.text = label(x, y, it.text, it.anchor || 'middle', 'lbl ' + (it.cls || '')); break;
@@ -627,7 +627,7 @@
       }
       if ('hidden' in props) { r.g.style.display = props.hidden ? 'none' : ''; if (r.text) r.text.style.display = props.hidden ? 'none' : ''; }
       if ('cls' in props) r.g.classList.toggle(props.cls[0], props.cls[1]);
-      if ('stroke' in props) r.g.style.stroke = props.stroke ? W.col(props.stroke) : '';
+      if ('stroke' in props) { const sc = props.stroke ? W.col(props.stroke) : ''; r.g.style.stroke = sc; r.g.querySelectorAll('line, polyline, path, circle:not(.glow), polygon, rect:not(.hit)').forEach((e) => { e.style.stroke = sc; if (e.classList.contains('fill')) e.style.fill = sc; }); }
       if ('spin' in props) {
         const rot = r.g.querySelector('.rotor');
         if (rot) { r.spin = props.spin; ensureLoop(); }

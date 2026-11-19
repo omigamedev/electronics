@@ -15,17 +15,17 @@
   .ch7-info b { color: var(--accent); }
   .ch7-regs { display: grid; gap: 8px; font: .9rem var(--mono); }
   .ch7-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-  .ch7-row .nm { width: 4.2em; font-weight: 700; color: var(--ink); }
+  .ch7-row .nm { width: 60px; font-weight: 700; color: var(--ink); }
   .ch7-row .val { margin-left: 8px; color: var(--muted); min-width: 7em; }
   .ch7-bit { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 .85rem var(--mono); cursor: pointer; padding: 0; }
   .ch7-bit.on { background: var(--c1); color: #fff; border-color: var(--c1); }
   .ch7-bit.ro { cursor: default; opacity: .85; }
   .ch7-bit.na { opacity: .35; cursor: not-allowed; }
-  .ch7-hdr { display: flex; gap: 4px; margin-left: 4.2em; color: var(--muted); font-size: .72rem; }
+  .ch7-hdr { display: flex; gap: 4px; margin-left: 64px; color: var(--muted); font-size: .72rem; }
   .ch7-hdr span { width: 30px; text-align: center; }
   .ch7-led { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface2); display: inline-block; box-sizing: border-box; }
   .ch7-led.lit { background: #ff4d4d; border-color: #ff8787; box-shadow: 0 0 12px #ff4d4d; }
-  @media (max-width: 520px) { .ch7-bit, .ch7-led { width: 24px; height: 24px; } .ch7-hdr span { width: 24px; } .ch7-row .nm, .ch7-hdr { width: auto; } .ch7-row .nm { width: 3.6em; } .ch7-hdr { margin-left: 3.6em; } .ch7-regs { font-size: .8rem; } }
+  @media (max-width: 520px) { .ch7-bit, .ch7-led { width: 24px; height: 24px; } .ch7-hdr span { width: 24px; } .ch7-row .nm { width: 46px; } .ch7-hdr { margin-left: 50px; font-size: .62rem; } .ch7-regs { font-size: .8rem; } }
   .ch7-code { font: .85rem var(--mono); background: var(--surface2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; min-height: 3.2em; color: var(--ink); }
   .ch7-tree { font-size: .92rem; line-height: 1.5; }
   .ch7-tree ul { list-style: none; margin: 0; padding-left: 18px; border-left: 1px dashed var(--line); }
@@ -215,9 +215,10 @@ void loop() {
 </ul>
 
 <figure class="widget" id="fig-bounce">
+  <div id="w-bounce-sch"></div>
   <div id="w-bounce"></div>
   <div class="w-controls" id="c-bounce"></div>
-  <figcaption><b>Figure 7.5</b> A bouncing button and an RC debouncer. The thin trace is the raw contact; the thick trace is the voltage after the RC filter; dashed lines are the Schmitt input's thresholds. The readouts count how many falling edges a plain input and a Schmitt input would see. Increase \(\tau\) until the Schmitt input sees exactly one press, then notice how much delay you've added.</figcaption>
+  <figcaption><b>Figure 7.5</b> A bouncing button and an RC debouncer. The schematic shows the circuit: the button discharges the capacitor quickly, the pull-up recharges it slowly, and a Schmitt-trigger inverter cleans up the slow edge (its output is inverted; the plot shows it re-inverted for comparison). The thin trace is the raw contact; the thick trace is the voltage after the RC filter; dashed lines are the Schmitt input's thresholds. The readouts count how many falling edges a plain input and a Schmitt input would see. Increase \(\tau\) until the Schmitt input sees exactly one press. The press is still detected at once (the closed contact empties the capacitor directly), but the release is now reported later: that's the delay you pay.</figcaption>
 </figure>
 
 <pre><code>// Software debounce: accept a press only if 30 ms have passed since the last one
