@@ -491,7 +491,7 @@
     const lm = document.getElementById('levelmap'); if (lm) renderLevelMap(lm);
     exList = Array.from(document.querySelectorAll('.ex'));
     exList.forEach((e) => setupEx(e));
-    if (isKid) document.querySelectorAll('main .card').forEach((c) => addSay(c, () => c.dataset.say || Array.from(c.querySelectorAll('h1, h2, h3, p, .say')).filter((x) => !x.closest('.ex')).map(textOf).join('. ')));
+    if (isKid) document.querySelectorAll('main .card').forEach((c) => addSay(c, () => c.dataset.say || Array.from(c.querySelectorAll('h1, h2, h3, p, .say, .speech:not(.say)')).filter((x) => !x.closest('.ex')).map(textOf).join('. ')));
     if (main.classList.contains('cards')) setupCards(main);
     chapterNav(main);
     updateProgress();
