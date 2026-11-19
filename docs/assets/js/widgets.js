@@ -110,6 +110,7 @@
     const lab = W.h('span', { class: 'w-slider-label', html: o.label || '' });
     const row = W.h('label', { class: 'w-slider' }, lab, input, out);
     W.$(parent).append(row);
+    if (window.Book && window.Book._ready) window.Book.renderMath(lab);
     let val;
     const set = (v, fire = true) => { val = v; input.value = toPos(v); out.textContent = fmt(v); if (fire && o.onInput) o.onInput(v); };
     input.addEventListener('input', () => { val = fromPos(input.value); out.textContent = fmt(val); if (o.onInput) o.onInput(val); });
@@ -604,7 +605,7 @@
         g.append(S('polygon', { class: 'fill', points: `${b[0]},${b[1]} ${b[0] - 10 * Math.cos(ang) + 5 * Math.sin(ang)},${b[1] - 10 * Math.sin(ang) - 5 * Math.cos(ang)} ${b[0] - 10 * Math.cos(ang) - 5 * Math.sin(ang)},${b[1] - 10 * Math.sin(ang) + 5 * Math.cos(ang)}` }));
         gT.append(g);
         const rec = { g, it };
-        if (it.label) rec.text = label((a[0] + b[0]) / 2 + 12 * Math.sin(ang) * (it.side || 1), (a[1] + b[1]) / 2 - 12 * Math.cos(ang) * (it.side || 1), it.label, 'middle', 'lbl anno-t');
+        if (it.label) { rec.text = label((a[0] + b[0]) / 2 + 12 * Math.sin(ang) * (it.side || 1), (a[1] + b[1]) / 2 - 12 * Math.cos(ang) * (it.side || 1), it.label, 'middle', 'lbl anno-t'); if (it.color) rec.text.style.fill = W.col(it.color); }
         if (it.id) parts[it.id] = rec;
       }
     }
@@ -623,7 +624,7 @@
         if (r.it.t === 'SW') lv.setAttribute('y2', props.closed ? 0 : -13);
         else if (lv) lv.setAttribute('transform', props.closed ? 'translate(0 7)' : '');
       }
-      if ('hidden' in props) r.g.style.display = props.hidden ? 'none' : '';
+      if ('hidden' in props) { r.g.style.display = props.hidden ? 'none' : ''; if (r.text) r.text.style.display = props.hidden ? 'none' : ''; }
       if ('cls' in props) r.g.classList.toggle(props.cls[0], props.cls[1]);
       if ('stroke' in props) r.g.style.stroke = props.stroke ? W.col(props.stroke) : '';
       if ('spin' in props) {

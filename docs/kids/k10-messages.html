@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>10 · Secret Messages — Sparky's Circuit Adventure</title>
+<meta name="description" content="Level 10 of Sparky's Circuit Adventure: blinking codes, on/off numbers, wires that carry messages, Bluetooth radio whispers, a recap quiz and a printable Spark Explorer diploma.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+/* kid level page styles (shared pattern, page-local copy) */
+.toy { background: var(--surface2); border: 2px solid var(--line); border-radius: 22px; padding: 12px 10px; margin: 16px 0; text-align: center; }
+.toy svg.art { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.toy .cap { font-size: 1rem; color: var(--muted); margin: 6px auto 0; }
+.toy-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0 4px; }
+.kbtn { font-family: inherit; font-size: 1.25rem; line-height: 1.2; min-width: 56px; min-height: 56px; padding: 6px 14px; border-radius: 18px; border: 3px solid var(--line); border-bottom-width: 6px; background: var(--surface); color: var(--ink); cursor: pointer; touch-action: manipulation; transition: transform .06s, border-color .15s, background .15s; }
+.kbtn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.kbtn:active { transform: translateY(3px); border-bottom-width: 3px; }
+.kbtn.on { border-color: var(--accent); background: var(--accent2); }
+.kbtn.go { background: var(--c3); border-color: color-mix(in srgb, var(--c3) 60%, #000); color: #fff; }
+.kbtn:disabled { opacity: .45; cursor: not-allowed; }
+.kbtn small { display: block; font-size: .8rem; color: var(--muted); }
+.kbtn.go small { color: inherit; opacity: .9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kbtn.go { color: #0b1a12; } }
+:root[data-theme="dark"] .kbtn.go { color: #0b1a12; }
+.ex .opts.emoji > li .lab, .ex .opts .lab { display: block; font-size: 1rem; line-height: 1.2; color: var(--muted); margin-top: 4px; }
+.ex .opts > li svg.mini { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto; }
+.toy .w-controls { justify-content: center; }
+.toy .w-slider { grid-template-columns: max-content 1fr max-content; font-size: 1.15rem; flex-basis: 260px; max-width: 460px; }
+.toy .w-slider input { height: 44px; }
+.toy .w-slider output { font-family: inherit; font-size: 1.05rem; min-width: 2.5em; }
+.toy .w-seg button { font-size: 1.1rem; min-height: 48px; padding: 6px 12px; }
+ol.steps { padding-left: 1.4em; } ol.steps li { margin: 6px 0; }
+.grownup { font-size: .82em; }
+.grownup > div { line-height: 1.5; }
+.card .big-emoji { letter-spacing: .05em; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  body.kid { font-size: 19px; }
+  main.cards > .card { padding: 18px 14px 20px; }
+  .speech { margin-left: 52px; padding: 12px 14px; }
+  .speech .who { left: -54px; font-size: 2.4rem; }
+  body.kid .ex { padding-left: 12px; padding-right: 50px; }
+  .big-emoji { font-size: clamp(2rem, 10.5vw, 3.2rem); }
+}
+main.cards > .card > h2 { padding-right: 48px; }
+.morse { font: 700 2rem/1.2 ui-monospace, monospace; letter-spacing: .12em; min-height: 1.4em; word-break: break-all; margin: 6px 0; color: var(--ink); }
+.morse .goal { color: var(--muted); font-size: 1.1rem; letter-spacing: .06em; display: block; font-family: inherit; }
+.namecode { display: flex; flex-wrap: wrap; gap: 6px 12px; justify-content: center; margin: 8px 0; }
+.namecode span { display: inline-flex; flex-direction: column; align-items: center; background: var(--surface); border: 2px solid var(--line); border-radius: 12px; padding: 2px 8px; font-weight: 600; }
+.namecode span.on { border-color: var(--accent); background: var(--accent2); }
+.namecode small { font-family: ui-monospace, monospace; font-size: 1rem; letter-spacing: .1em; }
+.diploma { position: relative; text-align: center; border: 8px double var(--c2); border-radius: 26px; padding: 22px 16px; margin: 14px 0; background: linear-gradient(160deg, color-mix(in srgb, var(--c2) 12%, var(--surface)), var(--surface) 60%, color-mix(in srgb, var(--c5) 12%, var(--surface))); }
+.diploma .dtitle { font-size: clamp(1.7rem, 7vw, 2.4rem); font-weight: 700; color: var(--accent); margin: .2em 0; line-height: 1.15; }
+.diploma .dname { font-size: clamp(1.8rem, 8vw, 2.8rem); font-weight: 700; border-bottom: 3px solid var(--c2); display: inline-block; padding: 0 .4em; margin: .2em 0; }
+.diploma .badges { font-size: 1.7rem; letter-spacing: .1em; margin: 8px 0; overflow-wrap: anywhere; }
+.diploma .dsmall { font-size: 1rem; color: var(--muted); margin: 4px auto; }
+.diploma svg.art { max-width: 140px; margin: 0 auto; display: block; }
+.namebox { display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; font-size: 1rem; }
+.namebox input { font: inherit; font-size: 1.1rem; padding: 8px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); color: var(--ink); width: 200px; min-height: 44px; }
+@media print {
+  body > *:not(main), main > *:not(.dip-card), .dip-card > *:not(.diploma) { display: none !important; }
+  main.chapter { padding: 0; max-width: none; }
+  main.cards > .card.dip-card { display: block !important; border: 0; box-shadow: none; padding: 0; margin: 0; animation: none; }
+  .diploma { margin: 0; min-height: 92vh; display: flex; flex-direction: column; justify-content: center; align-items: center; border-color: #f08c00; background: #fff; color: #000; font-size: 22px; }
+  .diploma .dtitle { color: #7048e8; font-size: 3rem; }
+  .diploma .dname { font-size: 3.4rem; }
+  .diploma .dsmall { font-size: 1.2rem; color: #333; }
+  .diploma .badges { font-size: 2.4rem; }
+  .diploma svg.art { max-width: 220px; }
+  #dip-sparky { width: 220px; }
+}
+</style>
+</head>
+<body data-book="kid" data-chapter="k10-messages">
+<main class="chapter cards">
+<header class="chapter-head">
+  <p class="kicker">Level 10</p>
+  <h1>📡 Secret Messages</h1>
+  <p class="lede">Blinks, beeps and invisible whispers. Then: your diploma!</p>
+</header>
+
+<section class="card">
+  <h2>💡 Lights can talk!</h2>
+  <div class="speech say"><span class="who">⚡</span>On, off, on, off. Blinks can carry a secret message! Long ago, sailors flashed lights from ship to ship using a code: short blinks and long blinks. It's called Morse code.</div>
+  <div class="big-emoji">🚢 💡 · — ·</div>
+  <div class="speech say"><span class="who">⚡</span>The most famous message is SOS. It means: help! It's three short, three long, three short.</div>
+</section>
+
+<section class="card">
+  <h2>🔦 Blink a message</h2>
+  <div class="toy">
+    <div id="t-blink"></div>
+    <div class="morse" id="t-blink-out"></div>
+    <div id="t-blink-ctl" class="toy-row"></div>
+    <p class="cap">👆 Tap short ( · ) and long ( — ) to blink SOS.</p>
+  </div>
+  <div class="ex" data-id="sos" data-kind="task">
+    <div class="q">Blink SOS: · · · — — — · · ·</div>
+    <div class="explain">You sent SOS! Short-short-short, long-long-long, short-short-short. Anyone who knows Morse code would come to help.</div>
+  </div>
+  <div class="speech say"><span class="who">⚡</span>Now let's blink YOUR name! Every letter has its own pattern.</div>
+  <div class="toy">
+    <div id="t-name" class="namecode"></div>
+    <div id="t-name-ctl" class="toy-row"></div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🔢 Counting with lights</h2>
+  <div class="speech say"><span class="who">⚡</span>Computers talk with on and off too! They use lights or Sparky pulses to make numbers. Each bulb here has some dots. Count the dots of the bulbs that are on!</div>
+  <div class="toy">
+    <div id="t-bits"></div>
+    <p class="cap">👆 Tap the bulbs to turn them on and off.</p>
+  </div>
+  <div class="ex" data-id="five" data-kind="task">
+    <div class="q">Make the number 5, like the fingers on one hand! 🖐️</div>
+    <div class="hint">Try the bulb with 4 dots and the bulb with 1 dot.</div>
+    <div class="explain">4 + 1 = 5. Computers store every number, picture and song as patterns of on and off. Grown-ups call it binary.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>〰️ Wires carry messages</h2>
+  <div class="speech say"><span class="who">⚡</span>Wires can carry messages too. When someone presses the doorbell, Sparkies zoom down the wire and ding-dong, the bell rings inside! Computers send super-fast on and off pulses down wires to talk to each other.</div>
+  <div class="big-emoji">🔘 〰️〰️ 🔔</div>
+  <div class="ex" data-id="wire" data-kind="mc">
+    <div class="q">The doorbell button is outside. The bell is inside. What carries the message?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>〰️<span class="lab">a wire</span></li>
+      <li>🕊️<span class="lab">a pigeon</span></li>
+      <li>🧦<span class="lab">a sock</span></li>
+    </ol>
+    <div class="explain">A wire! Pressing the button closes the circle road, and electricity rings the bell. (Some doorbells use radio instead, with no wire at all!)</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>📶 Invisible whispers</h2>
+  <div class="speech say"><span class="who">⚡</span>Some messages need no wire at all! Bluetooth is like an invisible whisper. A phone sends radio waves through the air to your headphones. Radio waves are a cousin of light, but our eyes can't see them.</div>
+  <div class="toy">
+    <div id="t-bt"></div>
+    <div id="t-bt-ctl" class="toy-row"></div>
+    <p class="cap">🔗 Tap to connect the headphones.</p>
+  </div>
+  <div class="ex" data-id="pair" data-kind="task">
+    <div class="q">Connect the headphones and play the music! 🎵</div>
+    <div class="explain">Connected! The phone whispers the song to the headphones with radio waves, many times every second.</div>
+  </div>
+  <div class="ex" data-id="bt" data-kind="mc">
+    <div class="q">How does Bluetooth send messages?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>📶<span class="lab">invisible radio waves</span></li>
+      <li>🧵<span class="lab">a long string</span></li>
+      <li>✉️<span class="lab">a paper letter</span></li>
+    </ol>
+    <div class="explain">Invisible radio waves! Wi-Fi, walkie-talkies and the radio in a car use radio waves too.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🏆 The big Spark quiz</h2>
+  <div class="speech say"><span class="who">⚡</span>You learned SO much! Let's see what you remember from our whole adventure.</div>
+  <div class="ex" data-id="r-loop" data-kind="mc">
+    <div class="q">To light a bulb, Sparky's road must be…</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>🔁<span class="lab">a full circle</span></li>
+      <li>🚧<span class="lab">full of gaps</span></li>
+    </ol>
+    <div class="explain">A full circle road: a circuit!</div>
+  </div>
+  <div class="ex" data-id="r-cond" data-kind="mc">
+    <div class="q">Which one lets Sparky through?</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>🥄<span class="lab">metal spoon</span></li>
+      <li>🧸<span class="lab">teddy bear</span></li>
+    </ol>
+    <div class="explain">Metal is a conductor. Teddy is an insulator.</div>
+  </div>
+  <div class="ex" data-id="r-led" data-kind="mc">
+    <div class="q">The LED's long leg goes to…</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>➕<span class="lab">plus</span></li>
+      <li>➖<span class="lab">minus</span></li>
+    </ol>
+    <div class="explain">Long leg to plus! The LED is a one-way door.</div>
+  </div>
+</section>
+
+<section class="card dip-card">
+  <h2>🎓 Your diploma!</h2>
+  <div class="speech say"><span class="who">⚡</span>Hooray! You finished the whole adventure! You are now a real Spark Explorer. Here's your diploma. Ask a grown-up to print it!</div>
+  <div class="namebox"><label for="dip-name">✏️ Your name:</label><input id="dip-name" autocomplete="off"></div>
+  <div class="diploma" id="diploma">
+    <div id="dip-sparky"></div>
+    <p class="dsmall">This diploma is proudly given to</p>
+    <div class="dname"><span data-kid-name></span></div>
+    <p class="dtitle">⚡ Spark Explorer ⚡</p>
+    <p class="dsmall">for exploring circuits, lights, magnets, robots and secret messages with Sparky.</p>
+    <div class="badges">⚡🔁🔋🥄💡🛣️🧲🪣🤖📡</div>
+    <p class="dsmall" id="dip-date"></p>
+    <p class="dsmall">Signed: Sparky the Electron ⚡</p>
+  </div>
+  <div class="toy-row"><button class="kbtn go" type="button" id="dip-print" title="Print the diploma">🖨️ Print</button></div>
+</section>
+
+<section class="card home">
+  <h2>🏠 Try it at home (with a grown-up)</h2>
+  <div class="speech say"><span class="who">⚡</span>Send secret messages with a torch!</div>
+  <p>You need: 🔦 two torches, a dark room, and a paper with the Morse code for a few letters.</p>
+  <ol class="steps">
+    <li class="say">Stand on opposite sides of the room.</li>
+    <li class="say">Blink SOS to each other: three short, three long, three short.</li>
+    <li class="say">Make up your own secret code! Maybe one blink means "yes" and two blinks mean "no".</li>
+    <li class="say">Blink the first letter of your name. Can your grown-up guess it?</li>
+  </ol>
+  <aside class="callout tip grownup"><span class="ct">👨‍👩‍👧 For grown-ups</span><div>Morse code is an early digital protocol: on/off symbols with defined timing (a dash is three dot-lengths). Serial links such as UART send bytes the same way, as timed high/low levels on a wire; the bulbs game is 4-bit binary. Bluetooth Low Energy uses 2.4 GHz radio (electromagnetic waves, like light but at a far lower frequency) and hops between channels. See <a href="../book/ch06-interfaces.html">Chapter 6: Digital Interfaces</a> (UART, I²C, SPI) and <a href="../book/ch07-mcu.html">Chapter 7</a> (ESP32 and BLE).</div></aside>
+</section>
+</main>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/kidkit.js"></script>
+<script src="js/k10-messages.js"></script>
+</body>
+</html>

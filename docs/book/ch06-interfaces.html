@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>6 · Digital Interfaces: GPIO, UART, I²C, SPI — Sparks & Circuits</title>
+<meta name="description" content="Logic levels, CMOS inputs, pull-ups, push-pull vs open-drain, ADC and PWM, UART, I2C, SPI, CAN, RC protocols, DShot, signal integrity and logic analysers.">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+  .ch6-note { font-size: .9rem; color: var(--muted); }
+  .ch6-bits { font: .85rem var(--mono); overflow-wrap: anywhere; color: var(--ink); background: var(--surface2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-top: 8px; min-height: 1.6em; }
+  .ch6-bits b.ok { color: var(--good); } .ch6-bits b.err { color: var(--bad); }
+  .ch6-in { font: .95rem var(--mono); width: 6.5em; padding: 5px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); }
+  .ch6-lbl { display: inline-flex; gap: 6px; align-items: center; font-size: .9rem; }
+</style>
+</head>
+<body data-book="adult" data-chapter="ch06-interfaces">
+<main class="chapter">
+
+<header class="chapter-head">
+  <p class="kicker">Chapter 6</p>
+  <h1>Digital Interfaces: GPIO, UART, I²C, SPI</h1>
+  <p class="lede">To your code, a GPIO is a boolean and a bus is a byte stream. To the copper, both are voltages that take time to change, fight with each other and pick up noise. This chapter covers what actually happens on the wire, so that when <code>Wire.endTransmission()</code> returns 2 you know whether to blame a missing pull-up, a wrong address or a 40 cm ribbon cable.</p>
+</header>
+
+<section>
+<h2 id="levels">Logic levels: what "1" and "0" really mean</h2>
+<p>A digital signal is an analog voltage that we agree to read in only two ways. The agreement is not "0 V means 0 and 3.3 V means 1". If it were, nothing would ever work, because no real wire sits at exactly 0 V or exactly 3.3 V. A transistor that is switched on still has some resistance, so it drops a little voltage. The ground return carries current and drops some more. Wires pick up noise. So every logic family publishes <b>ranges</b>, plus a forbidden zone between them where the result is undefined.</p>
+
+<p>Four numbers on a datasheet define the agreement. Two of them describe what a <b>driver</b> promises to produce, and two describe what a <b>receiver</b> promises to accept:</p>
+<table>
+  <tr><th>Symbol</th><th>Name</th><th>Meaning</th></tr>
+  <tr><td>\(V_{OH(\min)}\)</td><td>Output high voltage</td><td>When a driver outputs 1, it guarantees at least this voltage (at a stated load current).</td></tr>
+  <tr><td>\(V_{OL(\max)}\)</td><td>Output low voltage</td><td>When a driver outputs 0, it guarantees no more than this.</td></tr>
+  <tr><td>\(V_{IH(\min)}\)</td><td>Input high voltage</td><td>A receiver reads any voltage at or above this as 1.</td></tr>
+  <tr><td>\(V_{IL(\max)}\)</td><td>Input low voltage</td><td>A receiver reads any voltage at or below this as 0.</td></tr>
+</table>
+<p>Between \(V_{IL}\) and \(V_{IH}\) the receiver may read either value, may oscillate, and (as we'll see) may burn extra current. For the link to be reliable, the driver's worst-case output has to land well inside the receiver's acceptance window. The distance between them is the <b>noise margin</b>:</p>
+<div class="formula">
+$$NM_H = V_{OH(\min)} - V_{IH(\min)} \qquad NM_L = V_{IL(\max)} - V_{OL(\max)}$$
+<p>Noise margins: how much noise can be added to a valid output before a receiver might misread it. Both must be positive, and you want them comfortably so.</p>
+</div>
+<p>Think of the noise margin as the error budget of the link. Ground bounce from a motor driver, crosstalk from a neighbouring wire, and the drop across a long ground return all eat into it. If a 1 V spike appears on a line with a 0.4 V noise margin, the receiver sees a phantom bit.</p>
+
+<p>Here are the families you'll actually meet on an RC or robotics board:</p>
+<table>
+  <tr><th>Family</th><th>\(V_{OL}\)</th><th>\(V_{OH}\)</th><th>\(V_{IL}\)</th><th>\(V_{IH}\)</th><th>Note</th></tr>
+  <tr><td>5 V TTL (74LS)</td><td>0.4</td><td>2.4</td><td>0.8</td><td>2.0</td><td>Fixed thresholds, historical</td></tr>
+  <tr><td>5 V CMOS (74HC)</td><td>0.33</td><td>4.4</td><td>1.5</td><td>3.5</td><td>Thresholds scale with \(V_{DD}\): roughly 30% and 70%</td></tr>
+  <tr><td>74HCT at 5 V</td><td>0.33</td><td>4.4</td><td>0.8</td><td>2.0</td><td>CMOS outputs with TTL-compatible inputs: the classic 3.3 → 5 V fix</td></tr>
+  <tr><td>ATmega328P at 5 V</td><td>0.9</td><td>4.2</td><td>1.5</td><td>3.0</td><td>Output values at 20 mA load; inputs \(0.3/0.6\,V_{CC}\)</td></tr>
+  <tr><td>ESP32 (3.3 V)</td><td>0.33</td><td>2.64</td><td>0.825</td><td>2.475</td><td>\(0.1/0.8/0.25/0.75 \times V_{DD}\)</td></tr>
+  <tr><td>1.8 V LVCMOS</td><td>0.45</td><td>1.35</td><td>0.63</td><td>1.17</td><td>Many modern sensors' I/O rail</td></tr>
+</table>
+<p class="ch6-note">Values in volts, worst case, from the respective datasheets and JEDEC-style definitions. Always check the exact part: output levels depend on load current and supply voltage.</p>
+
+<figure class="widget" id="fig-levels">
+  <div id="w-levels"></div>
+  <figcaption><b>Figure 6.1</b> Noise margins, live. The left bar shows the voltages the driver can produce; the right bar shows how the receiver reads them. Green zones are noise margins and the red band is the receiver's forbidden zone. Try an <b>ESP32 driving an ATmega328P at 5 V</b> (a common Uno + ESP32 combination): the high-side margin goes negative. Then raise the noise slider and watch the wiggly trace cross into the forbidden band.</figcaption>
+</figure>
+
+<div class="ex" data-id="lv-task" data-kind="task">
+  <div class="q">In Figure 6.1, keep the <b>ESP32</b> as the driver and find a <b>5 V receiver</b> for which both noise margins are positive. That's the chip you'd put between an ESP32 and a 5 V device as a level translator.</div>
+  <div class="explain">A 74HCT gate running from 5 V has TTL-style thresholds (\(V_{IH} = 2.0\) V), so the ESP32's guaranteed 2.64 V high gives \(NM_H = 0.64\) V. Its outputs swing almost rail to rail at 5 V. A 74AHCT125 or 74HCT245 is the standard "3.3 V to 5 V" buffer for things like WS2812 LEDs. (A 74LS TTL input passes too, for the same reason, but nobody designs new boards around 74LS.)</div>
+</div>
+
+<div class="ex" data-id="lv-nm" data-kind="num" data-answer="0.9" data-tol="0.02" data-unit="V">
+  <div class="q">A 74HC gate at 5 V drives another 74HC gate. Using the table, what is the high-level noise margin \(NM_H\)?</div>
+  <div class="hint">\(NM_H = V_{OH(\min)} - V_{IH(\min)}\) for the driver's output and the receiver's input.</div>
+  <div class="explain">\(4.4 - 3.5 = 0.9\) V. The low side is \(1.5 - 0.33 = 1.17\) V. Families are designed to talk to themselves with healthy margins on both sides. Mixing families is where trouble starts.</div>
+</div>
+
+<h3 id="cmos-in">Inside a CMOS input</h3>
+<p>Almost every input you'll touch, on an ESP32, an AVR, an STM32 or a sensor, is a CMOS input. Strip away the protection and it is the gate of a complementary pair of MOSFETs: a P-channel transistor on top and an N-channel below, the CMOS inverter from <a href="ch04-semis.html">Chapter 4</a>. The gate of a MOSFET is a tiny capacitor, a plate separated from the channel by a few nanometres of oxide. No DC current flows into it, except for leakage on the order of nanoamps to a microamp.</p>
+<p>That fact has three consequences that explain most GPIO weirdness:</p>
+<ol>
+  <li><b>An input has very high resistance.</b> It draws almost no current, so it doesn't load the signal. That's the good news.</li>
+  <li><b>An input is a capacitor</b>, typically 3–10 pF counting the pad and package. Every edge has to charge or discharge it through whatever drives the line. That limits speed and is the heart of the I²C rise-time story later.</li>
+  <li><b>An unconnected input has nothing to set its voltage.</b> A few picofarads with almost no leakage path act as a little memory: the pin floats wherever stray charge and nearby fields put it.</li>
+</ol>
+
+<figure class="widget" id="fig-cmos">
+  <div id="w-cmos"></div>
+  <div class="w-controls" id="c-cmos"></div>
+  <figcaption><b>Figure 6.2</b> A CMOS input stage with its ESD clamp diodes. Drag the pin voltage. Inside the thresholds only one transistor conducts. Near the middle (≈ \(V_{DD}/2\)) <em>both</em> conduct a little, and shoot-through current flows from VDD to GND. Above \(V_{DD} + 0.6\) V the upper clamp diode conducts and pushes current into the supply rail.</figcaption>
+</figure>
+
+<p>The middle of the transfer curve matters more than it looks. When the input sits near half the supply, the PMOS is partly on (its gate is below the source by about \(V_{DD}/2\)) and the NMOS is partly on too. Current flows straight through both, from VDD to ground. For a single gate that's tens to hundreds of microamps. That doesn't sound like much, but on a battery-powered board in deep sleep it can be ten times the whole chip's sleep budget. Slow edges also spend a long time in this zone, and a little noise makes the output chatter. That's why inputs that see slow or noisy signals use a <b>Schmitt trigger</b>: an input with two thresholds (hysteresis), so that a rising signal must reach the upper threshold to switch high and a falling one must reach the lower threshold to switch back. Most MCU GPIO inputs have some hysteresis built in, typically 5–10% of \(V_{DD}\).</p>
+
+<h3 id="clamps">ESD clamp diodes and "5 V tolerant"</h3>
+<p>Your finger can carry thousands of volts of static charge. A gate oxide a few nanometres thick breaks down at a few volts. So every pin has <b>clamp diodes</b>: one from the pin up to VDD and one from GND up to the pin (often with more elaborate protection structures, but the diodes are the part you can reason about). In normal operation both are reverse-biased and invisible. If the pin goes more than a diode drop above VDD, the upper diode conducts and dumps the excess current into the supply rail. If it goes below ground, the lower one conducts.</p>
+<p>This explains a famous puzzle: <em>"I unplugged power from my 3.3 V board but it still runs when the 5 V UART is connected."</em> The 5 V signal drives current through the clamp diode into the 3.3 V rail and powers the whole chip through its I/O pin. This is called <b>back-powering</b> or <b>phantom powering</b>. It stresses the diode, it can latch up the chip, and it can push the 3.3 V rail above its rating if nothing else is drawing current from it.</p>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "a 1 kΩ resistor makes 5 V safe on a 3.3 V pin"</span>
+<p>A series resistor limits the clamp current: \((5 - 3.3 - 0.6)/1000 \approx 1.1\) mA. Some vendors document a maximum injection current (often a few mA per pin), and inside that limit it's a legitimate trick. But that current still goes <em>into your 3.3 V rail</em>. If the rail is lightly loaded (say, the MCU is asleep), and the regulator can only source current and not sink it, the rail voltage rises. The ESP32's datasheet rates its pins at VDD + 0.3 V maximum and does not claim 5 V tolerance. Use a proper level shifter, or a divider for slow input-only signals.</p>
+</aside>
+
+<p>A pin that is genuinely <b>5 V tolerant</b> (many STM32 pins are marked "FT"; some sensor I/O pins are too) replaces the upper clamp diode with a different protection structure, so it can sit above VDD without conducting. Datasheets also list the condition: usually only while VDD is powered, and only when the pin is configured as an input or open-drain.</p>
+
+<h3 id="floating">Floating inputs</h3>
+<p>Leave an input unconnected and read it in a loop. You'll see a stream of random-looking ones and zeros that changes when you wave your hand near the board. Nothing is broken. The input is a few picofarads with nothing holding its voltage, and your body, the mains wiring in the walls and the neighbouring pins all couple charge into it through stray capacitance. Mains hum (50 or 60 Hz) is usually the strongest component, since your body acts as an antenna for it.</p>
+
+<figure class="widget" id="fig-float">
+  <div id="w-float"></div>
+  <div class="w-controls" id="c-float"></div>
+  <figcaption><b>Figure 6.3</b> A floating pin in a noisy room. The top trace is the analog voltage on the pin; the bottom trace is what <code>digitalRead()</code> returns. Turn on "hand nearby" to couple in mains hum, then enable a pull-up or pull-down and watch the noise collapse. The counter shows phantom transitions per second, each of which could be a false button press or a spurious interrupt.</figcaption>
+</figure>
+
+<p>In software terms a floating input is an <b>uninitialised variable</b>: reading it is undefined behaviour, and it often <em>appears</em> to work while you test it. The bug shows up later, in a different room, on a different board. Every input pin must be driven by <em>something</em> at all times: an output, a pull-up or a pull-down resistor. That includes unused pins on low-power designs. Datasheets recommend enabling an internal pull or configuring unused pins as outputs, both to avoid the shoot-through current described above and to stop them generating interrupts.</p>
+
+<h3 id="pullups">Pull-up and pull-down resistors</h3>
+<p>A <b>pull-up resistor</b> connects the pin to VDD through a resistance large enough that anything actively driving the line can easily overpower it. With nothing else connected, no current flows (the input draws almost none), so there is no voltage drop across the resistor and the pin sits at VDD: a clean 1. When a button connects the pin to ground, the pin goes to 0 V and a small current \(V_{DD}/R\) flows through the resistor. A pull-down is the mirror image.</p>
+<p>This makes the common button circuit <b>active low</b>: pressed reads 0. That looks backwards to a programmer, but it's the conventional choice for good reasons. Ground is the reference everything shares, the button wire carries no supply voltage that could be shorted, and every MCU has internal pull-ups (and not all have pull-downs).</p>
+
+<figure class="widget" id="fig-pullup">
+  <div id="w-pullup"></div>
+  <div class="w-controls" id="c-pullup"></div>
+  <figcaption><b>Figure 6.4</b> A button with a pull-up. Press and hold the button. Current flows through the resistor only while it's pressed. Change \(R\) and look at the trade-off: small resistors waste current while pressed; large resistors make the pin slow to recover (the RC time constant with the pin and wire capacitance) and more susceptible to noise. Untick "pull-up fitted" to see the floating case.</figcaption>
+</figure>
+
+<p>How big should a pull-up be? Two forces pull in opposite directions:</p>
+<ul>
+  <li><b>Power:</b> while the line is low, current \(I = V_{DD}/R\) flows to waste. At 3.3 V, 1 kΩ costs 3.3 mA, 10 kΩ costs 330 µA and 100 kΩ costs 33 µA.</li>
+  <li><b>Speed and noise immunity:</b> when the line is released, the resistor has to charge the line's capacitance \(C\). The voltage rises as \(V(t) = V_{DD}(1 - e^{-t/RC})\), so the rise time scales with \(RC\) (see <a href="ch03-ac.html">Chapter 3</a> for the exponential). A weak pull-up also means a high-impedance node, which picks up noise more easily: the same coupled current makes a bigger voltage across a bigger resistor.</li>
+</ul>
+<p>For a button, 10 kΩ is the classic value. The internal pull-ups (roughly 20–50 kΩ on an AVR, around 45 kΩ on an ESP32) are fine for buttons on short wires. For a button at the end of a 1 m cable in a robot full of motor noise, use an external 4.7–10 kΩ and add a small capacitor (see debouncing in <a href="ch07-mcu.html">Chapter 7</a>).</p>
+
+<pre><code>// Arduino: internal pull-up, active-low button
+pinMode(BUTTON_PIN, INPUT_PULLUP);
+bool pressed = (digitalRead(BUTTON_PIN) == LOW);
+
+// ESP-IDF: same thing, explicitly
+gpio_config_t cfg = {
+    .pin_bit_mask = 1ULL &lt;&lt; GPIO_NUM_4,
+    .mode         = GPIO_MODE_INPUT,
+    .pull_up_en   = GPIO_PULLUP_ENABLE,
+    .pull_down_en = GPIO_PULLDOWN_DISABLE,
+    .intr_type    = GPIO_INTR_NEGEDGE,   // interrupt on press
+};
+gpio_config(&amp;cfg);</code></pre>
+
+<div class="ex" data-id="pu-mc" data-kind="mc">
+  <div class="q">A limit switch on your robot's arm connects a GPIO to ground when pressed. With no pull-up configured, the firmware occasionally sees the switch "pressed" while the arm is in mid-air, especially when the motors run. What is the most likely cause?</div>
+  <ol class="opts">
+    <li>The switch contacts are worn out</li>
+    <li data-correct>The input floats when the switch is open and picks up motor noise</li>
+    <li>The GPIO pin has been damaged by ESD</li>
+    <li>The motor current is flowing into the GPIO</li>
+  </ol>
+  <div class="hint">What sets the pin's voltage when the switch is open?</div>
+  <div class="explain">An open switch leaves the pin floating. Motor PWM edges couple capacitively into the long switch wire and toggle the reading. Add a pull-up (internal for short wires; an external 4.7–10 kΩ for long ones), and consider an RC filter or software debounce.</div>
+</div>
+
+</section>
+
+<section>
+<h2 id="outputs">Outputs: push-pull, open-drain and how much current a pin can give</h2>
+<p>An output pin is the same pair of transistors turned around: the MCU drives their gates and the shared drain node is the pin. How those two transistors are used defines the output type, and the type determines what you're allowed to connect.</p>
+
+<h3 id="pushpull">Push-pull</h3>
+<p>In a <b>push-pull</b> (or totem-pole) output, both transistors are used. Writing 1 turns the PMOS on and the NMOS off, so the pin is connected to VDD through the PMOS's on-resistance (typically 20–50 Ω on an MCU). Writing 0 does the reverse and connects the pin to GND. The output actively drives both edges, so it is fast and symmetric. This is the default mode for <code>pinMode(pin, OUTPUT)</code> and the right choice for SPI, UART TX, LED drive, and anything with exactly one driver per wire.</p>
+<p>The catch is <b>contention</b>. Connect two push-pull outputs together and have one drive high while the other drives low, and you've built a short circuit from VDD to GND through two small on-resistances. With 3.3 V across about 50 Ω you get tens of milliamps, limited only by the transistors themselves. That's beyond the pins' ratings, it heats the chip, and the voltage on the wire ends up somewhere in the forbidden zone. In software terms, it's two threads writing the same variable without a lock, except that the race also starts a small fire.</p>
+
+<h3 id="opendrain">Open-drain</h3>
+<p>An <b>open-drain</b> output (open-collector for bipolar parts) has only the bottom transistor. It can pull the line low, or it can let go. When it lets go, the pin is high-impedance ("Hi-Z"), and something else (a <b>pull-up resistor</b>) must bring the line high. That sounds like a weaker output, and for speed it is, because the rising edge is now an RC charge through the pull-up. But it has one property push-pull lacks: <b>any number of open-drain outputs can share a wire safely</b>. If any device pulls low, the line is low. Only when <em>all</em> devices let go does the pull-up make it high. Nobody can ever short anybody.</p>
+<p>This is called a <b>wired-AND</b> (with "high = 1": the line is 1 only if every device outputs 1). It's the basis of I²C, 1-Wire, SMBus, shared interrupt lines, and the CAN bus's arbitration (by differential analogy). It also lets a 3.3 V device talk to a 1.8 V or 5 V bus: the device only ever pulls down, and the pull-up sets the high voltage, as long as the pin can tolerate that voltage.</p>
+
+<figure class="widget" id="fig-pp">
+  <div id="w-pp"></div>
+  <div class="w-controls" id="c-pp"></div>
+  <figcaption><b>Figure 6.5</b> Push-pull vs open-drain. Switch modes and toggle the output value; the transistor that is on is highlighted and the dots show current. Then turn on "another device pulls low", which is what happens on a shared bus. In push-pull mode with output 1 you get a short circuit through both transistors. In open-drain mode the other device simply wins and only the pull-up's small current flows.</figcaption>
+</figure>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: open-drain is a lock-free "any" flag</span>
+<p>An open-drain line behaves like a shared flag that any thread may <em>set to busy</em> but nobody may <em>set to free</em>: it reads free only when every writer has released it. Writes can never conflict, and anyone can see that <em>someone</em> is holding it, which is exactly what I²C needs for clock stretching and arbitration. The cost is latency: releasing the line is passive (an RC charge), not an active write.</p>
+</aside>
+
+<p>On an MCU you usually choose the mode in software:</p>
+<pre><code>// ESP-IDF: open-drain output with internal pull-up (weak, ~45 kΩ)
+gpio_set_direction(GPIO_NUM_21, GPIO_MODE_INPUT_OUTPUT_OD);
+gpio_set_pull_mode(GPIO_NUM_21, GPIO_PULLUP_ONLY);
+gpio_set_level(GPIO_NUM_21, 0);   // pull low
+gpio_set_level(GPIO_NUM_21, 1);   // release (pull-up raises it)
+
+// Arduino-ESP32
+pinMode(21, OUTPUT_OPEN_DRAIN);
+
+// AVR has no OD mode, but you can emulate one: keep PORT bit = 0 and toggle DDR.
+DDRB |=  (1 &lt;&lt; PB0);   // output, driving low
+DDRB &amp;= ~(1 &lt;&lt; PB0);   // input (Hi-Z): the line floats up via the pull-up</code></pre>
+
+<h3 id="limits">How much current can a pin deliver?</h3>
+<p>A push-pull output is a voltage source with an internal resistance, the on-resistance of whichever transistor is conducting. Load it and the voltage sags: \(V_{OH}\) drops as you source more current, \(V_{OL}\) rises as you sink more. That's the Thevenin model from <a href="ch02-dc.html">Chapter 2</a>. The ATmega328P datasheet, for example, guarantees \(V_{OH} \ge 4.2\) V at 20 mA when running from 5 V, which implies an effective source resistance around 40 Ω.</p>
+<p>The ratings to look for:</p>
+<ul>
+  <li><b>Per-pin limit.</b> ATmega328P: 40 mA absolute maximum, with 20 mA as the sensible working value. ESP32: drive strength is programmable; the default level is around 20 mA and the strongest setting about 40 mA.</li>
+  <li><b>Per-port or per-package limit.</b> The ATmega328P allows 200 mA total through its VCC and GND pins. Eight pins at 20 mA each already use most of that budget.</li>
+  <li><b>The voltage at that current.</b> A pin delivering 20 mA is no longer at 3.3 V. If the load needs a clean logic level (another chip's input), don't also load the pin heavily.</li>
+</ul>
+<p>Good uses of raw pin current: an LED with a resistor (2–10 mA), the gate of a MOSFET (microamps on average, short current spikes when switching), the base of a small BJT through a resistor, a logic input.</p>
+
+<aside class="callout warn"><span class="ct">⚠️ Never drive a motor, solenoid or relay coil directly from a GPIO</span>
+<p>Even a tiny hobby motor draws 100–300 mA running and an amp or more at stall (startup), ten to fifty times what the pin can give. Worse, a motor is an inductor. When the pin switches off, the collapsing magnetic field produces a voltage spike (\(V = L\,di/dt\), from <a href="ch01-physics.html">Chapter 1</a>) that drives the pin far outside its rails and through the clamp diodes, which can kill the pin or the chip. Brushed motors also spray electrical noise from their commutators. The pin's job is to tell a <b>driver</b> (a logic-level MOSFET with a flyback diode, or an H-bridge IC like the DRV8833) what to do. <a href="ch04-semis.html">Chapter 4</a> covers those circuits.</p>
+</aside>
+
+<div class="ex" data-id="od-multi" data-kind="multi">
+  <div class="q">Which statements about open-drain outputs are true? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>Several open-drain outputs can share one wire without risk of a short circuit</li>
+    <li data-correct>The line's high level is set by the pull-up supply, not by the driving chip</li>
+    <li>Open-drain edges are equally fast in both directions</li>
+    <li data-correct>Without a pull-up resistor, an open-drain line never goes cleanly high</li>
+    <li>Open-drain is the best choice for a 20 MHz SPI clock</li>
+  </ol>
+  <div class="explain">The falling edge is driven by a transistor (fast); the rising edge is a passive RC charge through the pull-up (slow). That asymmetry is why I²C tops out around 1 MHz while SPI, which uses push-pull outputs, can go to tens of MHz.</div>
+</div>
+
+<div class="ex" data-id="od-sort" data-kind="sort">
+  <div class="q">Sort each line by the output type it normally uses.</div>
+  <div class="bins">
+    <div data-bin="pp">Push-pull</div>
+    <div data-bin="od">Open-drain + pull-up</div>
+  </div>
+  <ul class="items">
+    <li data-bin="od">I²C SDA and SCL</li>
+    <li data-bin="pp">SPI SCK and MOSI</li>
+    <li data-bin="pp">UART TX</li>
+    <li data-bin="od">1-Wire data line (DS18B20)</li>
+    <li data-bin="od">An interrupt line shared by three sensors</li>
+    <li data-bin="pp">WS2812 LED data</li>
+  </ul>
+  <div class="explain">Lines with exactly one driver use push-pull for speed. Lines that many devices drive, or that must support "anyone may pull low" semantics (ACKs, clock stretching, presence pulses, shared IRQ), use open-drain with a pull-up.</div>
+</div>
+
+</section>
+
+<section>
+<h2 id="adc">Analog in, analog out: ADC and PWM</h2>
+<p>Not every signal is digital. A battery's voltage, a potentiometer's position or a current-sense amplifier's output is a continuous voltage, and the MCU has to turn it into a number. That's the job of the <b>analog-to-digital converter</b> (ADC). Going the other way, most small MCUs have no true analog output; they fake one with <b>pulse-width modulation</b> (PWM).</p>
+
+<h3 id="quant">Resolution and quantisation</h3>
+<p>An \(N\)-bit ADC divides its input range, from 0 to the <b>reference voltage</b> \(V_{ref}\), into \(2^N\) steps. Each step is one <b>LSB</b> (least significant bit) wide:</p>
+<div class="formula">
+$$\text{LSB} = \frac{V_{ref}}{2^N} \qquad \text{code} = \left\lfloor \frac{V_{in}}{V_{ref}} \, 2^N \right\rfloor \qquad V_{in} \approx \text{code} \times \text{LSB}$$
+<p>An ideal ADC rounds the input down to the nearest step. Every reading carries up to one LSB of quantisation error (±½ LSB if it rounds to the nearest step).</p>
+</div>
+<p>An Arduino Uno's 10-bit ADC with its default 5 V reference has an LSB of \(5/1024 = 4.88\) mV. The ESP32's 12-bit ADC spans about 0–3.3 V at its widest attenuation, roughly 0.8 mV per LSB. Those are the <em>nominal</em> numbers. Real accuracy is limited by noise, by nonlinearity (the ESP32's ADC is notoriously curved near the ends of its range; Chapter 7 shows how to calibrate it) and above all by the reference. If \(V_{ref}\) is your 5 V USB rail and it sags to 4.8 V, every reading is 4% wrong. A precision reading needs a stable reference, or a ratiometric circuit: a potentiometer powered from the same rail as the reference reads the same code however the rail drifts.</p>
+
+<figure class="widget" id="fig-quant">
+  <div id="w-quant"></div>
+  <div class="w-controls" id="c-quant"></div>
+  <figcaption><b>Figure 6.6</b> Quantisation. The smooth curve is the analog input; the staircase is what the ADC reports. Slide the resolution down to 3 bits to see the steps, then back up to 12. The lower trace is the error, which is a sawtooth one LSB tall. Its RMS value is \(\text{LSB}/\sqrt{12}\), which is where the textbook signal-to-noise ratio \(6.02N + 1.76\) dB comes from.</figcaption>
+</figure>
+
+<details class="deep"><summary>Derivation: why quantisation noise is LSB/√12</summary>
+<p>If the input moves around enough, the error \(e\) between the true voltage and the reported step is equally likely to be anywhere in a one-LSB-wide window, say from \(-q/2\) to \(+q/2\) with \(q = \text{LSB}\). Its mean square is the average of \(e^2\) over that window:</p>
+$$\overline{e^2} = \frac{1}{q}\int_{-q/2}^{q/2} e^2\,de = \frac{1}{q}\cdot\frac{e^3}{3}\Big|_{-q/2}^{q/2} = \frac{q^2}{12}$$
+<p>So the RMS error is \(q/\sqrt{12} \approx 0.29\) LSB. A full-scale sine wave has an RMS of \(\frac{2^N q}{2\sqrt2}\). Dividing the two and converting to decibels (see <a href="appA-math.html">Appendix A</a>) gives \(20\log_{10}\!\left(2^N \sqrt{1.5}\right) = 6.02N + 1.76\) dB. Every extra bit buys 6 dB, a factor of two in amplitude.</p>
+</details>
+
+
+<div class="ex" data-id="adc-batt" data-kind="num" data-answer="8.40" data-tol="1%" data-unit="V">
+  <div class="q">An Arduino Uno (10-bit, 5.00 V reference) measures a 2S LiPo through a divider of two equal resistors. <code>analogRead()</code> returns 860. What is the battery voltage?</div>
+  <div class="hint">First convert the code to the voltage at the pin: \(860 \times 5/1024\). Then undo the divider.</div>
+  <div class="explain">\(V_{pin} = 860 \times 5.00/1024 = 4.20\) V, so \(V_{batt} = 2 \times 4.20 = 8.40\) V, a fully charged 2S pack. With equal resistors the pin sees half the battery voltage, which keeps it under the 5 V reference.</div>
+</div>
+
+<h3 id="sampling">Sampling rate and aliasing</h3>
+<p>An ADC doesn't watch the signal continuously. It takes snapshots, \(f_s\) of them per second. Between snapshots it knows nothing. The <b>Nyquist–Shannon sampling theorem</b> says that if the signal contains no frequencies above \(f_s/2\) (the <b>Nyquist frequency</b>), the samples capture it completely. If it does contain higher frequencies, they don't disappear. They <b>alias</b>: they show up as false low frequencies that are indistinguishable from real ones. A component at frequency \(f\) appears at</p>
+<div class="formula">
+$$f_{alias} = \left| f - k f_s \right| \quad \text{for the integer } k \text{ that makes it smallest (} \le f_s/2 \text{)}$$
+<p>The aliasing rule. A 990 Hz tone sampled at 1 kHz looks exactly like a 10 Hz tone.</p>
+</div>
+<p>You've seen aliasing in films: the wagon wheel that appears to spin backwards because the camera's frame rate is close to the spoke rate. In robotics it shows up as a slow "wobble" in IMU or current readings that's really motor PWM or propeller vibration, sampled too slowly. Once the samples are taken, no amount of software filtering can remove an alias, because the information about the original frequency is gone. The fix is analog: an <b>anti-aliasing filter</b> (even a simple RC low-pass, Chapter 3) <em>before</em> the ADC, or sampling fast enough and filtering digitally.</p>
+
+<figure class="widget" id="fig-alias">
+  <div id="w-alias"></div>
+  <div class="w-controls" id="c-alias"></div>
+  <figcaption><b>Figure 6.7</b> Aliasing. The thin curve is the real signal; dots are the ADC's samples; the thick line is the slowest sine that fits those samples, which is what your firmware "sees". Raise the signal frequency past half the sample rate and watch the apparent frequency fold back down.</figcaption>
+</figure>
+
+<div class="ex" data-id="alias-task" data-kind="task">
+  <div class="q">In Figure 6.7, with the sample rate at <b>1 kHz</b>, find a signal frequency <b>above 900 Hz</b> that your firmware would mistake for a signal <b>below 50 Hz</b>.</div>
+  <div class="explain">Anything from about 950 Hz to 1 kHz works: \(|f - f_s|\) is under 50 Hz. A sensor sampled at 1 kHz next to a motor PWM or a vibration near 1 kHz will report a slow, very convincing fake oscillation.</div>
+</div>
+
+<h3 id="sar">Input impedance and the sample capacitor</h3>
+<p>Most MCU ADCs are <b>SAR</b> (successive approximation) converters. Before each conversion a switch connects the input pin to a small <b>sample-and-hold capacitor</b> (around 14 pF on an ATmega328P) for a short acquisition time, then disconnects it and binary-searches its voltage against an internal DAC, one bit per clock. It's a hardware binary search: \(N\) comparisons for \(N\) bits.</p>
+<p>The weak point is the acquisition phase. The capacitor must charge through the source's output resistance \(R_s\) and the switch's resistance, a simple RC circuit. To settle within ½ LSB of an \(N\)-bit converter, the voltage error \(e^{-t/RC}\) must drop below \(2^{-(N+1)}\):</p>
+<div class="formula">
+$$t_{acq} \ge R C \ln\!\left(2^{N+1}\right) = (N+1)\,\ln 2 \; RC \approx 0.69\,(N+1)\,RC$$
+<p>Settling time for an RC to reach ½ LSB. A 10-bit ADC needs about 7.6 time constants; a 12-bit one about 9.</p>
+</div>
+<p><b>Worked example.</b> You measure a battery through a 100 kΩ / 100 kΩ divider (to waste only 21 µA from 8.4 V). The divider's Thevenin resistance is the two resistors in parallel, 50 kΩ. With a 14 pF sample capacitor, \(\tau = 50\text{k} \times 14\text{p} = 0.7\) µs, and 10-bit settling needs \(7.6\tau \approx 5.3\) µs. The ATmega's acquisition window at the usual 125 kHz ADC clock is 1.5 cycles, 12 µs, so it's fine. Halve the ADC clock period or switch quickly between channels with different voltages, though, and you'll see one channel's voltage "leak" into the next reading. The datasheet's advice to keep source impedance below 10 kΩ comes from this calculation.</p>
+<p>The standard fix for a high-impedance source is a <b>capacitor from the ADC pin to ground</b>, say 100 nF. It acts as a charge reservoir: when the 14 pF sample cap connects, charge sharing moves the voltage by only \(14\text{p}/100\text{n} \approx 0.014\%\), well under an LSB. The divider then recharges the big cap between samples. This only works for slowly changing signals (the 50 kΩ × 100 nF = 5 ms time constant is also a low-pass filter), but a battery voltage is exactly that.</p>
+
+<h3 id="pwm">PWM: faking an analog output</h3>
+<p>A PWM output switches between 0 and VDD at a fixed frequency \(f_{PWM}\) and varies the fraction of each period it spends high, the <b>duty cycle</b> \(D\). Anything slow compared to the period, such as a motor's mechanical inertia, an LED seen by your eye, or an RC low-pass filter, responds to the <em>average</em>:</p>
+<div class="formula">
+$$V_{avg} = D \cdot V_{DD} \qquad f_{PWM} = \frac{f_{timer}}{\text{TOP} + 1} \qquad \text{resolution} = \log_2\!\left(\frac{f_{timer}}{f_{PWM}}\right) \text{ bits}$$
+<p>A hardware timer counts from 0 to TOP and the output flips when the count passes a compare value. More counts per period means finer duty steps, but a lower frequency.</p>
+</div>
+<p>That last formula is the fundamental PWM trade-off. The ESP32's LEDC peripheral clocks its timers from the 80 MHz APB clock. At 1 kHz there are 80,000 ticks per period, enough for 16 bits. At 20 kHz (inaudible, the usual choice for motors) there are only 4,000, so the largest power-of-two resolution is 11 bits (2048 steps). An AVR at 16 MHz gets 8-bit PWM at 62.5 kHz with no prescaler, or the default <code>analogWrite()</code> frequency of about 490 Hz (or 980 Hz on pins 5 and 6) with a prescaler of 64.</p>
+
+<figure class="widget" id="fig-pwm">
+  <div id="w-pwm"></div>
+  <div class="w-controls" id="c-pwm"></div>
+  <figcaption><b>Figure 6.8</b> PWM and timer resolution. Change duty cycle and frequency. The dashed line is the average voltage a slow load sees. The readouts show how many ticks of the timer clock fit in one period and therefore how many bits of duty resolution you get. Try 20 kHz on the 16 MHz AVR clock, then on the 80 MHz ESP32 clock.</figcaption>
+</figure>
+
+<pre><code>// ESP32 Arduino core 3.x: 20 kHz, 11-bit PWM on GPIO 25
+ledcAttach(25, 20000, 11);          // pin, frequency, resolution bits
+ledcWrite(25, 1024);                // 50% duty (1024 / 2048)
+
+// ESP-IDF LEDC
+ledc_timer_config_t t = {
+    .speed_mode = LEDC_LOW_SPEED_MODE, .timer_num = LEDC_TIMER_0,
+    .duty_resolution = LEDC_TIMER_11_BIT, .freq_hz = 20000, .clk_cfg = LEDC_AUTO_CLK,
+};
+ledc_timer_config(&amp;t);
+ledc_channel_config_t ch = {
+    .gpio_num = 25, .speed_mode = LEDC_LOW_SPEED_MODE, .channel = LEDC_CHANNEL_0,
+    .timer_sel = LEDC_TIMER_0, .duty = 1024, .hpoint = 0,
+};
+ledc_channel_config(&amp;ch);</code></pre>
+
+<div class="ex" data-id="pwm-bits" data-kind="num" data-answer="11" data-tol="0" data-unit="bits">
+  <div class="q">An ESP32 LEDC timer runs from the 80 MHz APB clock. What is the highest whole-number duty resolution (in bits) you can use at a PWM frequency of 20 kHz?</div>
+  <div class="hint">How many 80 MHz ticks fit in one 50 µs period? Find the largest \(2^n\) that's no bigger.</div>
+  <div class="explain">\(80\,\text{MHz}/20\,\text{kHz} = 4000\) ticks. \(2^{11} = 2048 \le 4000 \lt 4096 = 2^{12}\), so 11 bits. Ask for 12 bits at 20 kHz and the driver reports an error.</div>
+</div>
+</section>
+
+<section>
+<h2 id="uart">UART: the simplest serial link</h2>
+<p>The <b>UART</b> (universal asynchronous receiver-transmitter) is the oldest and simplest of the serial protocols, and it's the one behind <code>Serial.println()</code>, GPS modules, Bluetooth serial modules, the ESP32's boot log, and RC receiver protocols like SBUS and CRSF. Two wires carry data, one in each direction: your TX goes to the other side's RX and vice versa. A third wire, ground, is just as essential, because a voltage only means something relative to a reference (<a href="ch01-physics.html">Chapter 1</a>).</p>
+<p>"Asynchronous" means there is <b>no clock wire</b>. Both sides agree in advance on a <b>baud rate</b> (bits per second, such as 9600 or 115200) and each times the bits with its own local clock. The frame format makes that possible:</p>
+<ol>
+  <li>The line <b>idles high</b> (logic 1, called "mark" in old telegraph language).</li>
+  <li>A <b>start bit</b> pulls the line low for one bit time. The falling edge is the receiver's synchronisation point.</li>
+  <li><b>Data bits</b> follow, usually 8, <b>least significant bit first</b>.</li>
+  <li>An optional <b>parity bit</b> makes the number of ones even (even parity) or odd (odd parity), which catches single-bit errors.</li>
+  <li>One or two <b>stop bits</b> return the line high, guaranteeing that the next start bit produces a fresh falling edge.</li>
+</ol>
+<p>The shorthand "8N1" means 8 data bits, no parity, 1 stop bit: 10 bit times per byte. At 115200 baud a bit lasts \(1/115200 = 8.68\) µs and you can send at most 11,520 bytes per second.</p>
+
+<figure class="widget" id="fig-uart">
+  <div id="w-uart"></div>
+  <div class="w-controls" id="c-uart"></div>
+  <div class="ch6-bits" id="uart-bits"></div>
+  <figcaption><b>Figure 6.9</b> A UART frame, drawn from the character you type. The cursor shows the receiver's sampling instants, in the middle of each bit. Try <code>U</code> (0x55, alternating bits, a favourite for measuring baud rate on a scope), then add parity and a second stop bit and watch the frame grow.</figcaption>
+</figure>
+
+
+<div class="ex" data-id="uart-idle" data-kind="text" data-answer="high|1|mark|logic high|logic 1|vcc|vdd">
+  <div class="q">At what logic level does a (non-inverted, TTL-level) UART line sit when nothing is being sent? (One word.)</div>
+  <div class="explain">High. That's why the start bit is low: a falling edge marks the start of a frame. It's also why a disconnected RX pin with no pull-up reads garbage, since a floating line produces random "start bits". Many UART peripherals enable an internal pull-up on RX for this reason.</div>
+</div>
+
+<h3 id="baud">How accurate do the clocks need to be?</h3>
+<p>The receiver sees the start bit's falling edge, waits 1.5 bit times, and samples the first data bit in its middle. Then it samples every bit time after that, using <em>its</em> clock. If the transmitter's clock runs slightly fast or slow, the sampling point drifts relative to the bits. By the stop bit, 9.5 bit times after the edge in 8N1, the accumulated drift is \(9.5 \times\) the relative clock error. The sample lands in the wrong bit once the drift exceeds half a bit:</p>
+$$9.5\,|\varepsilon| \lt 0.5 \;\Rightarrow\; |\varepsilon| \lt 5.3\%$$
+<p>That's the total mismatch between the two ends, and it ignores edge jitter, slow rise times and the receiver's own sampling granularity (most sample 16 times per bit). Practical designs keep each side within about 2%. This is why UART works fine with an MCU's internal RC oscillator (typically 1–2% accurate after factory trimming) at moderate baud rates, and why baud rates that don't divide evenly from your clock can fail. A 16 MHz AVR asked for 115200 baud actually produces 117647 baud (+2.1%) in normal mode, or 111111 (−3.5%) with a different divisor setting. That's why Arduino's bootloader historically ran at 57600 or 115200 with the double-speed bit set.</p>
+
+<figure class="widget" id="fig-baud">
+  <div id="w-baud"></div>
+  <div class="w-controls" id="c-baud"></div>
+  <figcaption><b>Figure 6.10</b> Baud-rate mismatch. The waveform is sent with a transmitter clock that's off by the slider's percentage; the dots are where a receiver with a perfect clock samples. The transmitter sends the character twice, back to back, like a real data stream. Push the error up until the decoded byte or the stop bit goes wrong. Every character fails at about the same error, because the receiver only resynchronises on each start edge.</figcaption>
+</figure>
+
+<div class="ex" data-id="baud-task" data-kind="task">
+  <div class="q">In Figure 6.10, find the <b>smallest positive clock error</b> (to the nearest 0.5%) at which the receiver gets a framing error or a wrong byte. Then check that it matches the 9.5-bit-time prediction.</div>
+  <div class="explain">The first failure is at +5.5%. The receiver samples the stop bit 9.5 of its bit times after the start edge; once the transmitter is 5.3% fast, that instant falls into the <em>next</em> character's start bit, which is low, so the receiver flags a framing error. On the slow side the same thing happens at −5.5%, where the stop-bit sample lands in data bit 7. The prediction \(0.5/9.5 = 5.3\%\) is spot on. In practice, aim for under 2% per side.</div>
+</div>
+
+<h3 id="rs232">TTL serial, RS-232 and RS-485</h3>
+<p>What MCUs speak is "TTL serial": 0 V and VDD, idle high. <b>RS-232</b>, the old PC COM port, uses the same framing but different electrical levels: a 1 (mark) is −3 to −15 V and a 0 is +3 to +15 V. It's inverted and bipolar, designed to survive long cables in 1960s offices. Connect an RS-232 port directly to a 3.3 V MCU pin and you'll destroy the pin. A transceiver such as the MAX3232 translates. The USB-serial adapters you'll use (CP2102, CH340, FT232) produce TTL levels; check whether yours is 3.3 V or 5 V before you connect it to an ESP32.</p>
+<p>For longer runs in electrically noisy machines, <b>RS-485</b> sends the same UART frames over a differential pair (we'll see why differential signalling helps in the CAN section) and allows multiple devices on one bus. Many smart servos, such as Dynamixel and Feetech, use RS-485 or half-duplex TTL serial.</p>
+
+<pre><code>// ESP-IDF: UART2 at 115200 8N1 on GPIO17 (TX) / GPIO16 (RX)
+const uart_config_t cfg = {
+    .baud_rate = 115200, .data_bits = UART_DATA_8_BITS,
+    .parity = UART_PARITY_DISABLE, .stop_bits = UART_STOP_BITS_1,
+    .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, .source_clk = UART_SCLK_DEFAULT,
+};
+uart_driver_install(UART_NUM_2, 1024, 0, 0, NULL, 0);   // RX buffer 1 KB
+uart_param_config(UART_NUM_2, &amp;cfg);
+uart_set_pin(UART_NUM_2, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+uint8_t buf[64];
+int n = uart_read_bytes(UART_NUM_2, buf, sizeof buf, pdMS_TO_TICKS(20));</code></pre>
+</section>
+
+<section>
+<h2 id="i2c">I²C in depth</h2>
+<p><b>I²C</b> (inter-integrated circuit, pronounced "I-squared-C"; also written I2C or IIC) was designed by Philips in the early 1980s to connect chips inside a TV with as few wires as possible. It has become the default bus for small sensors: IMUs, barometers, magnetometers, OLED displays, battery fuel gauges, port expanders, EEPROMs. Two wires, <b>SDA</b> (data) and <b>SCL</b> (clock), connect up to dozens of devices. Each device has a 7-bit address, and a controller (the MCU) starts every transaction. The formal reference is NXP's UM10204 specification, and it's short enough to read in an evening.</p>
+<p>The speed grades you'll meet:</p>
+<table>
+  <tr><th>Mode</th><th>Max clock</th><th>Max rise time \(t_r\)</th><th>Max bus capacitance</th><th>Sink current at \(V_{OL}\) = 0.4 V</th></tr>
+  <tr><td>Standard-mode (Sm)</td><td>100 kHz</td><td>1000 ns</td><td>400 pF</td><td>3 mA</td></tr>
+  <tr><td>Fast-mode (Fm)</td><td>400 kHz</td><td>300 ns</td><td>400 pF</td><td>3 mA</td></tr>
+  <tr><td>Fast-mode Plus (Fm+)</td><td>1 MHz</td><td>120 ns</td><td>550 pF</td><td>20 mA</td></tr>
+</table>
+
+<h3 id="wiredand">Open-drain, both lines, all the time</h3>
+<p>Both SDA and SCL are open-drain with a pull-up resistor each. Every device, including the controller, can only pull a line low or release it. Everything distinctive about I²C follows from that:</p>
+<ul>
+  <li><b>Acknowledgement.</b> After each byte the transmitter releases SDA for one clock and the receiver pulls it low to say "got it" (ACK). If nobody pulls, the pull-up leaves it high: a <b>NACK</b>. A missing device can't ACK, which is how an I²C scanner finds devices.</li>
+  <li><b>Clock stretching.</b> A slow target can hold SCL low after the controller releases it. The controller sees that SCL hasn't risen and waits. It's hardware back-pressure.</li>
+  <li><b>Multi-controller arbitration.</b> Two controllers transmitting at once each check that SDA reads back what they wrote. The one sending a 1 that reads a 0 knows it lost, and backs off without corrupting the winner's message.</li>
+</ul>
+
+<figure class="widget" id="fig-wand">
+  <div id="w-wand"></div>
+  <div class="w-controls" id="c-wand"></div>
+  <figcaption><b>Figure 6.11</b> The wired-AND bus. Each switch stands for one device's open-drain transistor on SDA. Click switches to close them (that device pulls low). The bus is high only when every device has released it. Notice that closing two switches at once is completely harmless: the pull-up current just splits.</figcaption>
+</figure>
+
+<h3 id="risetime">Sizing the pull-ups</h3>
+<p>Here is where the electrical side gets real. Every device input, every centimetre of wire or trace, and the connector all add capacitance to the line: roughly 5–10 pF per device and around 1 pF per cm of breadboard wire, more for long ribbon cables. Call the total the <b>bus capacitance</b> \(C_b\). When the last device releases the line, the pull-up \(R_p\) charges \(C_b\) along the familiar exponential. I²C defines the rise time \(t_r\) from 30% to 70% of VDD, the input thresholds:</p>
+$$V(t) = V_{DD}\left(1 - e^{-t/R_pC_b}\right) \;\Rightarrow\; t_{0.3} = -R_pC_b\ln 0.7, \quad t_{0.7} = -R_pC_b \ln 0.3$$
+<div class="formula">
+$$t_r = t_{0.7} - t_{0.3} = R_p C_b \ln\frac{0.7}{0.3} \approx 0.8473\,R_pC_b$$
+<p>I²C rise time. For the bus to meet its speed grade, \(t_r\) must stay below 1000 ns (Sm), 300 ns (Fm) or 120 ns (Fm+).</p>
+</div>
+<p>That gives a <b>maximum</b> pull-up. There's also a <b>minimum</b>: when a device pulls low, it must sink the pull-up's current while keeping the line below \(V_{OL} = 0.4\) V, and Sm/Fm devices are only rated for 3 mA. TI's application note SLVA689 lays out both limits:</p>
+<div class="formula">
+$$R_{p(\min)} = \frac{V_{DD} - V_{OL(\max)}}{I_{OL}} \qquad R_{p(\max)} = \frac{t_r}{0.8473\, C_b}$$
+<p>Any pull-up between these two values works. Pick a standard value near the low end for margin on speed, near the high end to save power.</p>
+</div>
+<p><b>Worked example.</b> A 3.3 V Fast-mode bus with an IMU, a barometer and an OLED on 20 cm of wire. Estimate \(C_b \approx 3 \times 10 + 20 + 10 \approx 60\) pF; call it 100 pF to be safe. Then \(R_{p(\min)} = (3.3 - 0.4)/3\,\text{mA} = 967\,\Omega\), and \(R_{p(\max)} = 300\,\text{ns}/(0.8473 \times 100\,\text{pF}) = 3.54\) kΩ. A <b>2.2 kΩ</b> pull-up sits nicely in the middle. The ESP32's internal ~45 kΩ pull-ups give \(t_r \approx 3.8\) µs on the same bus, far too slow even for Standard-mode. They only "work" on a bench because short wires and lenient chips forgive a lot.</p>
+
+<figure class="widget" id="fig-rise">
+  <div id="w-rise"></div>
+  <div class="w-controls" id="c-rise"></div>
+  <figcaption><b>Figure 6.12</b> I²C rise time versus pull-up and bus capacitance. The curve is SDA rising after release; dashed lines mark 30% and 70% of VDD; the shaded window is the allowed rise time for the chosen mode. A red readout means the pull-up is too strong for a 3 mA sink (\(R_p \lt R_{p(\min)}\)) or the edge is too slow.</figcaption>
+</figure>
+
+<div class="ex" data-id="rise-task" data-kind="task">
+  <div class="q">In Figure 6.12, choose <b>Fast-mode</b>, set the bus capacitance to about <b>200 pF</b> (a long cable to a remote sensor), and find a pull-up value that passes both checks.</div>
+  <div class="explain">You need \(967\,\Omega \le R_p \le 300\text{n}/(0.8473 \times 200\text{p}) = 1.77\) kΩ. A 1.5 kΩ pull-up works. If the window were empty (very high capacitance), your options would be to drop to Standard-mode, split the bus with a multiplexer, or use an active bus buffer/accelerator like the LTC4311 or P82B96.</div>
+</div>
+
+<div class="ex" data-id="rp-num" data-kind="num" data-answer="1770" data-tol="2%" data-unit="Ω">
+  <div class="q">What is the <b>largest</b> pull-up resistor that still meets the 300 ns Fast-mode rise time on a bus with 200 pF of capacitance?</div>
+  <div class="hint">\(R_{p(\max)} = t_r / (0.8473\,C_b)\). Use \(t_r = 300 \times 10^{-9}\) and \(C_b = 200 \times 10^{-12}\).</div>
+  <div class="explain">\(300\text{n}/(0.8473 \times 200\text{p}) = 1770\,\Omega\). In practice you'd choose 1.5 kΩ (E12) and confirm on the scope.</div>
+</div>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "every breakout board has pull-ups, so I'm covered"</span>
+<p>Many sensor breakouts include 4.7 kΩ or 10 kΩ pull-ups. Connect five of them and you've put five resistors in parallel: 10 kΩ / 5 = 2 kΩ, which is fine, but 4.7 kΩ / 5 = 940 Ω, already under \(R_{p(\min)}\) for a 3 mA sink at 3.3 V. Devices then can't pull the line low enough, \(V_{OL}\) creeps up, and you get intermittent NACKs. On a multi-breakout bus, count the pull-ups and cut the solder jumpers on extra ones.</p>
+</aside>
+
+<h3 id="frames">Anatomy of a transaction</h3>
+<p>The rule that structures all of I²C: <b>SDA may only change while SCL is low.</b> A data bit is valid while SCL is high. The two exceptions are the frame markers, and they are deliberate violations:</p>
+<ul>
+  <li><b>START (S):</b> SDA falls while SCL is high.</li>
+  <li><b>STOP (P):</b> SDA rises while SCL is high.</li>
+</ul>
+<p>After a START, the controller sends a byte made of the 7-bit address followed by a <b>R/W bit</b> (0 = write, 1 = read), most significant bit first. The addressed device ACKs. Then data bytes flow, each followed by an ACK from whoever is receiving. For a write, the controller sends and the target ACKs. For a read, the target sends and the <em>controller</em> ACKs each byte except the last, which it NACKs to say "that's enough", then sends STOP.</p>
+<p>Because the address is shifted left by one bit to make room for R/W, the same device shows up under two conventions. The MPU-6050's address is 0x68 (7-bit), but its first byte on the wire is 0xD0 for a write and 0xD1 for a read. Some datasheets and libraries quote the 8-bit form. If a sensor "isn't responding", check whether you've given the library an address that's double what it should be.</p>
+
+<figure class="widget wide" id="fig-i2c">
+  <div id="w-i2c"></div>
+  <div class="w-controls" id="c-i2c"></div>
+  <div class="ch6-bits" id="i2c-dec"></div>
+  <figcaption><b>Figure 6.13</b> An I²C transaction, animated, with a decoder like the one in PulseView. Choose a 7-bit address, read or write, and a data byte, then press Play. Coloured boxes mark who drives SDA during each bit: blue for the controller, orange for the target. Untick "device present" to see what a missing sensor looks like on the wire: a NACK on the address byte.</figcaption>
+</figure>
+
+<div class="ex" data-id="i2c-addr" data-kind="text" data-answer="0xD1|D1|0xd1|209|0b11010001|11010001">
+  <div class="q">An MPU-6050 has 7-bit address 0x68. What is the first byte (address + R/W) that the controller puts on the wire to <b>read</b> from it? Answer in hex (like 0x3C) or decimal.</div>
+  <div class="hint">Shift the address left by one, then set bit 0 for a read.</div>
+  <div class="explain">\((0\text{x}68 \ll 1) \,|\, 1 = 0\text{xD0} \,|\, 1 = 0\text{xD1}\) (209 decimal). A write would be 0xD0.</div>
+</div>
+
+<h3 id="regs">Register reads and the repeated START</h3>
+<p>Most sensors expose a bank of numbered registers. Reading register 0x3B means two steps: <em>write</em> the register number to the device, then <em>read</em> the data. If you send STOP between them, another controller could grab the bus in the gap, and some devices reset their internal register pointer on STOP. So I²C allows a <b>repeated START</b> (Sr): a START condition without a preceding STOP, which keeps the bus and changes direction.</p>
+<pre><code>// Arduino: read 6 bytes of accelerometer data starting at register 0x3B
+Wire.beginTransmission(0x68);
+Wire.write(0x3B);                         // register pointer
+if (Wire.endTransmission(false) != 0) {   // false = repeated START, no STOP
+    // 2 = NACK on address (wrong address / no device), 3 = NACK on data
+}
+Wire.requestFrom(0x68, 6);                // Sr, 0xD1, 6 bytes, NACK, STOP
+int16_t ax = Wire.read() &lt;&lt; 8;            // high byte first (two statements:
+ax |= Wire.read();                        // C++ doesn't fix the order of operands)</code></pre>
+<pre><code>// ESP-IDF (i2c_master driver, IDF 5.2+)
+i2c_master_bus_config_t bus_cfg = {
+    .i2c_port = I2C_NUM_0, .sda_io_num = 21, .scl_io_num = 22,
+    .clk_source = I2C_CLK_SRC_DEFAULT, .glitch_ignore_cnt = 7,
+    .flags.enable_internal_pullup = false,     // use real 2.2k resistors!
+};
+i2c_master_bus_handle_t bus;
+i2c_new_master_bus(&amp;bus_cfg, &amp;bus);
+i2c_device_config_t dev_cfg = { .device_address = 0x68, .scl_speed_hz = 400000 };
+i2c_master_dev_handle_t imu;
+i2c_master_bus_add_device(bus, &amp;dev_cfg, &amp;imu);
+uint8_t reg = 0x3B, data[6];
+i2c_master_transmit_receive(imu, &amp;reg, 1, data, 6, 50 /* ms timeout */);</code></pre>
+
+<div class="ex" data-id="i2c-order" data-kind="order">
+  <div class="q">Put the events of a "read one register" I²C transaction in the order they appear on the wire.</div>
+  <ol class="items">
+    <li>START</li>
+    <li>Address + W (e.g. 0xD0), target ACKs</li>
+    <li>Register number, target ACKs</li>
+    <li>Repeated START</li>
+    <li>Address + R (e.g. 0xD1), target ACKs</li>
+    <li>Data byte from target, controller NACKs</li>
+    <li>STOP</li>
+  </ol>
+  <div class="explain">The controller NACKs the last byte it wants, which tells the target to stop driving SDA so the controller can generate the STOP.</div>
+</div>
+
+<h3 id="stretch">Clock stretching, conflicts and multiplexers</h3>
+<p><b>Clock stretching</b> lets a target say "wait" by holding SCL low after the controller releases it, for example while it finishes a measurement. A good controller waits; a bit-banged or buggy one doesn't. Some MCU I²C peripherals have had trouble with it (the original Raspberry Pi's controller notoriously mishandled stretching), and some sensors (the BNO055 IMU is the classic example) stretch for longer than certain controllers tolerate. If a device works at 100 kHz but fails at 400 kHz, or fails only on one host, suspect clock stretching and look at SCL on a scope.</p>
+<p><b>Address conflicts</b> happen as soon as you want two identical sensors, such as two IMUs or several VL53L0X distance sensors. Your options, in order of preference:</p>
+<ol>
+  <li>An <b>address-select pin</b>. The MPU-6050's AD0 pin chooses 0x68 or 0x69, and many parts offer 2–8 choices this way.</li>
+  <li>A <b>software-programmable address</b>. The VL53L0X boots at 0x29, but you can hold all but one in reset via their XSHUT pins, reassign that one's address, and repeat.</li>
+  <li>A <b>second I²C bus</b>. The ESP32 has two hardware controllers, and pins can be routed anywhere through its GPIO matrix.</li>
+  <li>An <b>I²C multiplexer</b> like the TI <b>TCA9548A</b>: itself an I²C device (address 0x70–0x77), it connects your bus to any combination of eight downstream channels. Writing a byte with bit \(n\) set enables channel \(n\). Each channel is its own electrical segment with its own pull-ups, which also splits the bus capacitance: a mux is also a fix for long or heavily loaded buses.</li>
+</ol>
+
+<figure class="widget" id="fig-mux">
+  <div id="w-mux"></div>
+  <div class="w-controls" id="c-mux"></div>
+  <figcaption><b>Figure 6.14</b> Two IMUs with the same address behind a TCA9548A. Pick which channel the control byte enables: the highlighted path is the one the controller can reach. Address 0x68 is unambiguous because only one IMU is connected at a time.</figcaption>
+</figure>
+
+<pre><code>void tcaSelect(uint8_t ch) {           // TCA9548A at 0x70
+    Wire.beginTransmission(0x70);
+    Wire.write(1 &lt;&lt; ch);                // one bit per channel; 0 = all off
+    Wire.endTransmission();
+}
+tcaSelect(0); readImu(0x68, &amp;left);
+tcaSelect(1); readImu(0x68, &amp;right);</code></pre>
+
+<h3 id="recovery">When the bus hangs: the 9-clock recovery</h3>
+<p>Sooner or later you'll see this: after an MCU reset (a brown-out from a motor, a watchdog, or simply re-flashing), every I²C transaction fails and SDA is stuck low. The MCU reset in the middle of a read. The target was sending a byte, happened to be driving a 0, and is now patiently waiting for clock pulses that will never come. It has no reset pin and no timeout; as far as it knows, the transaction is still going.</p>
+<p>The fix, described in UM10204, is to clock it out. Before initialising the I²C peripheral, configure SCL as a GPIO and pulse it up to <b>nine times</b>: at most eight remaining data bits plus the ACK slot. Once the target releases SDA (it reads high while SCL is high), generate a STOP. Put this in your startup code; it costs microseconds and saves whole afternoons.</p>
+<pre><code>void i2cBusRecover(int sda, int scl) {
+    pinMode(sda, INPUT_PULLUP);
+    pinMode(scl, OUTPUT_OPEN_DRAIN);
+    for (int i = 0; i &lt; 9 &amp;&amp; digitalRead(sda) == LOW; i++) {
+        digitalWrite(scl, LOW);  delayMicroseconds(5);
+        digitalWrite(scl, HIGH); delayMicroseconds(5);
+    }
+    // STOP: SDA low -&gt; high while SCL is high
+    pinMode(sda, OUTPUT_OPEN_DRAIN);
+    digitalWrite(sda, LOW);  delayMicroseconds(5);
+    digitalWrite(scl, HIGH); delayMicroseconds(5);
+    digitalWrite(sda, HIGH); delayMicroseconds(5);
+}</code></pre>
+<p>ESP-IDF's newer I²C master driver has <code>i2c_master_bus_reset()</code>, which does the same thing.</p>
+
+<div class="ex" data-id="i2c-hang" data-kind="mc">
+  <div class="q">After your robot browns out and the ESP32 reboots, the IMU no longer responds and SDA reads permanently low. Power-cycling the whole robot fixes it. What should the firmware do at boot?</div>
+  <ol class="opts">
+    <li>Enable the internal pull-ups to overpower the IMU</li>
+    <li data-correct>Toggle SCL up to nine times until SDA is released, then issue a STOP</li>
+    <li>Switch to 10 kHz clock speed</li>
+    <li>Send a START condition repeatedly</li>
+  </ol>
+  <div class="explain">The IMU is stuck mid-byte, holding SDA low. A pull-up can't overpower an active pull-down, and you can't generate a START while SDA is low. Clocking SCL lets it finish shifting out its byte; then a STOP resets the bus state for everyone.</div>
+</div>
+</section>
+
+<section>
+<h2 id="spi">SPI: fast, simple, and a little anarchic</h2>
+<p><b>SPI</b> (serial peripheral interface) was popularised by Motorola and never formally standardised, which is both its charm and its curse. It uses push-pull lines and a dedicated clock, so it runs at tens of MHz: SD cards, TFT displays, fast IMUs like the ICM-42688 or BMI270, flash memory, radio transceivers (nRF24L01, SX127x LoRa) and the flash chip your ESP32 boots from all use it. The signals are:</p>
+<ul>
+  <li><b>SCK</b> (or SCLK): the clock, always driven by the controller.</li>
+  <li><b>MOSI</b> (controller out, peripheral in; newer docs say <b>COPI</b> or SDO): data to the device.</li>
+  <li><b>MISO</b> (controller in, peripheral out; <b>CIPO</b> or SDI): data from the device.</li>
+  <li><b>CS</b> (chip select, also SS or nCS), usually active low, one per device. There are no addresses: pulling a device's CS low <em>is</em> the address.</li>
+</ul>
+
+<figure class="widget" id="fig-spibus">
+  <div id="w-spibus"></div>
+  <figcaption><b>Figure 6.15</b> A typical SPI bus. SCK, MOSI and MISO are shared; each device gets its own chip-select line from a GPIO. Only the selected device drives MISO; the others put their MISO pins into high impedance. Not drawn: many designs add a 10 kΩ pull-up on each CS line, so every device stays deselected while the MCU boots and its pins are still floating inputs.</figcaption>
+</figure>
+
+<h3 id="shift">Full duplex: two shift registers in a ring</h3>
+<p>Physically, SPI is two 8-bit shift registers wired in a loop. On each clock cycle the controller shifts one bit out on MOSI and the peripheral shifts one bit out on MISO, at the same moment. After eight clocks the two registers have <b>swapped contents</b>. That's why SPI is inherently full-duplex and why every SPI API is a "transfer" that sends and receives at once: to read, you must send something (often 0x00 or 0xFF, "dummy bytes"), and every time you send, you receive something, even if it's garbage you ignore.</p>
+<pre><code>// Arduino SPI: read the WHO_AM_I register of an ICM-42688 (reg 0x75)
+SPI.beginTransaction(SPISettings(8000000, MSBFIRST, SPI_MODE0));
+digitalWrite(CS_IMU, LOW);
+SPI.transfer(0x75 | 0x80);         // bit 7 set = read (common sensor convention)
+uint8_t id = SPI.transfer(0x00);   // send a dummy byte, receive the answer
+digitalWrite(CS_IMU, HIGH);
+SPI.endTransaction();               // id should be 0x47</code></pre>
+
+<h3 id="modes">Clock polarity and phase: the four modes</h3>
+<p>Because SPI was never standardised, devices disagree about two things: whether the clock idles low or high (<b>CPOL</b>), and whether data is sampled on the first or second clock edge of each bit (<b>CPHA</b>). Together they give four <b>modes</b>:</p>
+<table>
+  <tr><th>Mode</th><th>CPOL</th><th>CPHA</th><th>Clock idles</th><th>Data sampled on</th><th>Data changes on</th></tr>
+  <tr><td>0</td><td>0</td><td>0</td><td>low</td><td>rising edge</td><td>falling edge</td></tr>
+  <tr><td>1</td><td>0</td><td>1</td><td>low</td><td>falling edge</td><td>rising edge</td></tr>
+  <tr><td>2</td><td>1</td><td>0</td><td>high</td><td>falling edge</td><td>rising edge</td></tr>
+  <tr><td>3</td><td>1</td><td>1</td><td>high</td><td>rising edge</td><td>falling edge</td></tr>
+</table>
+<p>With CPHA = 0, the first data bit has to be on the wire <em>before</em> the first clock edge, so the device puts it out as soon as CS goes low. With CPHA = 1, the first edge is a "shift" edge and data is sampled on the second. Modes 0 and 3 are by far the most common, and many sensors accept either. A device's datasheet timing diagram tells you which; when it doesn't say "mode", look at which edge the arrows for "data valid" point to and what level SCK has while CS is high.</p>
+
+<figure class="widget wide" id="fig-spi">
+  <div id="w-spi"></div>
+  <div class="w-controls" id="c-spi"></div>
+  <figcaption><b>Figure 6.16</b> SPI modes, animated. Choose a mode and two bytes. The vertical markers show sampling edges. Below the waveform, the two shift registers exchange their contents one bit per clock: by the end, the controller holds the peripheral's byte and vice versa. Compare mode 0 with mode 1: same data, different edges.</figcaption>
+</figure>
+
+<div class="ex" data-id="spi-mode" data-kind="mc">
+  <div class="q">A datasheet's timing diagram shows SCK low while CS is high, and the MOSI bits are centred on the <em>rising</em> edges of SCK. Which SPI mode is it?</div>
+  <ol class="opts grid2">
+    <li data-correct>Mode 0</li>
+    <li>Mode 1</li>
+    <li>Mode 2</li>
+    <li>Mode 3</li>
+  </ol>
+  <div class="hint">Idle-low clock means CPOL = 0. Is the rising edge the first or second edge of each bit?</div>
+  <div class="explain">Idle low gives CPOL = 0; with the clock idling low, the rising edge is the first (leading) edge, so sampling on it means CPHA = 0. Mode 0. A wrong mode often "almost works": you read every byte shifted by one bit (values doubled or halved) or get garbage only on some bits.</div>
+</div>
+
+<h3 id="spispeed">Speed versus wire length</h3>
+<p>SPI's push-pull drivers can switch in a nanosecond or two, and a 20 MHz clock has a 50 ns period. On a PCB with 3 cm traces that's easy. On 30 cm of jumper wire it often fails, for three reasons:</p>
+<ul>
+  <li><b>Round-trip delay.</b> MISO data is launched by the peripheral on one clock edge and must arrive back at the controller before the controller samples. The clock travels out, the data travels back, and each chip adds its own output delay. At 20 MHz, half a period is 25 ns. Signals travel roughly 15–20 cm per ns in wire, so the cable itself isn't the issue until it's long; the chips' delays (often 10–20 ns) usually are, and the cable's capacitance slows the edges further.</li>
+  <li><b>Ringing.</b> A fast edge on a long wire reflects back and forth (next section). A ringing clock can cross the threshold twice and register as two clock edges, shifting every subsequent bit.</li>
+  <li><b>Crosstalk.</b> Unshielded parallel wires couple edges from SCK into MISO and CS.</li>
+</ul>
+<p>Rules of thumb for breadboards and flying leads: start at 1 MHz, keep wires under 10–15 cm, twist each signal with a ground wire for longer runs, and raise the clock only after the decoded data is clean. For a sensor at the end of a cable in a robot arm, I²C at 100–400 kHz, CAN or RS-485 is usually a better choice than fast SPI.</p>
+</section>
+
+<section>
+<h2 id="others">Other buses you'll meet in robots</h2>
+
+<h3 id="can">CAN: differential signalling for noisy machines</h3>
+<p><b>CAN</b> (controller area network) was designed by Bosch for cars, which are perhaps the electrically noisiest environment anyone builds electronics for. It's now common in robotics: motor controllers (ODrive, VESC, many servo drives), battery management systems, and ROS-based robots use it. Its trick is <b>differential signalling</b>. Instead of one wire measured against ground, a twisted pair, CANH and CANL, carries the bit as the <em>difference</em> between them:</p>
+<ul>
+  <li><b>Recessive</b> (logic 1): no transceiver drives; both lines sit near 2.5 V, difference ≈ 0 V.</li>
+  <li><b>Dominant</b> (logic 0): a transceiver pulls CANH up to about 3.5 V and CANL down to about 1.5 V, difference ≈ 2 V.</li>
+</ul>
+<p>Noise from a nearby motor cable couples almost equally into both wires of a twisted pair, because they occupy nearly the same place. The receiver subtracts the two, and that <b>common-mode</b> noise cancels. Like I²C, the bus is wired-AND in spirit: dominant beats recessive, so CAN arbitrates by message ID bit by bit without collisions. The bus needs a 120 Ω termination resistor at each physical end (60 Ω measured across CANH–CANL with power off is the quick check). The ESP32 contains a CAN controller (Espressif calls it <b>TWAI</b>); add a 3.3 V transceiver such as the SN65HVD230 or TJA1051T/3.</p>
+
+<figure class="widget" id="fig-can">
+  <div id="w-can"></div>
+  <div class="w-controls" id="c-can"></div>
+  <figcaption><b>Figure 6.17</b> Why differential signalling works. Raise the common-mode noise: CANH and CANL (top) both get buried in it, yet their difference (bottom) stays clean. Then raise the "imbalance" slider, which models noise that couples unequally (an untwisted pair). That part does reach the receiver.</figcaption>
+</figure>
+
+<h3 id="onewire">1-Wire</h3>
+<p>Maxim's (now Analog Devices') <b>1-Wire</b> bus uses a single open-drain data line plus ground, with a 4.7 kΩ pull-up. It's what the DS18B20 temperature sensor speaks. Timing is everything: a 480 µs low <b>reset pulse</b>, after which every device answers with a <b>presence pulse</b>; then bits are sent in roughly 60 µs time slots, where a short low pulse means 1 and a long one means 0. Every device has a unique, factory-lasered 64-bit ROM code, so you can hang dozens of sensors on one wire and address each by serial number. Devices can even run in "parasite power" mode, stealing their supply from the data line's pull-up while it's high.</p>
+
+<h3 id="ws2812">WS2812 "NeoPixels": timing as protocol</h3>
+<p>Addressable LEDs like the WS2812B have one data input and one data output. Each LED takes the first 24 bits it receives (green, red, blue, 8 bits each, in that order), then passes the rest of the stream down the chain. A <b>reset</b> (the line held low for more than 50 µs, or 280 µs for newer revisions) latches all the colours. Bits are encoded by pulse width at 800 kHz, so each bit is 1.25 µs long: a 0 is about 0.4 µs high then low, and a 1 is about 0.8 µs high then low, with roughly ±150 ns tolerance. That's too tight for <code>digitalWrite()</code> loops, so libraries use hand-timed assembly (AVR), the RMT peripheral (ESP32), or SPI/I2S/DMA tricks.</p>
+<p>The electrical gotcha: a WS2812B powered from 5 V wants \(V_{IH} = 0.7 \times 5 = 3.5\) V, and an ESP32 provides at most 3.3 V. It often works on the bench and fails in the field. The fixes are a 74AHCT125 buffer (Figure 6.1 explains why "HCT" matters) or a "sacrificial" first pixel powered through a diode, so its supply is about 4.3 V and its threshold about 3 V. Big strips also need a fat 5 V supply (up to 60 mA per pixel at full white), injected at several points, and a large capacitor at the strip input.</p>
+
+<h3 id="rc">RC receiver protocols</h3>
+<p>Hobby RC gear has its own family of protocols, and you'll want to read them (to put a receiver on your robot) and generate them (to drive servos and ESCs):</p>
+<ul>
+  <li><b>Servo PWM.</b> One wire per channel: a pulse every 20 ms (50 Hz) whose <em>width</em> encodes the position: 1.0 ms for one end, 1.5 ms for centre, 2.0 ms for the other end. The duty cycle doesn't matter, only the pulse width; many digital servos accept faster frame rates (e.g. 333 Hz). Ordinary ESCs for cars and planes use the same signal for throttle.</li>
+  <li><b>PPM</b> (pulse-position modulation, sometimes "CPPM"). All channels multiplexed on one wire: a train of short fixed-width pulses where the <em>time between</em> successive pulses is each channel's 1–2 ms value, followed by a long sync gap. Typically 8 channels in a 22.5 ms frame.</li>
+  <li><b>SBUS</b> (Futaba, used by FrSky and many others). Digital: an <b>inverted</b> UART at 100,000 baud, 8E2. Each 25-byte frame has a 0x0F header, 16 channels packed as 11-bit values into 22 bytes, a flags byte (including "frame lost" and "failsafe" bits) and a 0x00 footer, sent every 14 ms (or 7 ms in fast mode). The inversion means you need either a UART that can invert its input (ESP32 and STM32 can; the ATmega328P can't) or a one-transistor inverter.</li>
+  <li><b>CRSF</b> (TBS Crossfire, adopted by <b>ExpressLRS</b>). A non-inverted UART, 416,666 baud in the original Crossfire spec and 420,000 baud as the ExpressLRS default, carrying framed packets with a type byte, length and CRC-8. Channels are 11-bit values; the link also carries <b>telemetry</b> back to the transmitter (battery voltage, link quality, RSSI). It's the de facto standard for modern long-range RC links.</li>
+</ul>
+
+<figure class="widget" id="fig-servo">
+  <div id="w-servo"></div>
+  <div class="w-controls" id="c-servo"></div>
+  <figcaption><b>Figure 6.18</b> Servo PWM and PPM. Move the stick: the pulse width moves between 1 and 2 ms within a 20 ms frame, and the servo horn follows. Switch to PPM to see four channels packed into one wire, with the stick controlling channel 1's gap.</figcaption>
+</figure>
+
+<div class="ex" data-id="servo-num" data-kind="num" data-answer="0.00125" data-tol="1%" data-unit="s">
+  <div class="q">A servo maps 1.0 ms to 0° and 2.0 ms to 180°, linearly. What pulse width puts it at 45°?</div>
+  <div class="hint">45° is a quarter of the way from 0° to 180°.</div>
+  <div class="explain">\(1.0 + 0.25 \times 1.0 = 1.25\) ms. Real servos vary; many reach their mechanical stops beyond 1–2 ms (often 0.5–2.5 ms), so calibrate the endpoints per servo and clamp them in software to avoid stalling against the stops.</div>
+</div>
+
+<h3 id="dshot">DShot: digital throttle for ESCs</h3>
+<p>Analog servo-style PWM throttle is slow (one update per 20 ms frame) and imprecise (it depends on both ends' clocks). Multirotor flight controllers moved to <b>DShot</b>: a 16-bit digital frame per update, at 150, 300, 600 or 1200 kbit/s (DShot150, DShot300, ...). A frame is:</p>
+<ul>
+  <li>11 bits of throttle value (0 = disarmed, 1–47 reserved for commands such as "beep" or "reverse direction", 48–2047 = throttle),</li>
+  <li>1 telemetry-request bit,</li>
+  <li>a 4-bit checksum: XOR the three nibbles of the first 12 bits.</li>
+</ul>
+<p>Each bit, like WS2812, is pulse-width coded: the line goes high at the start of the bit period and stays high for 75% of it for a 1 and 37.5% for a 0. A DShot600 bit is 1.67 µs, so a whole frame takes about 27 µs, and flight controllers send thousands of them per second. Bidirectional DShot (an inverted variant) lets the ESC report motor RPM back on the same wire, which Betaflight uses for its RPM filter.</p>
+
+<figure class="widget" id="fig-dshot">
+  <div id="w-dshot"></div>
+  <div class="w-controls" id="c-dshot"></div>
+  <div class="ch6-bits" id="dshot-bits"></div>
+  <figcaption><b>Figure 6.19</b> A DShot frame encoder. Move the throttle and toggle the telemetry bit. The bit string, checksum and waveform update live; long highs are ones, short highs are zeros. Try throttle 0, then 48, the lowest real throttle value.</figcaption>
+</figure>
+
+<pre><code>uint16_t dshotFrame(uint16_t throttle, bool telemetry) {
+    uint16_t v = (throttle &lt;&lt; 1) | (telemetry ? 1 : 0);    // 12 bits
+    uint16_t crc = (v ^ (v &gt;&gt; 4) ^ (v &gt;&gt; 8)) &amp; 0x0F;      // XOR of three nibbles
+    return (v &lt;&lt; 4) | crc;                                   // 16 bits, sent MSB first
+}</code></pre>
+
+
+<div class="ex" data-id="proto-sort" data-kind="sort">
+  <div class="q">Sort the protocols by their physical-layer signal.</div>
+  <div class="bins">
+    <div data-bin="uart">UART-based</div>
+    <div data-bin="pw">Pulse-width coded</div>
+    <div data-bin="diff">Differential pair</div>
+  </div>
+  <ul class="items">
+    <li data-bin="uart">SBUS</li>
+    <li data-bin="uart">CRSF / ExpressLRS</li>
+    <li data-bin="pw">Servo PWM</li>
+    <li data-bin="pw">DShot</li>
+    <li data-bin="pw">WS2812</li>
+    <li data-bin="diff">CAN</li>
+    <li data-bin="diff">RS-485</li>
+  </ul>
+  <div class="explain">SBUS and CRSF reuse the UART frame (SBUS inverted, 8E2, 100 kbaud; CRSF non-inverted at 416,666 or 420,000 baud). Servo PWM, DShot and WS2812 all encode information in how long a pulse stays high. CAN and RS-485 subtract two wires to reject common-mode noise.</div>
+</div>
+</section>
+
+<section>
+<h2 id="si">Signal integrity: when wires stop being wires</h2>
+<p>Up to now we've treated a wire as an ideal connection. At the speeds of modern GPIO edges that stops being true surprisingly early. The important number isn't the clock frequency, it's the <b>edge rate</b>: an ESP32 or STM32 output can swing from 0 to 3.3 V in 1–3 ns, whether you toggle it once a second or at 40 MHz. A fast edge contains high-frequency content (roughly up to \(0.35/t_r\), so 1 ns edges carry energy up to about 350 MHz), and at those frequencies every wire has inductance and capacitance that matter.</p>
+
+<h3 id="ringing">Ringing</h3>
+<p>For a short wire, a lumped model captures the essentials: the driver's output resistance \(R\) (plus any series resistor you add), the wire's inductance \(L\) (very roughly 1 µH per metre for an isolated jumper, much less for a trace over a ground plane), and the receiver's input plus wire capacitance \(C\). That's a series RLC circuit, a mass on a spring with friction from <a href="ch03-ac.html">Chapter 3</a>. Its damping ratio is</p>
+<div class="formula">
+$$\zeta = \frac{R}{2}\sqrt{\frac{C}{L}} \qquad f_{ring} \approx \frac{1}{2\pi\sqrt{LC}} \qquad \text{overshoot} = e^{-\pi\zeta/\sqrt{1-\zeta^2}} \;\;(\zeta \lt 1)$$
+<p>Series RLC step response. With \(\zeta \ll 1\) the edge overshoots and rings; at \(\zeta = 1\) (critical damping, \(R = 2\sqrt{L/C}\)) it settles fastest without overshoot.</p>
+</div>
+<p>A 20 cm jumper (\(L \approx 200\) nH) into 20 pF has \(\sqrt{L/C} = 100\,\Omega\), so critical damping needs about 200 Ω in total, while the driver alone provides perhaps 25 Ω. Damping \(\zeta \approx 0.13\) gives roughly 70% overshoot: a 3.3 V edge peaks around 5.5 V and then undershoots below ground. The clamp diodes catch some of it (stressing the pin), the ringing can cross the logic threshold twice (a double clock edge in SPI), and the whole wire becomes an antenna.</p>
+
+<h3 id="term">Series termination</h3>
+<p>The cheapest fix is a resistor of a few tens of ohms <b>in series with the output, right at the driver</b>. It adds damping to the lumped circuit. In the transmission-line picture (for wires long enough that the round trip takes longer than the edge), it does something more precise: it makes the driver's total output resistance equal the line's characteristic impedance (typically 50–120 Ω for wires and traces), so the reflection that comes back from the high-impedance receiver is absorbed at the source instead of bouncing again. Values of 22–100 Ω on SPI clocks, camera and display buses, and long GPIO runs are routine on well-designed boards. The price is slightly slower edges, which is usually what you wanted anyway.</p>
+
+<figure class="widget" id="fig-ring">
+  <div id="w-ring-sch"></div>
+  <div id="w-ring"></div>
+  <div class="w-controls" id="c-ring"></div>
+  <figcaption><b>Figure 6.20</b> Ringing on a long wire and series termination. The schematic is the lumped model; the plot is the voltage at the receiver after the driver switches from 0 to 3.3 V. Lengthen the wire and watch the ringing grow, then add series resistance until the overshoot falls below the clamp-diode level (\(V_{DD}\) + 0.3 V, dashed). Try to find the value that gives a fast edge with little overshoot.</figcaption>
+</figure>
+
+<div class="ex" data-id="ring-task" data-kind="task">
+  <div class="q">In Figure 6.20, set the wire to <b>30 cm or more</b> and choose a series resistor so that the overshoot is <b>under 5%</b> while the 10–90% rise time stays <b>under 15 ns</b>.</div>
+  <div class="explain">Damping near \(\zeta \approx 0.7\) is the sweet spot: about 4.6% overshoot and a fast rise. Too little resistance rings; too much turns the edge into a slow RC curve (the same trade-off as an I²C pull-up). On real hardware you'd confirm with a scope using a short ground spring, not the long ground clip, which has its own inductance and adds ringing of its own.</div>
+</div>
+
+</section>
+
+<section>
+<h2 id="debug">Debugging with a logic analyser and a scope</h2>
+<p>When a bus misbehaves, your code's error codes tell you <em>that</em> something failed but rarely <em>why</em>. Two instruments let you see what actually happened on the wire, and they answer different questions.</p>
+
+<h3 id="la">Logic analyser: what bits were sent?</h3>
+<p>A logic analyser samples many lines at once, thresholds each into 0 or 1, and records long captures. A cheap 8-channel, 24 MHz analyser (a Saleae clone with the fx2lafw firmware) plus the open-source <b>sigrok PulseView</b> software covers everything in this chapter. PulseView's <b>protocol decoders</b> turn the raw traces into annotated bytes: add the I²C decoder, assign SDA and SCL, and you see "Start, Address write: 68, ACK, Data write: 3B, ACK, Start repeat..." right under the waveforms. Decoders can be stacked: the I²C decoder feeds device-specific decoders that name registers.</p>
+<p>The habits that make it useful:</p>
+<ul>
+  <li><b>Sample at least 4×, preferably 10×, the fastest signal.</b> 400 kHz I²C is fine at 4–8 MHz sampling; 8 MHz SPI needs the full 24 MHz and is marginal even then.</li>
+  <li><b>Connect ground first</b>, to the board's ground near the signals.</li>
+  <li><b>Trigger</b> on the event you care about: SDA falling while SCL is high (a START), or CS going low.</li>
+  <li><b>Toggle a spare GPIO</b> from your code at interesting points ("entering ISR", "starting read"). It's <code>printf</code> debugging with nanosecond timestamps and no effect on timing.</li>
+</ul>
+
+<h3 id="scope">Oscilloscope: what did the voltage look like?</h3>
+<p>A logic analyser shows you clean 0s and 1s even when the real waveform is a disaster, because it thresholds everything. The <b>oscilloscope</b> shows the analog truth: slow I²C rise times, ringing, ground bounce, a \(V_{OL}\) sitting at 0.6 V because there are too many pull-ups, a 3.3 V signal into a 5 V part that barely crosses the threshold. Rules of thumb:</p>
+<ul>
+  <li>Bandwidth of at least \(0.35/t_r\) to see an edge of rise time \(t_r\); a 100 MHz scope resolves edges down to about 3.5 ns.</li>
+  <li>Use 10× probes, and replace the long ground lead with the short ground spring when you look at fast edges. The long lead's inductance creates ringing that isn't really on your board.</li>
+  <li>Many modern scopes also decode I²C, SPI and UART, which combines both views.</li>
+</ul>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: Wireshark and the profiler</span>
+<p>The logic analyser with decoders is your Wireshark: it shows the protocol messages exactly as they were exchanged, and settles "my code sent the right bytes" arguments in seconds. The scope is closer to a profiler or a packet-capture card that shows the physical layer: it tells you <em>why</em> a packet got corrupted. Most hardware bugs in this chapter are invisible to the first tool and obvious in the second.</p>
+</aside>
+
+<div class="ex" data-id="dbg-sort" data-kind="sort">
+  <div class="q">Which tool answers each question best?</div>
+  <div class="bins">
+    <div data-bin="la">🔍 Logic analyser</div>
+    <div data-bin="scope">📈 Oscilloscope</div>
+  </div>
+  <ul class="items">
+    <li data-bin="la">Which register address did my driver actually write?</li>
+    <li data-bin="scope">Is the I²C rise time within 300 ns?</li>
+    <li data-bin="la">Does the sensor ACK its address?</li>
+    <li data-bin="scope">Is there ringing on the SPI clock above VDD?</li>
+    <li data-bin="la">How long does my ISR take (spare GPIO toggled)?</li>
+    <li data-bin="scope">Does the 3.3 V signal reach the 5 V device's VIH?</li>
+  </ul>
+  <div class="explain">Bits, bytes, ordering and timing between events go to the logic analyser; voltage levels, edge shapes and noise go to the scope. The ISR timing could also be done on a scope, but the analyser's long capture and multiple channels make it the usual choice.</div>
+</div>
+
+<aside class="callout lab"><span class="ct">🔧 Lab: one IMU, two buses, and the missing pull-ups</span>
+<p>You need an IMU breakout that supports both I²C and SPI (an MPU-6500/9250, ICM-42688-P or BMI270 board), an ESP32 dev board, a logic analyser with PulseView, and a scope.</p>
+<ol>
+  <li><b>I²C first.</b> Wire SDA → GPIO21, SCL → GPIO22, 3.3 V and GND. Run an I²C scanner sketch and note the address. Read WHO_AM_I and the accelerometer registers at 100 kHz.</li>
+  <li><b>Capture.</b> Connect the analyser to SDA, SCL and GND. Sample at 4 MHz, trigger on SDA falling, add the I²C decoder. Find the repeated START between writing the register address and reading the data. Count the ACKs and the final NACK.</li>
+  <li><b>Speed it up</b> to 400 kHz. Measure the time per transaction and compare with your calculation (9 clocks per byte).</li>
+  <li><b>SPI.</b> Rewire the same sensor for SPI (CS, SCK, MOSI/SDI, MISO/SDO; check the breakout's notes about tying the address/SDO pin). Read WHO_AM_I at 1 MHz in mode 0 or 3 (per the datasheet), then at 8 MHz. Decode MOSI and MISO in PulseView and confirm the read bit (0x80) on the register byte.</li>
+  <li><b>Break it on purpose.</b> Set the wrong SPI mode and look at what you read back; often it's the right value shifted by one bit.</li>
+  <li><b>Remove the pull-ups.</b> Back on I²C, scope SDA with the breakout's pull-ups in place: measure the 30–70% rise time. Cut or desolder the pull-up jumper (or use a bare sensor board) and enable only the ESP32's internal pull-ups: measure again. Finally remove all pull-ups. Write down rise times and which configurations still work at 100 and 400 kHz. Add an external 2.2 kΩ pair and compare with \(0.8473\,R_pC_b\) to estimate your bus capacitance.</li>
+</ol>
+<p>Lab notebook prompt: from the rise time with a known \(R_p\), calculate \(C_b\). Does it match the "10 pF per device + 1 pF per cm" estimate?</p>
+</aside>
+
+<aside class="callout ref"><span class="ct">📚 Go deeper</span>
+<ul>
+  <li><b>NXP UM10204, <i>I²C-bus specification and user manual</i></b> (rev. 7, 2021). Sections 3.1 (protocol: START/STOP, ACK, clock stretching, arbitration) and 7.1 (pull-up resistor sizing), plus 3.1.16 on bus clear (the nine clocks).</li>
+  <li><b>Texas Instruments SLVA689, <i>I2C Bus Pullup Resistor Calculation</i></b>. The \(R_{p(\min)}\)/\(R_{p(\max)}\) derivation used here, with worked examples.</li>
+  <li><b>Horowitz &amp; Hill, <i>The Art of Electronics</i>, 3rd ed.</b>, Chapter 10 (digital logic: logic families, noise margins, CMOS input behaviour) and Chapter 12 (logic interfacing: level translation, driving loads, transmission lines and termination). Chapter 14 covers serial buses from the hardware side.</li>
+  <li><b>Elecia White, <i>Making Embedded Systems</i></b>, 2nd ed. (O'Reilly, 2024). The chapters on inputs/outputs and on peripherals treat these buses from the firmware engineer's side, with excellent debugging advice.</li>
+  <li><b>SparkFun tutorials</b>: "Logic Levels", "Pull-up Resistors", "Serial Communication", "I2C" and "Serial Peripheral Interface (SPI)". Short, illustrated, and good for a second explanation.</li>
+  <li><b>Espressif, <i>ESP-IDF Programming Guide</i></b>: API Reference → Peripherals → GPIO, I2C, SPI Master, UART, LEDC, TWAI, RMT, and the ADC calibration pages.</li>
+  <li><b>Ben Eater</b>'s YouTube videos on serial communication and RS-232 framing, and on how SPI and the PS/2 keyboard protocol work, show the waveforms on a real scope.</li>
+  <li><b>Jonathan Valvano</b>, <i>Embedded Systems: Introduction to ARM Cortex-M Microcontrollers</i> (and the free UT Austin "Shape the World" course): chapters on UART, SPI and interfacing switches and LEDs.</li>
+  <li><b>sigrok/PulseView</b> wiki (sigrok.org): the list of supported logic analysers and protocol decoders. The ExpressLRS and Betaflight documentation describe CRSF and DShot in practice.</li>
+</ul>
+</aside>
+</section>
+
+</main>
+<script src="../assets/vendor/katex/katex.min.js"></script>
+<script src="../assets/vendor/katex/auto-render.min.js"></script>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/ch06-interfaces.js"></script>
+</body>
+</html>

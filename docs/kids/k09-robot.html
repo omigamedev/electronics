@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>9 · The Robot Brain — Sparky's Circuit Adventure</title>
+<meta name="description" content="Level 9 of Sparky's Circuit Adventure: microcontrollers follow instructions in order, sensors and motors, a robot programming game, and if-then rules.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+/* kid level page styles (shared pattern, page-local copy) */
+.toy { background: var(--surface2); border: 2px solid var(--line); border-radius: 22px; padding: 12px 10px; margin: 16px 0; text-align: center; }
+.toy svg.art { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.toy .cap { font-size: 1rem; color: var(--muted); margin: 6px auto 0; }
+.toy-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0 4px; }
+.kbtn { font-family: inherit; font-size: 1.25rem; line-height: 1.2; min-width: 56px; min-height: 56px; padding: 6px 14px; border-radius: 18px; border: 3px solid var(--line); border-bottom-width: 6px; background: var(--surface); color: var(--ink); cursor: pointer; touch-action: manipulation; transition: transform .06s, border-color .15s, background .15s; }
+.kbtn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.kbtn:active { transform: translateY(3px); border-bottom-width: 3px; }
+.kbtn.on { border-color: var(--accent); background: var(--accent2); }
+.kbtn.go { background: var(--c3); border-color: color-mix(in srgb, var(--c3) 60%, #000); color: #fff; }
+.kbtn:disabled { opacity: .45; cursor: not-allowed; }
+.kbtn small { display: block; font-size: .8rem; color: var(--muted); }
+.kbtn.go small { color: inherit; opacity: .9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kbtn.go { color: #0b1a12; } }
+:root[data-theme="dark"] .kbtn.go { color: #0b1a12; }
+.ex .opts.emoji > li .lab, .ex .opts .lab { display: block; font-size: 1rem; line-height: 1.2; color: var(--muted); margin-top: 4px; }
+.ex .opts > li svg.mini { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto; }
+.toy .w-controls { justify-content: center; }
+.toy .w-slider { grid-template-columns: max-content 1fr max-content; font-size: 1.15rem; flex-basis: 260px; max-width: 460px; }
+.toy .w-slider input { height: 44px; }
+.toy .w-slider output { font-family: inherit; font-size: 1.05rem; min-width: 2.5em; }
+.toy .w-seg button { font-size: 1.1rem; min-height: 48px; padding: 6px 12px; }
+ol.steps { padding-left: 1.4em; } ol.steps li { margin: 6px 0; }
+.grownup { font-size: .82em; }
+.grownup > div { line-height: 1.5; }
+.card .big-emoji { letter-spacing: .05em; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  body.kid { font-size: 19px; }
+  main.cards > .card { padding: 18px 14px 20px; }
+  .speech { margin-left: 52px; padding: 12px 14px; }
+  .speech .who { left: -54px; font-size: 2.4rem; }
+  body.kid .ex { padding-left: 12px; padding-right: 50px; }
+  .big-emoji { font-size: clamp(2rem, 10.5vw, 3.2rem); }
+}
+main.cards > .card > h2 { padding-right: 48px; }
+.prog { display: flex; flex-wrap: wrap; gap: 6px; min-height: 66px; border: 3px dashed var(--line); border-radius: 18px; padding: 6px; align-items: center; justify-content: center; margin: 8px 0; background: var(--surface); }
+.prog:empty::before { content: "👇 your program"; color: var(--muted); font-size: 1rem; }
+.prog .chip { font-size: 1.5rem; min-width: 48px; min-height: 48px; border-radius: 12px; background: var(--surface); border: 2px solid var(--line); border-bottom-width: 4px; cursor: pointer; padding: 0 4px; font-family: inherit; color: var(--ink); }
+.prog .chip.cur { border-color: var(--accent); background: var(--accent2); transform: scale(1.12); }
+.prog .chip.bad { border-color: var(--bad); background: var(--bad-bg); }
+.palette .kbtn { font-size: 1.7rem; min-width: 64px; }
+.rule { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; font-size: 1.15rem; font-weight: 600; background: var(--surface); border: 3px solid var(--c5); border-radius: 16px; padding: 8px 14px; margin: 6px 0; }
+.rule b { background: var(--accent2); border-radius: 10px; padding: 2px 10px; }
+</style>
+</head>
+<body data-book="kid" data-chapter="k09-robot">
+<main class="chapter cards">
+<header class="chapter-head">
+  <p class="kicker">Level 9</p>
+  <h1>🤖 The Robot Brain</h1>
+  <p class="lede">Robots follow instructions. Let's be robot programmers!</p>
+</header>
+
+<section class="card">
+  <h2>🧠 A tiny computer brain</h2>
+  <div class="speech say"><span class="who">⚡</span>Every robot has a brain. It's a tiny computer chip called a microcontroller. It's smaller than your fingernail!</div>
+  <div class="big-emoji">🤖 🧠 📜</div>
+  <div class="speech say"><span class="who">⚡</span>The brain follows a list of instructions called a program. It does them one at a time, in order. Super fast, and it never gets bored!</div>
+</section>
+
+<section class="card">
+  <h2>👀 Senses and 💪 muscles</h2>
+  <div class="speech say"><span class="who">⚡</span>A robot needs senses to find out about the world. These are called sensors. And it needs parts that DO things, like motors for muscles.</div>
+  <div class="ex" data-id="parts" data-kind="sort">
+    <div class="q">Is it a sense or a doer? Tap a card, then tap a box.</div>
+    <div class="bins">
+      <div data-bin="in">👀 Senses things</div>
+      <div data-bin="out">💪 Does things</div>
+    </div>
+    <ul class="items">
+      <li data-bin="in">🌞 light sensor (eyes)</li>
+      <li data-bin="in">🎤 microphone (ears)</li>
+      <li data-bin="in">🔘 touch button</li>
+      <li data-bin="out">⚙️ motor (muscles)</li>
+      <li data-bin="out">🔊 speaker (voice)</li>
+      <li data-bin="out">💡 light</li>
+    </ul>
+    <div class="explain">Sensors bring information INTO the brain. Motors, speakers and lights let the brain DO things in the world.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>📜 Order matters</h2>
+  <div class="speech say"><span class="who">⚡</span>A program is like a recipe. If the steps are mixed up, things go silly! Help the robot brush its teeth.</div>
+  <div class="ex" data-id="teeth" data-kind="order">
+    <div class="q">Put the steps in order.</div>
+    <ol class="items">
+      <li>🪥 Pick up the toothbrush</li>
+      <li>🧴 Put on toothpaste</li>
+      <li>😁 Brush your teeth</li>
+      <li>💦 Rinse</li>
+    </ol>
+    <div class="explain">Brush, then toothpaste? Silly! Robots do exactly what the program says, in order. So programmers think carefully about the order.</div>
+  </div>
+  <div class="ex" data-id="inorder" data-kind="mc">
+    <div class="q">How does a robot brain follow its program?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>1️⃣<span class="lab">one step at a time, in order</span></li>
+      <li>🎲<span class="lab">in any order it likes</span></li>
+      <li>😴<span class="lab">it takes a nap</span></li>
+    </ol>
+    <div class="explain">One step at a time, in order, exactly as written.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🕹️ Program the robot!</h2>
+  <div class="speech say"><span class="who">⚡</span>Robo is hungry for energy! Make a program to drive Robo to the charger. Tap the arrows to add steps, then press go!</div>
+  <div class="toy">
+    <div id="t-code-lv" class="toy-row"></div>
+    <div id="t-code"></div>
+    <div id="t-code-pal" class="toy-row palette"></div>
+    <div id="t-code-prog" class="prog"></div>
+    <div id="t-code-ctl" class="toy-row"></div>
+    <p class="cap">👆 Tap arrows to build the program. Tap a step in the program to remove it. ▶️ to run!</p>
+  </div>
+  <div class="ex" data-id="robot1" data-kind="task">
+    <div class="q">Puzzle 1: drive Robo to the charger. 🔋</div>
+    <div class="explain">Three steps to the right. Your first program!</div>
+  </div>
+  <div class="ex" data-id="robot2" data-kind="task">
+    <div class="q">Puzzle 2: go around the rocks! 🪨</div>
+    <div class="explain">Up, over, and down. Programmers often find a path around problems.</div>
+  </div>
+  <div class="ex" data-id="robot3" data-kind="task">
+    <div class="q">Puzzle 3: now Robo can only go forward or turn. Watch which way it faces! ↩️ ↪️</div>
+    <div class="explain">Real robots work like this: they drive forward and turn left or right. A turn doesn't move the robot, it just changes where it faces.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🐞 Bugs!</h2>
+  <div class="speech say"><span class="who">⚡</span>Did Robo bump into something? That's called a bug: a mistake in the program. Every programmer makes bugs! The trick is to look carefully, find the bug, fix it and try again.</div>
+  <div class="big-emoji">🐞 🔍 🔧 🎉</div>
+</section>
+
+<section class="card">
+  <h2>🌙 IF … THEN …</h2>
+  <div class="speech say"><span class="who">⚡</span>Robots can make choices with IF and THEN. Robo has a light sensor for eyes. Here's his rule:</div>
+  <div style="text-align:center"><span class="rule say">IF <b>🌙 it's dark</b> THEN <b>💡 light ON</b></span></div>
+  <div class="toy">
+    <div id="t-night"></div>
+    <div id="t-night-ctl"></div>
+    <p class="cap">🌞 Slide to make it day or night.</p>
+  </div>
+  <div class="ex" data-id="night" data-kind="task">
+    <div class="q">Make it night, and see what Robo does!</div>
+    <div class="explain">The sensor sees that it's dark, so the rule says: light ON. That's how street lights and night lights know when to turn on!</div>
+  </div>
+  <div class="ex" data-id="sunny" data-kind="mc">
+    <div class="q">Same rule. Now it's a sunny day. What is Robo's light?</div>
+    <ol class="opts emoji grid2">
+      <li>💡<span class="lab">ON</span></li>
+      <li data-correct>⚫<span class="lab">OFF</span></li>
+    </ol>
+    <div class="explain">It isn't dark, so the IF part is not true. Robo doesn't do the THEN part. The light stays off.</div>
+  </div>
+</section>
+
+<section class="card home">
+  <h2>🏠 Try it at home (with a grown-up)</h2>
+  <div class="speech say"><span class="who">⚡</span>Play the robot game! A grown-up is the robot.</div>
+  <p>You need: 🧸 a toy to be the "charger", and some space on the floor.</p>
+  <ol class="steps">
+    <li class="say">Put the toy somewhere in the room.</li>
+    <li class="say">Write or draw arrows on paper for the program: forward, turn left, turn right.</li>
+    <li class="say">Read the program out loud. The robot must do EXACTLY what it says, one step at a time.</li>
+    <li class="say">Did the robot reach the toy? If not, find the bug and fix the program!</li>
+    <li class="say">Now swap. You be the robot!</li>
+  </ol>
+  <aside class="callout tip grownup"><span class="ct">👨‍👩‍👧 For grown-ups</span><div>A microcontroller is a whole computer on one chip (CPU, memory and input/output pins) running one program in a loop. Sensors feed it inputs (often via an ADC or a digital bus); outputs drive LEDs directly and motors through driver transistors. The forward/turn puzzle is "turtle" control, close to how a differential-drive robot moves; the IF-THEN night light is a threshold on an ADC reading. See <a href="../book/ch06-interfaces.html">Chapter 6: Digital Interfaces</a>, <a href="../book/ch07-mcu.html">Chapter 7: Microcontrollers</a> and <a href="../book/ch08-robotics.html">Chapter 8: Motors, Sensors &amp; Control</a>.</div></aside>
+</section>
+</main>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/kidkit.js"></script>
+<script src="js/k09-robot.js"></script>
+</body>
+</html>

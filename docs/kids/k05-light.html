@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5 · Light It Up! — Sparky's Circuit Adventure</title>
+<meta name="description" content="Level 5 of Sparky's Circuit Adventure: hot light bulbs, LEDs as one-way doors, rainbow colour mixing, and the resistor helmet.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+/* kid level page styles (shared pattern, page-local copy) */
+.toy { background: var(--surface2); border: 2px solid var(--line); border-radius: 22px; padding: 12px 10px; margin: 16px 0; text-align: center; }
+.toy svg.art { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.toy .cap { font-size: 1rem; color: var(--muted); margin: 6px auto 0; }
+.toy-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0 4px; }
+.kbtn { font-family: inherit; font-size: 1.25rem; line-height: 1.2; min-width: 56px; min-height: 56px; padding: 6px 14px; border-radius: 18px; border: 3px solid var(--line); border-bottom-width: 6px; background: var(--surface); color: var(--ink); cursor: pointer; touch-action: manipulation; transition: transform .06s, border-color .15s, background .15s; }
+.kbtn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.kbtn:active { transform: translateY(3px); border-bottom-width: 3px; }
+.kbtn.on { border-color: var(--accent); background: var(--accent2); }
+.kbtn.go { background: var(--c3); border-color: color-mix(in srgb, var(--c3) 60%, #000); color: #fff; }
+.kbtn:disabled { opacity: .45; cursor: not-allowed; }
+.kbtn small { display: block; font-size: .8rem; color: var(--muted); }
+.kbtn.go small { color: inherit; opacity: .9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kbtn.go { color: #0b1a12; } }
+:root[data-theme="dark"] .kbtn.go { color: #0b1a12; }
+.ex .opts.emoji > li .lab, .ex .opts .lab { display: block; font-size: 1rem; line-height: 1.2; color: var(--muted); margin-top: 4px; }
+.ex .opts > li svg.mini { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto; }
+.toy .w-controls { justify-content: center; }
+.toy .w-slider { grid-template-columns: max-content 1fr max-content; font-size: 1.15rem; flex-basis: 260px; max-width: 460px; }
+.toy .w-slider input { height: 44px; }
+.toy .w-slider output { font-family: inherit; font-size: 1.05rem; min-width: 2.5em; }
+.toy .w-seg button { font-size: 1.1rem; min-height: 48px; padding: 6px 12px; }
+ol.steps { padding-left: 1.4em; } ol.steps li { margin: 6px 0; }
+.grownup { font-size: .82em; }
+.grownup > div { line-height: 1.5; }
+.card .big-emoji { letter-spacing: .05em; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  body.kid { font-size: 19px; }
+  main.cards > .card { padding: 18px 14px 20px; }
+  .speech { margin-left: 52px; padding: 12px 14px; }
+  .speech .who { left: -54px; font-size: 2.4rem; }
+  body.kid .ex { padding-left: 12px; padding-right: 50px; }
+  .big-emoji { font-size: clamp(2rem, 10.5vw, 3.2rem); }
+}
+main.cards > .card > h2 { padding-right: 48px; }
+
+</style>
+</head>
+<body data-book="kid" data-chapter="k05-light">
+<main class="chapter cards">
+<header class="chapter-head">
+  <p class="kicker">Level 5</p>
+  <h1>💡 Light It Up!</h1>
+  <p class="lede">Glowing bulbs, one-way doors and rainbow lights.</p>
+</header>
+
+<section class="card">
+  <h2>🔥 Bulbs get hot</h2>
+  <div class="speech say"><span class="who">⚡</span>Inside an old-style bulb is a super thin wire. It squeezes us so much that it gets VERY hot, and glows! An LED is a newer kind of light. It makes light in a different way and stays much cooler.</div>
+  <div class="toy">
+    <div id="t-heat"></div>
+    <div id="t-heat-ctl" class="toy-row"></div>
+    <p class="cap">👆 Switch them on and watch the thermometers 🌡️.</p>
+  </div>
+  <div class="ex" data-id="hotter" data-kind="mc">
+    <div class="q">Which light gets hotter?</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>💡<span class="lab">the old bulb</span></li>
+      <li>🔴<span class="lab">the LED</span></li>
+    </ol>
+    <div class="explain">The old bulb's thin wire gets hotter than an oven! That's why you must never touch a bulb that's on.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🚪 LEDs are one-way doors</h2>
+  <div class="speech say"><span class="who">⚡</span>An LED is a one-way door for Sparkies. It only lights up if you put it in the right way round. Look at its legs! The long leg goes to the plus side of the battery. The short leg goes to the minus side.</div>
+  <div class="toy">
+    <div id="t-led"></div>
+    <div id="t-led-ctl" class="toy-row"></div>
+    <p class="cap">🔄 Tap to flip the LED around.</p>
+  </div>
+  <div class="ex" data-id="flip" data-kind="task">
+    <div class="q">Flip the LED so it lights up!</div>
+    <div class="explain">Long leg to plus, short leg to minus. Now the one-way door is open, and the LED glows!</div>
+  </div>
+  <div class="ex" data-id="leg" data-kind="mc">
+    <div class="q">Where does the LED's long leg go?</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>➕<span class="lab">to the plus side</span></li>
+      <li>➖<span class="lab">to the minus side</span></li>
+    </ol>
+    <div class="explain">Long leg to plus. A handy trick: "plus" is the longer word for the longer leg!</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🌈 Rainbow lights</h2>
+  <div class="speech say"><span class="who">⚡</span>Some LEDs have three tiny lights inside: red, green and blue. Mix them to make new colours!</div>
+  <div class="toy">
+    <div id="t-rgb"></div>
+    <div id="t-rgb-ctl"></div>
+    <p class="cap">🔴 🟢 🔵 Slide to mix the light.</p>
+  </div>
+  <div class="ex" data-id="yellow" data-kind="task">
+    <div class="q">Make YELLOW light! 🟡</div>
+    <div class="hint">Try red and green together, with no blue.</div>
+    <div class="explain">Red light plus green light makes yellow light. Surprise! Light mixes differently from paint.</div>
+  </div>
+  <div class="ex" data-id="white" data-kind="task">
+    <div class="q">Now make WHITE light! ⚪</div>
+    <div class="explain">Red, green and blue all together make white. Your TV and tablet screens use tiny red, green and blue lights to make every colour!</div>
+  </div>
+  <div class="ex" data-id="mix" data-kind="mc">
+    <div class="q">Red light + green light = ?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>🟡<span class="lab">yellow</span></li>
+      <li>🟤<span class="lab">brown</span></li>
+      <li>🔵<span class="lab">blue</span></li>
+    </ol>
+    <div class="explain">Yellow! Mixing coloured lights adds them together.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🪖 The LED's helmet</h2>
+  <div class="speech say"><span class="who">⚡</span>LEDs are a bit delicate. If too many Sparkies rush in, poof, the LED breaks! So we give it a helmet: a resistor. It squeezes the road, so just the right number of us get through.</div>
+  <div class="toy">
+    <div id="t-helmet"></div>
+    <div id="t-helmet-ctl" class="toy-row"></div>
+    <p class="cap">🪖 Put the helmet on or off. ⚡ Then switch on!</p>
+  </div>
+  <div class="ex" data-id="helmet" data-kind="task">
+    <div class="q">Light the LED safely!</div>
+    <div class="explain">With the resistor helmet, the LED gets just enough electricity to glow, and stays safe.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🌍 Saving energy</h2>
+  <div class="speech say"><span class="who">⚡</span>Old bulbs turn most of their energy into heat. LEDs turn much more of it into light. So LEDs need less electricity to light up your room!</div>
+  <div class="ex" data-id="saver" data-kind="mc">
+    <div class="q">Which light needs less electricity?</div>
+    <ol class="opts emoji grid2">
+      <li>💡<span class="lab">old hot bulb</span></li>
+      <li data-correct>🔴<span class="lab">cool LED</span></li>
+    </ol>
+    <div class="explain">The LED! Less energy wasted as heat means less electricity needed.</div>
+  </div>
+</section>
+
+<section class="card home">
+  <h2>🏠 Try it at home (with a grown-up)</h2>
+  <div class="speech say"><span class="who">⚡</span>Make an LED glow with a coin battery!</div>
+  <p>You need: 🔴 an LED and 🪙 one coin cell battery (a CR2032).</p>
+  <ol class="steps">
+    <li class="say">Find the LED's long leg and short leg.</li>
+    <li class="say">Slide the battery between the legs. The long leg touches the plus side (the side with writing on it).</li>
+    <li class="say">Does it glow? Now flip the battery over. What happens?</li>
+  </ol>
+  <aside class="callout warn"><span class="ct">⚠️ Grown-ups only hold the coin battery</span><p>Coin batteries are very dangerous if swallowed. A grown-up keeps them, and puts them away right after.</p></aside>
+  <aside class="callout tip grownup"><span class="ct">👨‍👩‍👧 For grown-ups</span><div>An LED is a diode: current flows only from anode (long leg) to cathode, and it needs about 1.8–3 V before it conducts. Above that, current rises very steeply, so you always limit it with a series resistor, R = (V<sub>supply</sub> − V<sub>F</sub>) / I (about 100 Ω for a red LED on two AA cells). The CR2032 trick works because the cell's own internal resistance limits the current. Keep coin cells away from children: a swallowed cell can cause severe internal burns within hours. Incandescent bulbs radiate mostly infrared (heat); LEDs convert far more of their power to visible light. See <a href="../book/ch04-semis.html">Chapter 4: Diodes, Transistors &amp; Op-Amps</a> and the LED circuit in <a href="../book/ch00-lab.html">Chapter 0</a>.</div></aside>
+</section>
+</main>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/kidkit.js"></script>
+<script src="js/k05-light.js"></script>
+</body>
+</html>

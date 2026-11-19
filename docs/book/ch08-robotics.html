@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>8 · Motors, Sensors & Control — Sparks & Circuits</title>
+<meta name="description" content="DC, servo, brushless and stepper motors from the Lorentz force up; encoders, IMUs, distance sensors and sensor fusion; PID control, a self-balancing robot and differential drive.">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+  .ch8-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .85rem; color: var(--muted); margin: 6px 0 0; }
+  .ch8-legend i { display: inline-block; width: 14px; height: 4px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+  .ch8-note { font-size: .88rem; color: var(--muted); margin: 6px 0 0; min-height: 1.4em; }
+  .ch8-status { font: .9rem var(--mono); padding: 4px 10px; border-radius: 8px; background: var(--surface2); display: inline-block; }
+  .ch8-status.good { background: var(--good-bg); color: var(--good); }
+  .ch8-status.bad { background: var(--bad-bg); color: var(--bad); }
+  /* local fixes: let long segmented controls wrap on phones; let grid cells shrink below their canvas width */
+  .chapter .w-seg { flex-wrap: wrap; max-width: 100%; }
+  .w-grid2 > * { min-width: 0; }
+</style>
+</head>
+<body data-book="adult" data-chapter="ch08-robotics">
+<main class="chapter">
+
+<header class="chapter-head">
+  <p class="kicker">Chapter 8</p>
+  <h1>Motors, Sensors &amp; Control</h1>
+  <p class="lede">A robot is a feedback loop with wheels. Electricity becomes force in the motor, sensors turn motion back into numbers, and a few lines of control code close the loop. This chapter follows that loop from the force on a single wire to a robot that balances on two wheels.</p>
+</header>
+
+<section>
+<h2 id="lorentz">From a force on a wire to a spinning shaft</h2>
+
+<p>Every electric motor in this chapter, from the 50-cent vibration motor in a phone to the brushless motor in a racing drone, rests on a single fact of physics: <b>a current-carrying wire in a magnetic field feels a sideways force</b>. You met the magnetic field in <a href="ch01-physics.html">Chapter 1</a> as the thing that a current creates around itself. The flip side is that a magnetic field pushes on moving charge. The charges drifting along a copper wire are pushed sideways, they can't leave the wire, so they drag the whole wire with them.</p>
+
+<p>The force on a single charge \(q\) moving with velocity \(\vec v\) through a field \(\vec B\) is the <b>Lorentz force</b>. Summing it over all the drifting charges in a straight wire of length \(L\) carrying current \(I\) gives the version engineers use:</p>
+
+<div class="formula">
+$$\vec F = q\,\vec v \times \vec B \quad\Longrightarrow\quad \vec F = I\,\vec L \times \vec B, \qquad |F| = B\,I\,L \;\text{ (wire perpendicular to } B\text{)}$$
+<p>The force is perpendicular to both the wire and the field. Its size grows with field strength, current and the length of wire inside the field.</p>
+</div>
+
+<aside class="callout math"><span class="ct">∑ The cross product, just in time</span>
+<p>\(\vec a \times \vec b\) is a vector perpendicular to both \(\vec a\) and \(\vec b\), with magnitude \(|a||b|\sin\theta\). It's largest when the two are at right angles and zero when they are parallel. Direction: point your right hand's fingers along \(\vec a\), curl them toward \(\vec b\), and your thumb points along the result. For a motor, that means a wire running <em>along</em> the field feels nothing; only the parts of the winding that cut <em>across</em> the field make torque. <a href="appA-math.html">Appendix A</a> has more on vectors.</p>
+</aside>
+
+<p>Numbers help. A small hobby motor has a magnet gap field of roughly 0.3 T. One side of one turn of its winding might be 20 mm long. At 1 A, the force is \(0.3 \times 1 \times 0.02 = 6\) mN, about the weight of half a gram. That's feeble, which is why real motors use <b>many turns</b> (each turn adds its own force), iron cores to concentrate the field, and gearboxes to trade speed for torque.</p>
+
+<h3>Torque on a loop, and why it needs a commutator</h3>
+<p>Bend the wire into a rectangular loop and put it on an axle between a north and a south pole. The two long sides carry current in opposite directions, so they are pushed in opposite directions: one up, one down. Opposite forces on opposite sides of an axle make a <b>torque</b>, a twist. If each side sits at radius \(r\) from the axle and the loop is tilted by an angle \(\theta\) from the field direction, the lever arm of each force is \(r\cos\theta\), and</p>
+$$\tau = 2\,B I L\, r \cos\theta = B\,I\,A\cos\theta \qquad (A = 2rL \text{ is the loop area}).$$
+
+<p>Here's the problem: as the loop turns past the vertical, \(\cos\theta\) changes sign and the torque reverses. A plain loop on a DC supply just swings to the vertical and parks there, like a compass needle. To keep turning, the current in the loop must <em>reverse</em> every half turn, exactly when the torque would. The brushed DC motor does this mechanically with a <b>commutator</b>: a copper ring split into segments, mounted on the shaft, with two stationary carbon <b>brushes</b> sliding on it. As the shaft turns, the brushes touch a different pair of segments, and the coil's connection to the supply flips. It's a rotary switch driven by the very rotation it causes.</p>
+
+<figure class="widget wide" id="fig-motor">
+  <div id="w-motor"></div>
+  <div id="w-motor-ctl"></div>
+  <figcaption><b>Figure 8.1</b> An end-on view of a two-pole brushed DC motor. ⊙ is current coming out of the screen, ⊗ going in; the orange arrows are the Lorentz forces. The strip at the bottom plots torque against shaft angle. Try: (1) switch the commutator <em>off</em> and watch the rotor swing and park; (2) turn it back on and see the torque turn into humps of one sign; (3) switch to three coils and watch the torque ripple shrink; (4) raise the load and watch speed drop and current rise.</figcaption>
+</figure>
+
+<p>Real brushed motors use three or more coils on an iron armature, with a commutator segment per coil. Each coil is only energised around the angle where it makes the most torque, and the overlapping humps give a much smoother total. Figure 8.1's three-coil mode shows this. The leftover wobble, called <b>torque ripple</b>, is one reason cheap motors buzz at low speed.</p>
+
+<aside class="callout physics"><span class="ct">⚛️ The same physics runs backwards: back-EMF</span>
+<p>When the rotor turns, its wires move through the magnet's field. Moving a conductor through a field pushes on its charges too (that's the same \(q\vec v\times\vec B\), with \(\vec v\) now the wire's own velocity), so a voltage appears along the wire. That's Faraday's law of induction from <a href="ch01-physics.html">Chapter 1</a>. In a motor this induced voltage <em>opposes</em> the supply (Lenz's law), so it's called the <b>back-EMF</b>. A motor is a generator that you happen to be overpowering. Spin a motor by hand with a voltmeter on its terminals and you'll see a voltage proportional to speed.</p>
+</aside>
+
+<p>The brushes are the motor's weak point. They spark as the segments break contact (each break interrupts current in an inductor, and you know from <a href="ch03-ac.html">Chapter 3</a> what inductors do when you do that). The sparks wear the brushes and spray radio noise across a wide band. This is why you'll see small ceramic capacitors soldered right across the terminals of hobby motors, and sometimes from each terminal to the metal can.</p>
+
+<div class="ex" data-id="m-commutator" data-kind="mc">
+  <div class="q">In Figure 8.1 with the commutator turned off, the rotor swings and then settles. Why does it stop where it does?</div>
+  <ol class="opts">
+    <li>Friction is largest at that angle</li>
+    <li data-correct>The loop reaches the angle where the torque \(\propto\cos\theta\) is zero and changes sign, so any further motion is pushed back</li>
+    <li>The back-EMF becomes larger than the supply voltage</li>
+    <li>The magnetic field is weakest at the top of the rotor</li>
+  </ol>
+  <div class="hint">Look at the torque strip: what happens to the sign of the torque either side of the parking angle?</div>
+  <div class="explain">Without a commutator, the torque is positive on one side of the vertical and negative on the other. That makes the vertical a stable equilibrium, like a pendulum hanging down. The commutator reverses the current exactly there, so the torque keeps the same sign and the rotor keeps going.</div>
+</div>
+</section>
+
+<section>
+<h2 id="model">The DC motor as a circuit: back-EMF and the two constants</h2>
+
+<p>For electronics, you don't need the coil geometry. A brushed DC motor behaves, to an excellent approximation, like three things in series: the <b>winding resistance</b> \(R\), the <b>winding inductance</b> \(L\), and a voltage source \(e\) equal to the back-EMF. All the magnetics and geometry collapse into one number, the <b>motor constant</b> \(k\):</p>
+
+<div class="formula">
+$$V = I R + L\frac{dI}{dt} + k\,\omega \qquad\qquad \tau = k\,I$$
+<p>Electrical side (left) and mechanical side (right). \(\omega\) is shaft speed in rad/s, \(\tau\) the torque in N·m. In SI units the same \(k\) appears in both, as V·s/rad = N·m/A.</p>
+</div>
+
+<p>Why is it the <em>same</em> \(k\)? Energy conservation. The electrical power going into the back-EMF source is \(e \cdot I = k\omega I\). The mechanical power coming out of the shaft is \(\tau\omega = kI\omega\). They must be equal, because the back-EMF source is exactly where electrical energy turns into mechanical energy. Datasheets often quote the two halves separately, as a <em>torque constant</em> \(k_t\) in N·m/A or oz·in/A and a <em>speed</em> or <em>back-EMF constant</em> \(k_e\) in V/krpm. In consistent SI units they're the same number.</p>
+
+<p>In steady state (\(dI/dt = 0\)) the motor obeys two lines of algebra, and almost everything about choosing and driving a motor follows from them:</p>
+<ul>
+  <li><b>Stall current</b>. With the shaft held still, \(\omega=0\), there's no back-EMF, and the winding is just a resistor: \(I_{\text{stall}} = V/R\). This is the current at start-up, every single time.</li>
+  <li><b>Stall torque</b>. \(\tau_{\text{stall}} = k\,V/R\).</li>
+  <li><b>No-load speed</b>. With no load, the motor speeds up until the back-EMF almost equals the supply and only a tiny current flows to overcome friction: \(\omega_0 \approx V/k\).</li>
+  <li><b>In between</b>, combining the two equations gives a straight line: \(\omega = \dfrac{V}{k} - \dfrac{R}{k^2}\,\tau\). Speed falls linearly as load torque rises.</li>
+</ul>
+
+<figure class="widget" id="fig-eq">
+  <div id="w-eq"></div>
+  <div id="w-eq-ctl"></div>
+  <figcaption><b>Figure 8.2</b> The motor's equivalent circuit, solved live. The back-EMF source \(e=k\omega\) "pushes back" against the supply. Try: set the load torque to 0 and watch the current drop to almost nothing while \(e\) climbs to nearly the supply voltage. Then click <b>Stall</b> to freeze the shaft: \(e\) collapses to 0 and the current jumps to \(V/R\).</figcaption>
+</figure>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "the motor draws the current it's rated for"</span>
+<p>A motor draws whatever current its <em>load</em> demands, through \(I = \tau/k\), up to the stall current. A "6 V, 0.2 A" motor is drawing 0.2 A at its rated load. At the moment you switch it on, it's stalled and draws \(V/R\), which might be 3 A. That start-up spike is what browns out your microcontroller, trips your regulator's current limit, and welds relay contacts. Size the driver, the wiring and the battery for stall current, or limit it in software with a ramp.</p>
+</aside>
+
+<h3>Speed, torque, power and efficiency</h3>
+<p>Mechanical output power is \(P = \tau\,\omega\). Speed falls linearly with torque, so power is a parabola: zero at no load (no torque), zero at stall (no speed), and maximum exactly halfway, at half the stall torque, where</p>
+$$P_{\max} = \frac{\tau_{\text{stall}}}{2}\cdot\frac{\omega_0}{2} = \frac{V^2}{4R}.$$
+<p>Efficiency is a different story. The power wasted as heat in the winding is \(I^2R\), which grows with the square of the torque. A real motor also needs a small <b>no-load current</b> \(I_0\) to overcome bearing and brush friction. Efficiency \(\eta = P_{\text{out}}/(V I)\) is therefore zero at both ends and peaks at fairly <em>light</em> load. A little algebra shows that the peak sits at \(I = \sqrt{I_0\, I_{\text{stall}}}\). For a motor with \(I_0 = 0.1\) A and \(I_{\text{stall}} = 4\) A, that's 0.63 A, about 15% of stall. That's why you choose a motor so that its <em>normal</em> operating point is at 10–30% of stall torque, and use a gearbox to get there.</p>
+
+<figure class="widget wide" id="fig-curve">
+  <div id="w-curve"></div>
+  <div id="w-curve-ctl"></div>
+  <figcaption><b>Figure 8.3</b> Speed–torque curves for a hobby "130-size" motor (default \(R = 1.5\,\Omega\), \(k = 5.7\) mN·m/A, \(I_0 = 0.12\) A). Speed and current are drawn as fractions of their maxima, output power as a fraction of its peak, and efficiency in percent. The green dashed line marks peak efficiency; the purple line is your operating point. Hover to read values. Try: double the supply voltage: stall torque and no-load speed double, maximum power quadruples, and the efficiency peak rises and moves to a smaller fraction of stall. Then increase \(R\) (thinner wire) and watch the stall torque collapse.</figcaption>
+</figure>
+
+<h3>Worked example: sizing a drive motor</h3>
+<p>A small robot needs 0.4 N·m at each wheel to climb a ramp, at 120 rpm. Your motor has \(R = 2\,\Omega\), \(k = 0.01\) N·m/A, \(I_0 = 0.15\) A and runs on 7.4 V (a 2S LiPo).</p>
+<ol>
+  <li><b>Motor limits.</b> \(I_{\text{stall}} = 7.4/2 = 3.7\) A, \(\tau_{\text{stall}} = 0.01 \times 3.7 = 37\) mN·m, and \(\omega_0 = 7.4/0.01 = 740\) rad/s \(\approx 7070\) rpm.</li>
+  <li><b>Pick the gear ratio from speed.</b> We want the motor near 70% of no-load speed, around 5000 rpm, so \(N \approx 5000/120 \approx 42\). A stock 50:1 gearbox is close.</li>
+  <li><b>Check torque.</b> Through a 50:1 gearbox with 70% efficiency, the motor must deliver \(0.4/(50\times0.7) = 11.4\) mN·m. That's 31% of stall: acceptable.</li>
+  <li><b>Current.</b> \(I = I_0 + \tau/k = 0.15 + 1.14 = 1.29\) A. Your driver must handle 1.3 A continuous and 3.7 A at start-up.</li>
+  <li><b>Speed check.</b> \(\omega = (7.4 - 1.29 \times 2)/0.01 = 482\) rad/s = 4600 rpm at the motor, 92 rpm at the wheel. A bit slow: a 40:1 box would bring it closer, at a slightly higher torque fraction.</li>
+</ol>
+
+<div class="ex" data-id="m-stall" data-kind="num" data-answer="6" data-tol="2%" data-unit="A">
+  <div class="q">A motor has winding resistance \(R = 2\,\Omega\) and \(k = 0.01\) V·s/rad and is driven from 12 V. What current does it draw at the instant you switch it on?</div>
+  <div class="hint">At the instant of switch-on the shaft isn't moving yet. What is the back-EMF?</div>
+  <div class="explain">At \(\omega = 0\) the back-EMF is zero, so \(I = V/R = 12/2 = 6\) A. Inductance delays this for a fraction of a millisecond (\(L/R\)), but the mechanical time constant is far longer, so the current really does reach stall level.</div>
+</div>
+
+
+</section>
+
+<section>
+<h2 id="drive">Driving DC motors: H-bridges, PWM and gearboxes</h2>
+
+<p>You never drive a motor from a GPIO pin. A pin can source maybe 20–40 mA and the motor wants amps, and the motor's inductance will kick the pin with a voltage spike when it switches off. In <a href="ch04-semis.html">Chapter 4</a> you built the answer: MOSFET switches. To run a motor in <em>both</em> directions you need four of them arranged as an <b>H-bridge</b>. Close the top-left and bottom-right switches and current flows through the motor left-to-right; close the other diagonal and it reverses.</p>
+
+<figure class="widget" id="fig-hbridge">
+  <div id="w-hb"></div>
+  <div id="w-hb-ctl"></div>
+  <figcaption><b>Figure 8.4</b> An H-bridge of four N-channel MOSFETs, as inside a DRV8833 or TB6612. Switches that are on are drawn in green. Try each mode: <b>Forward</b> and <b>Reverse</b> drive current through the motor in opposite directions; <b>Brake</b> shorts the motor through both low-side switches (the spinning motor's back-EMF drives a braking current around the lower loop); <b>Coast</b> turns everything off. The forbidden state, both switches on one side, would short the supply ("shoot-through"), which is why drivers add dead-time.</figcaption>
+</figure>
+
+<p>Integrated drivers like the <b>DRV8833</b> (two bridges, up to about 10.8 V and 1.5 A per channel) and the <b>TB6612FNG</b> (two bridges, up to 15 V and 1.2 A) package the four MOSFETs, the gate drivers, dead-time, over-current and thermal protection in one chip. You give each bridge two logic inputs. For the DRV8833, IN1/IN2 = 1/0 is forward, 0/1 reverse, 0/0 coast and 1/1 brake.</p>
+
+<h3>PWM: speed control by averaging</h3>
+<p>To run a motor at half speed you don't make half the voltage, which would waste power in a linear regulator. You switch the full voltage on and off quickly with <b>pulse-width modulation</b>. With duty cycle \(D\), the average voltage across the motor is \(D\cdot V\). The motor's inductance smooths the <em>current</em>, and its mechanical inertia smooths the speed even more. Since torque follows current and speed follows torque, the motor behaves almost as if it saw a steady \(DV\).</p>
+
+<p>The word "almost" hides the frequency choice. While the switch is on, current rises with slope \((V - e - IR)/L\); while it's off it falls. The current wiggles by a <b>ripple</b> \(\Delta I\) around its average. When the PWM period is much shorter than the electrical time constant \(L/R\), the ramps are nearly straight and</p>
+$$\Delta I \approx \frac{V\,D(1-D)}{L\,f_{\text{PWM}}}.$$
+<p>Ripple doesn't add torque on average, but it does add heat. Copper loss is \(I_{\text{rms}}^2 R\), and the RMS value of a rippling current is larger than its average. Ripple current also stresses capacitors and radiates noise. Doubling the frequency halves the ripple.</p>
+
+<figure class="widget" id="fig-pwm">
+  <div id="w-pwm"></div>
+  <div id="w-pwm-ctl"></div>
+  <figcaption><b>Figure 8.5</b> Motor current under PWM (slow-decay mode), simulated from the RL + back-EMF model for a small motor with \(L = 0.5\) mH, \(R = 1.5\,\Omega\) at 6 V and a steady 0.5 A load. The shaded band is the switch-on time. Try: drop the frequency to 500 Hz and see the current swing wildly (it even goes negative, braking the motor); raise it to 20 kHz and the current is nearly flat. Watch the "extra copper loss" readout.</figcaption>
+</figure>
+
+<p>So why not run at 1 MHz? Because every switching edge costs energy. While a MOSFET is half-on during the transition it has both voltage across it and current through it, and that loss is paid once per edge. Switching losses grow linearly with frequency. The usual compromise for small motors is <b>about 20–30 kHz</b>: above the range of human hearing (no whining) and low enough that the driver's switching losses stay small. Very low frequencies, 100–1000 Hz, give poor torque linearity but can help a cheap motor start at low duty cycle; you'll occasionally see them in toys. Very large motors with high inductance are often run at 8–16 kHz.</p>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: PWM is time-slicing</span>
+<p>A CPU at 30% load isn't running at 30% speed; it's running at full speed 30% of the time, and the scheduler's time slice is short enough that it looks smooth from outside. PWM is the same trick, with the motor's inductance and inertia playing the role of the human who can't see individual time slices. If the slice is too long (low PWM frequency), the "jank" shows up as current ripple and audible whine.</p>
+<pre><code>// ESP32 (Arduino core 3.x): 20 kHz, 10-bit PWM on two pins of a DRV8833 bridge
+const int AIN1 = 4, AIN2 = 5;
+void setup() {
+  ledcAttach(AIN1, 20000, 10);   // pin, frequency (Hz), resolution (bits)
+  ledcAttach(AIN2, 20000, 10);
+}
+// speed in -1.0 .. +1.0. "Slow decay": PWM the low phase while the other input stays high.
+void motor(float speed) {
+  int duty = (int)(fabsf(speed) * 1023);
+  if (speed &gt;= 0) { ledcWrite(AIN1, 1023); ledcWrite(AIN2, 1023 - duty); }
+  else            { ledcWrite(AIN1, 1023 - duty); ledcWrite(AIN2, 1023); }
+}</code></pre>
+<p>Driving IN1 high and PWM-ing IN2 alternates between "forward" and "brake". During the off-time the current circulates through the low-side switches, so the ripple is small and speed is roughly proportional to duty. That's <b>slow decay</b>. Driving one input low and PWM-ing the other alternates forward and <em>coast</em>, which is <b>fast decay</b>: the current dies quickly through the body diodes, giving more ripple and a less linear speed response.</p>
+</aside>
+
+<div class="ex" data-id="m-pwmfreq" data-kind="multi">
+  <div class="q">You raise a motor's PWM frequency from 1 kHz to 25 kHz at the same duty cycle. Which statements are true? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>The current ripple drops by about 25×</li>
+    <li data-correct>The audible whine disappears</li>
+    <li>The average motor speed roughly doubles</li>
+    <li data-correct>The driver's switching losses increase</li>
+    <li>The stall current decreases</li>
+  </ol>
+  <div class="hint">Ripple \(\propto 1/f\). Average voltage depends only on duty cycle. What happens on every switching edge?</div>
+  <div class="explain">Ripple scales as \(1/f\), and 25 kHz is above human hearing. Average voltage is \(DV\) at any frequency, so the speed hardly changes (it rises slightly because there's less ripple-related loss). Each edge dissipates energy in the MOSFETs, so switching loss goes up 25×, though for small motors it's usually still small. Stall current is \(V/R\) during the on-time regardless.</div>
+</div>
+
+<h3>Gearboxes: trading speed for torque</h3>
+<p>Small DC motors are happiest spinning fast (thousands of rpm) at low torque. Wheels and arms want the opposite. A gearbox with ratio \(N\) divides speed by \(N\) and multiplies torque by \(N\), minus losses:</p>
+$$\omega_{\text{out}} = \frac{\omega_{\text{motor}}}{N}, \qquad \tau_{\text{out}} = N\,\eta_g\,\tau_{\text{motor}}.$$
+<p>Spur gearboxes lose a few percent per stage, so a 3–4 stage 100:1 box might have \(\eta_g\) around 0.6–0.8. Planetary gearboxes are more compact and stiffer. Worm gears give huge ratios in one stage and are usually <em>non-backdrivable</em>, so a robot arm holds its position with the power off, but their efficiency is poor (often 30–50%).</p>
+<p>Two side effects matter for control. First, <b>backlash</b>: the small play between gear teeth means the output can wobble a degree or so without the motor turning, which makes precise position control harder. Second, <b>reflected inertia</b>: the motor's rotor inertia appears at the output multiplied by \(N^2\). A high-ratio gearmotor feels sluggish and heavy, and is remarkably good at ignoring disturbances.</p>
+
+<div class="ex" data-id="m-gear" data-kind="num" data-answer="0.48" data-tol="2%" data-unit="N·m">
+  <div class="q">A motor delivers 20 mN·m into a 30:1 gearbox with 80% efficiency. What torque comes out of the output shaft?</div>
+  <div class="hint">\(\tau_{\text{out}} = N\,\eta\,\tau_{\text{in}}\). Watch the milli prefix.</div>
+  <div class="explain">\(0.020 \times 30 \times 0.8 = 0.48\) N·m. Speed is divided by 30, so the output power is 80% of the input power, as it must be.</div>
+</div>
+</section>
+
+<section>
+<h2 id="servo">Hobby servos: a motor with its own feedback loop</h2>
+
+<p>An RC servo is a small DC motor, a gearbox, a potentiometer on the output shaft and a little control board in one box. You don't tell it how hard to push; you tell it <em>where to be</em>, and its internal controller works out the rest. It's the first <b>closed-loop</b> system in this chapter. The board measures the output angle with the potentiometer, compares it to the angle you asked for, and drives the motor (through its own tiny H-bridge) in whichever direction reduces the error, harder when the error is large.</p>
+
+<p>The command is a pulse. Every 20 ms (50 Hz) you send a high pulse whose <b>width</b> encodes the target angle. By convention 1.5 ms is centre, and 1.0 ms and 2.0 ms are the ends of the nominal range. Many servos accept wider pulses, roughly 0.5–2.5 ms, for about 180° of travel, but the exact mapping varies between models, so calibrate yours. The repetition rate isn't critical: anything from 40 to 200 Hz usually works, and "digital" servos are happy at the high end. Only the pulse <em>width</em> carries information.</p>
+
+<figure class="widget" id="fig-servo">
+  <div class="w-grid2">
+    <div id="w-servo"></div>
+    <div id="w-servo-plot"></div>
+  </div>
+  <div id="w-servo-ctl"></div>
+  <figcaption><b>Figure 8.6</b> A servo following a 50 Hz pulse train. This widget maps 0.5–2.5 ms to 0–180°. The horn moves at a realistic rate limit (0.15 s per 60°), and the red wedge is the error the internal loop is fighting. Try: snap the pulse width from one end to the other and watch the horn lag; press <b>Load</b> to push on the horn and watch the loop push back. Goal for the exercise below: hold the horn at 135°.</figcaption>
+</figure>
+
+<div class="ex" data-id="servo-task" data-kind="task">
+  <div class="q">In Figure 8.6, set the pulse width that puts the servo horn at <b>135° ± 2°</b>, and let it settle there.</div>
+  <div class="explain">With 0.5 ms → 0° and 2.5 ms → 180°, each degree is \(2/180\) ms, so 135° needs \(0.5 + 135 \times 2/180 = 2.0\) ms. Real servos differ by tens of microseconds, so robots usually store a per-servo calibration offset.</div>
+</div>
+
+<p>Generating servo pulses on an ESP32 is a job for its LEDC PWM hardware: set the frequency to 50 Hz and compute the duty count from the pulse width.</p>
+<pre><code>// 50 Hz servo signal with 14-bit resolution: one count = 20 ms / 16384 = 1.22 µs
+const int SERVO_PIN = 13;
+void setup() { ledcAttach(SERVO_PIN, 50, 14); }
+void servoWriteUs(int us) {
+  uint32_t duty = (uint32_t)us * 16384 / 20000;   // 1500 µs -&gt; 1228
+  ledcWrite(SERVO_PIN, duty);
+}</code></pre>
+
+<div class="ex" data-id="servo-duty" data-kind="num" data-answer="1228.8" data-tol="0.6" data-unit="counts">
+  <div class="q">With a 50 Hz, 14-bit PWM channel (counts 0–16383 per period), what duty value gives a 1.5 ms pulse? (The hardware takes an integer; give the exact value or round it.)</div>
+  <div class="hint">The period is 20 ms. The duty count is (pulse width / period) × 16384.</div>
+  <div class="explain">\(1.5/20 \times 16384 = 1228.8\), so you'd write 1229 (or 1228). One count is 1.22 µs, fine enough for about 0.1° steps. With 8-bit resolution, one count would be 78 µs, about 7° per step: too coarse.</div>
+</div>
+
+<aside class="callout warn"><span class="ct">⚠️ Servos and power</span>
+<p>A standard servo can draw 1–2 A when it starts moving or is stalled against a load, and a big digital servo several amps. Never power servos from the microcontroller's 3.3 V or 5 V regulator. Give them their own 5–6 V supply (a BEC or buck converter), tie the grounds together, and put a few hundred µF of bulk capacitance near the servo connectors. Most hobby servos accept a 3.3 V signal pulse even when powered at 5 V, but check: some need a level shifter.</p>
+</aside>
+</section>
+
+<section>
+<h2 id="bldc">Brushless motors, ESCs and field-oriented control</h2>
+
+<p>The brushed motor's commutator is a mechanical switch that wears out and sparks. A <b>brushless DC motor</b> (BLDC) turns the design inside-out: the permanent magnets spin (on the rotor), and the coils sit still (on the stator), where they can be wired directly to a driver. With no brushes, something else must flip the coil currents at the right moments. That something is electronics: the <b>ESC</b> (electronic speed controller), which is three half-bridges, six MOSFETs in total, and a microcontroller that runs the commutation sequence.</p>
+
+<p>A BLDC has three phases, A, B and C. In the simplest scheme, <b>six-step</b> (or trapezoidal) commutation, two phases conduct at any time: current flows in through one and out through another while the third floats. The combination of currents makes a stator magnetic field pointing in one of six directions. The rotor's magnet tries to align with that field, and just before it does, the ESC steps the field 60° ahead. The rotor chases the field forever, and the torque is largest when the field leads the rotor by 90°.</p>
+
+<figure class="widget wide" id="fig-bldc">
+  <div id="w-bldc"></div>
+  <div id="w-bldc-ctl"></div>
+  <figcaption><b>Figure 8.7</b> A three-phase brushless motor (one pole pair, for clarity). The arrow in the stator is the net stator field; the rotor magnet chases it. The bars show each phase current (+, −, or floating) and the three Hall sensors' outputs. Try: compare <b>Six-step</b> with <b>Sinusoidal (FOC)</b> and watch the field jump in 60° steps or rotate smoothly; drop the <b>field lead</b> from 90° towards 0° and see the torque fall away.</figcaption>
+</figure>
+
+<h3>Knowing where the rotor is</h3>
+<p>To commutate, the ESC must know the rotor angle. <b>Sensored</b> motors have three Hall-effect sensors that switch as the magnets pass. Their three bits give six states per electrical revolution, one per commutation step, which is exactly enough for six-step drive and works even at zero speed. <b>Sensorless</b> ESCs, which are nearly all drone and RC-plane ESCs, read the back-EMF on the floating phase instead: when it crosses the midpoint voltage, the rotor is 30° before the next step. Back-EMF is proportional to speed, so at standstill there's nothing to measure. Sensorless ESCs start the motor "open loop", stepping blindly until there's enough back-EMF to lock on. That's why a drone motor twitches at start-up, and why sensorless drives struggle with heavy loads at low speed. For a crawler or a robot arm, you want sensors.</p>
+
+<h3>KV rating</h3>
+<p>Hobby BLDCs are labelled with a <b>KV</b> number: no-load rpm per volt. A 920 KV motor on a 3S LiPo (11.1 V nominal) spins at about \(920 \times 11.1 \approx 10\,200\) rpm unloaded. KV is just the inverse of the motor constant in different units:</p>
+$$k_t\ [\text{N·m/A}] = \frac{60}{2\pi\,\mathrm{KV}} \approx \frac{9.55}{\mathrm{KV}}.$$
+<p>A <em>high</em> KV motor is fast and weak per amp; a <em>low</em> KV motor is slow and strong per amp. At the same power, a low-KV motor needs more voltage and less current. That's why gimbal motors are wound for very low KV (dozens of rpm/V), while a small racing-quad motor might be 2000–3000 KV.</p>
+
+<div class="ex" data-id="bldc-kv" data-kind="num" data-answer="10212" data-tol="2%" data-unit="rpm">
+  <div class="q">A 920 KV brushless motor runs from a 3S LiPo at its nominal 11.1 V. What's its approximate no-load speed?</div>
+  <div class="explain">\(920 \times 11.1 = 10\,212\) rpm. Under load it will be lower: the same straight-line speed–torque law applies as for a brushed motor. A full pack at 12.6 V gives about 11 600 rpm.</div>
+</div>
+
+<h3>Field-oriented control</h3>
+<p>Six-step drive is simple but lumpy: the stator field jumps in 60° steps, so the angle between field and rotor swings between 60° and 120°, and the torque ripples. <b>Field-oriented control</b> (FOC) drives all three phases with sinusoidal currents so that the stator field rotates smoothly and stays at exactly 90° to the rotor. It needs a good rotor angle (a magnetic encoder like the AS5600 or AS5048, or an observer that estimates angle from currents) and measured phase currents. The mathematics, the Clarke and Park transforms, rotates the three phase currents into a frame that spins with the rotor. In that frame, two numbers describe everything: \(I_q\) (the "quadrature" current, which makes torque) and \(I_d\) (the "direct" current, which only pushes along the magnet and is normally held at zero). Two PI controllers regulate them, and a brushless motor suddenly behaves like an ideal brushed motor: torque \(=k_t I_q\), smooth down to zero speed.</p>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Try it: SimpleFOC</span>
+<p>The open-source <b>SimpleFOC</b> library (Arduino and PlatformIO, works on ESP32 and STM32) puts FOC within reach of a hobbyist. Pair a gimbal motor, a cheap three-phase driver board and an AS5600 encoder, and you get silky position, velocity or torque control. The skeleton looks like this:</p>
+<pre><code>#include &lt;SimpleFOC.h&gt;
+BLDCMotor motor(7);                          // 7 pole pairs
+BLDCDriver3PWM driver(25, 26, 27, 14);       // phase A/B/C PWM pins + enable
+MagneticSensorI2C sensor(AS5600_I2C);
+
+void setup() {
+  sensor.init();          motor.linkSensor(&amp;sensor);
+  driver.voltage_power_supply = 12;
+  driver.init();          motor.linkDriver(&amp;driver);
+  motor.controller = MotionControlType::velocity;
+  motor.PID_velocity.P = 0.2;  motor.PID_velocity.I = 20;
+  motor.init();  motor.initFOC();             // aligns the sensor to the electrical angle
+}
+void loop() {
+  motor.loopFOC();        // as fast as possible: the inner current/voltage loop
+  motor.move(10);         // target: 10 rad/s
+}</code></pre>
+<p>Note the structure: a fast inner loop (<code>loopFOC</code>) and a slower outer motion loop (<code>move</code>). Nested loops with the fastest one innermost are the standard architecture of motion control, and you'll see the same idea again in the PID section.</p>
+</aside>
+
+<div class="ex" data-id="bldc-foc" data-kind="text" data-answer="foc|field oriented control|fieldorientedcontrol|vector control">
+  <div class="q">What's the name (or its three-letter abbreviation) of the control technique that drives a BLDC with sinusoidal phase currents so the stator field stays at 90° to the rotor?</div>
+  <div class="explain">Field-oriented control (FOC), also called vector control. It needs rotor angle and phase current measurements, and gives smooth torque at any speed.</div>
+</div>
+</section>
+
+<section>
+<h2 id="stepper">Stepper motors: moving by counting</h2>
+
+<p>A <b>stepper motor</b> is designed to be positioned without a sensor. Inside, a toothed rotor (permanent magnet plus soft iron, in a "hybrid" stepper) sits inside a stator with two phases, A and B. Energise phase A and the rotor's teeth snap into alignment with A's teeth. Switch to B and they snap to the next alignment, a step further on. The geometry gives the common NEMA 17 stepper <b>200 full steps per revolution</b>, 1.8° each. The rotor has 50 teeth, so one full electrical cycle of the coil currents (four full steps) moves the shaft \(360°/50 = 7.2°\).</p>
+
+<p>The driver sequence for <b>full stepping</b> is A+, B+, A−, B− (or, for more torque, both phases on: A+B+, A−B+, A−B−, A+B−). <b>Half stepping</b> alternates one-phase-on and two-phases-on states, giving 400 positions per revolution. <b>Microstepping</b> goes further: the driver sets the two coil currents to \(I\cos\phi\) and \(I\sin\phi\) for many intermediate values of the electrical angle \(\phi\), so the combined field (and the rotor) moves in small, smooth increments. 1/16 microstepping gives 3200 positions per revolution. The positions between full steps aren't perfectly accurate, but the motion is far smoother and quieter, and resonance is reduced.</p>
+
+<figure class="widget wide" id="fig-stepper">
+  <div id="w-step"></div>
+  <div id="w-step-ctl"></div>
+  <figcaption><b>Figure 8.8</b> A stepper drawn in <em>electrical</em> angle (one turn here is four full steps, 7.2° of a real NEMA 17 shaft). The coil arrows show phase currents; the rotor follows the field through a magnetic "spring" whose stiffness falls at high step rates because the coil inductance can't build up current in time. Try: compare full, half and 1/16 microstepping at low speed; then raise the step rate and switch <b>run</b> off and on (an instant start), or raise the load (a percentage of holding torque), until the rotor slips and the <b>missed steps</b> counter climbs. Turn on <b>acceleration ramp</b> and see how much faster you can go without losing steps.</figcaption>
+</figure>
+
+<h3>Why steppers miss steps</h3>
+<p>The "spring" in Figure 8.8 is real: the torque pulling the rotor towards the field is roughly \(\tau_h \sin(\phi_{\text{field}} - \phi_{\text{rotor}})\), where \(\tau_h\) is the holding torque. If the field gets more than 90° (electrical) ahead, the torque starts to <em>decrease</em>; past 180° it pulls the rotor the wrong way, and the rotor falls back by a whole electrical cycle. The controller has no idea: it keeps counting steps that didn't happen. An open-loop stepper is only as good as your guarantee that this never occurs. Three things cause it:</p>
+<ul>
+  <li><b>Load torque</b> above the motor's available torque.</li>
+  <li><b>Speed</b>. Each coil is an inductor; at high step rates the current can't rise to its set value before the next step (time constant \(L/R\)), so available torque falls with speed. Higher supply voltage helps, which is why stepper drivers run at 12–36 V even though the coil is rated at 3 V: the driver <em>chops</em> the current to a set limit.</li>
+  <li><b>Acceleration</b>. Jumping instantly to a high step rate asks the rotor for infinite acceleration. Real firmware (GRBL, Marlin, Klipper, AccelStepper) ramps the step rate up and down.</li>
+</ul>
+
+<h3>Driver chips: A4988 and TMC2209</h3>
+<p>A stepper driver takes two logic signals, <b>STEP</b> (one pulse per microstep) and <b>DIR</b>, and handles the rest: two H-bridges, current sensing, and a <b>chopper</b> that switches the bridges on and off to hold each coil's current at the value the microstep table demands. You set the peak current with a trimmer potentiometer that adjusts a reference voltage. For the classic Allegro A4988:</p>
+$$I_{\text{trip,max}} = \frac{V_{\text{REF}}}{8\,R_S}$$
+<p>where \(R_S\) is the current-sense resistor on the board (read its marking: R100 is 0.1 Ω, R068 is 0.068 Ω). Set the limit at or below the motor's rated phase current. Too high cooks the motor and driver; too low loses torque and steps.</p>
+
+<figure class="widget" id="fig-a4988">
+  <div id="w-a4988"></div>
+  <figcaption><b>Figure 8.9</b> Wiring an A4988 (or a pin-compatible TMC2209 module) between an ESP32 and a bipolar stepper. The 100 µF electrolytic across VMOT is not optional: the motor leads' inductance can produce voltage spikes that destroy the driver. MS1–MS3 select the microstep resolution (all high = 1/16 on the A4988).</figcaption>
+</figure>
+
+<p>Trinamic's <b>TMC2209</b> is a drop-in upgrade on the same "StepStick" footprint. Its <b>StealthChop</b> mode makes steppers nearly silent at low speed; it interpolates to 256 microsteps internally; and its <b>StallGuard</b> feature detects a stall from the back-EMF signature, so a 3D printer can home an axis without an end-stop switch. It can be configured over a single-wire UART instead of jumpers. For new designs it's the default choice for small steppers.</p>
+
+<div class="ex" data-id="step-vref" data-kind="num" data-answer="0.8" data-tol="2%" data-unit="V">
+  <div class="q">An A4988 board has 0.1 Ω sense resistors (marked R100). Your motor is rated 1.0 A per phase. What \(V_{\text{REF}}\) should you set?</div>
+  <div class="hint">Rearrange \(I = V_{\text{REF}}/(8R_S)\).</div>
+  <div class="explain">\(V_{\text{REF}} = 8 \times 0.1 \times 1.0 = 0.8\) V. Measure it between the trimmer's wiper and ground with the board powered and no motor moving. Many builders set 70–90% of rated current to keep the motor cooler.</div>
+</div>
+
+<div class="ex" data-id="step-miss" data-kind="multi">
+  <div class="q">An open-loop stepper on a 3D printer occasionally shifts layers. Which changes are likely to help? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>Reduce the maximum acceleration in the firmware</li>
+    <li data-correct>Raise the driver supply voltage from 12 V to 24 V (same current limit)</li>
+    <li>Lower the current limit well below the motor rating</li>
+    <li data-correct>Reduce friction or binding in the mechanics</li>
+    <li>Switch from 1/16 microstepping to full steps to "get more torque"</li>
+  </ol>
+  <div class="hint">Missed steps happen when the load or the acceleration demand exceeds the torque the motor can make at that speed.</div>
+  <div class="explain">Lower acceleration means less torque demand. A higher supply voltage lets the chopper build coil current faster, so torque holds up at speed. Less friction is less load. Lowering the current limit removes torque. Full stepping doesn't raise the maximum torque meaningfully and makes resonance worse, which often <em>causes</em> skipped steps.</div>
+</div>
+</section>
+
+<section>
+<h2 id="encoders">Measuring motion: encoders</h2>
+
+<p>To control speed or position you have to measure it. The workhorse is the <b>incremental quadrature encoder</b>: a disc with slots (optical) or a multi-pole magnet (magnetic, Hall-effect) on the motor shaft, read by <b>two</b> sensors, A and B, placed so that their square waves are 90° apart. One channel alone tells you how fast the shaft turns but not which way. Two channels in quadrature tell you both, because which one leads tells you the direction.</p>
+
+<p>The two bits form a Gray-code sequence: going forward, the state (A,B) cycles 00 → 10 → 11 → 01 → 00; going backward, the reverse. Each transition changes exactly one bit. A decoder looks at the previous state and the new state, and adds +1, −1, or (for an impossible double-bit jump, which means noise or a missed edge) flags an error. Counting every edge of both channels is <b>×4 decoding</b>, and gives four counts per slot.</p>
+
+<figure class="widget wide" id="fig-enc">
+  <div id="w-enc"></div>
+  <div id="w-enc-ctl"></div>
+  <figcaption><b>Figure 8.10</b> A 12-slot quadrature encoder with sensors A and B. The trace shows both channels as the disc turns; the counter decodes direction with a state table. Try: drag the speed slider through zero and watch which channel leads; switch decoding between ×1, ×2 and ×4 and compare counts per revolution; turn on <b>Noise</b> to see illegal transitions get flagged.</figcaption>
+</figure>
+
+<div class="ex" data-id="enc-order" data-kind="order">
+  <div class="q">Channel A leads channel B. Starting from (A,B) = (0,0), put the states in the order the decoder sees them as the shaft turns forward.</div>
+  <ol class="items">
+    <li>A=0, B=0</li>
+    <li>A=1, B=0</li>
+    <li>A=1, B=1</li>
+    <li>A=0, B=1</li>
+  </ol>
+  <div class="explain">A rises first (A leads), then B rises, then A falls, then B falls. Only one bit changes at a time. Running backwards visits the same states in reverse order, which is how the decoder knows the direction.</div>
+</div>
+
+<h3>From counts to speed</h3>
+<p>The resolution that matters is <b>counts per output revolution</b>: sensor lines (or magnet pole pairs) per motor revolution × decoding factor × gear ratio. A typical N20 micro gearmotor has a 7-pole-pair magnetic encoder: with ×4 decoding and a 100:1 box that's \(7\times4\times100 = 2800\) counts per wheel revolution. Speed is change in count over time. Two estimators are common:</p>
+<ul>
+  <li><b>Fixed time window</b>: count edges in, say, 10 ms. Simple, but at low speed you get just a few counts per window, so the estimate is quantised into big steps.</li>
+  <li><b>Time between edges</b>: timestamp each edge and divide. Accurate at low speed but noisy at high speed, and you need a timeout to detect "stopped".</li>
+</ul>
+<p>Good firmware switches between them, or averages several windows.</p>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Quadrature decoding is a state machine</span>
+<p>Here's a lookup-table decoder. It's branch-free, handles both directions, and counts illegal transitions. On an ESP32 you'd normally use the hardware <b>PCNT</b> (pulse counter) peripheral instead, which does exactly this in silicon with glitch filtering and no CPU load. On an AVR Arduino, run this in a pin-change interrupt.</p>
+<pre><code>// index = (prevAB &lt;&lt; 2) | newAB ; value = step (+1, -1, 0 = no change, 2 = illegal)
+static const int8_t QDEC[16] = { 0, -1, +1,  2,
+                                +1,  0,  2, -1,
+                                -1,  2,  0, +1,
+                                 2, +1, -1,  0 };
+volatile int32_t count = 0; volatile uint32_t errors = 0;
+volatile uint8_t prevAB = 0;
+void IRAM_ATTR onEdge() {                      // attach to CHANGE on both pins
+  uint8_t ab = (digitalRead(PIN_A) &lt;&lt; 1) | digitalRead(PIN_B);
+  int8_t d = QDEC[(prevAB &lt;&lt; 2) | ab];
+  if (d == 2) errors++; else count += d;
+  prevAB = ab;
+}
+// in the 100 Hz control loop:
+float rpm = (count - lastCount) / COUNTS_PER_REV / 0.01f * 60.0f;</code></pre>
+</aside>
+
+<div class="ex" data-id="enc-rpm" data-kind="num" data-answer="100" data-tol="2%" data-unit="rpm">
+  <div class="q">An encoder has 12 lines per motor revolution, you decode ×4, and the gearbox is 30:1. In a 10 ms window you count 24 edges. What is the wheel speed in rpm?</div>
+  <div class="hint">First find counts per wheel revolution: \(12\times4\times30\).</div>
+  <div class="explain">Counts per wheel revolution \(= 12\times4\times30 = 1440\). In 10 ms: \(24/1440 = 1/60\) rev, i.e. \(1/60 \div 0.01 = 1.67\) rev/s \(= 100\) rpm. Notice the quantisation: one count more or less changes the estimate by about 4 rpm.</div>
+</div>
+
+<p><b>Absolute</b> encoders give the shaft angle directly at power-up, with no homing. Common hobby examples are magnetic angle sensors like the AS5600 (12-bit, I²C or analog/PWM output) and AS5048 (14-bit, SPI), which read a diametrically magnetised magnet glued to the end of the shaft. They're how SimpleFOC gimbals know their rotor angle.</p>
+</section>
+
+<section>
+<h2 id="imu">IMUs, sensor fusion and range sensors</h2>
+
+<p>An <b>IMU</b> (inertial measurement unit) such as the MPU-6050, ICM-42688-P, BMI270 or LSM6DSO combines a three-axis <b>accelerometer</b> and a three-axis <b>gyroscope</b> on one chip, usually with I²C and SPI interfaces (<a href="ch06-interfaces.html">Chapter 6</a>). Nine-axis modules add a three-axis <b>magnetometer</b>. All are MEMS devices: microscopic silicon structures etched into the die.</p>
+
+<ul>
+  <li>The <b>accelerometer</b> is a tiny proof mass on silicon springs. Acceleration deflects the mass, and the deflection changes a capacitance that the chip measures. At rest it measures the reaction to gravity: 1 g pointing <em>up</em>. Its direction gives tilt angles, which is great, except that every bump, vibration and acceleration of the robot looks just like a change in tilt.</li>
+  <li>The <b>gyroscope</b> has a mass vibrating at kHz frequencies. When the chip rotates, the Coriolis effect pushes the vibrating mass sideways in proportion to the rotation rate. It measures <em>angular velocity</em> (°/s), not angle. Integrate it to get angle, which is smooth and fast and ignores linear acceleration. But any small bias in the rate (a few tenths of a °/s is typical) integrates into an angle error that grows without bound: <b>drift</b>.</li>
+  <li>The <b>magnetometer</b> senses Earth's field (about 25–65 µT) to give heading. Motors, magnets, battery currents and steel frames all distort it, so it needs careful calibration ("hard-iron" offsets and "soft-iron" scaling) and a position away from motor wiring.</li>
+</ul>
+
+<div class="ex" data-id="imu-sort" data-kind="sort">
+  <div class="q">Sort each property to the sensor it belongs to.</div>
+  <div class="bins">
+    <div data-bin="acc">Accelerometer</div>
+    <div data-bin="gyro">Gyroscope</div>
+    <div data-bin="mag">Magnetometer</div>
+  </div>
+  <ul class="items">
+    <li data-bin="acc">Gives tilt from gravity, but vibration looks like tilt</li>
+    <li data-bin="gyro">Measures rotation rate; integrating it drifts</li>
+    <li data-bin="mag">Gives heading, but motor currents distort it</li>
+    <li data-bin="acc">Reads about 9.8 m/s² pointing up when lying still</li>
+    <li data-bin="gyro">Smooth and fast over short times, wrong over long times</li>
+    <li data-bin="mag">Needs hard-iron and soft-iron calibration</li>
+  </ul>
+  <div class="explain">The accelerometer is right on average but noisy; the gyro is accurate over short times but drifts; the magnetometer is the only one that knows north. Sensor fusion combines their strengths.</div>
+</div>
+
+<h3>The complementary filter</h3>
+<p>The accelerometer angle is correct in the long run but noisy from moment to moment. The integrated gyro angle is clean from moment to moment but wrong in the long run. In frequency terms (<a href="ch03-ac.html">Chapter 3</a>), the accelerometer's errors are high-frequency and the gyro's errors are low-frequency. So <b>low-pass filter the accelerometer, high-pass filter the gyro, and add them</b>. The two filters are chosen to be complementary (their gains sum to 1 at every frequency) so the true signal passes through unchanged. In code it collapses into one line:</p>
+
+<div class="formula">
+$$\hat\theta_k = \alpha\,\big(\hat\theta_{k-1} + \omega_{\text{gyro}}\,\Delta t\big) + (1-\alpha)\,\theta_{\text{accel}}, \qquad \tau = \frac{\alpha\,\Delta t}{1-\alpha}$$
+<p>Each step, trust the gyro to propagate the estimate, then nudge it a little towards the accelerometer. \(\tau\) is the crossover time constant.</p>
+</div>
+
+<p>With a 100 Hz loop (\(\Delta t = 10\) ms) and \(\alpha = 0.98\), \(\tau = 0.49\) s: the estimate follows the gyro for anything faster than about half a second and the accelerometer for anything slower. Choose \(\alpha\) too close to 1 and drift creeps back; too small and vibration leaks in.</p>
+
+<figure class="widget wide" id="fig-comp">
+  <div id="w-comp"></div>
+  <div id="w-comp-ctl"></div>
+  <figcaption><b>Figure 8.11</b> Ten seconds of simulated IMU data at 100 Hz from a robot tilting back and forth. Grey is the true angle; orange the accelerometer angle (noisy); blue the integrated gyro (drifting); green the complementary filter. Try: \(\alpha = 0\) is "accelerometer only" and \(\alpha = 1\) is "gyro only". Find the \(\alpha\) that minimises the RMS error, then increase the gyro bias and see the optimum move.</figcaption>
+</figure>
+
+<div class="ex" data-id="comp-task" data-kind="task">
+  <div class="q">In Figure 8.11, with the default noise settings (gyro bias 2 °/s, accel noise 4°), tune \(\alpha\) so that the filter's RMS error is <b>below 1.0°</b>.</div>
+  <div class="explain">Anything from about \(\alpha \approx 0.92\) to \(0.975\) works here (\(\tau\) of roughly 0.1–0.4 s), with the minimum near 0.955. The theory predicts it: a constant gyro bias \(b\) leaves a steady offset of \(b\tau\) (2 °/s × 0.4 s = 0.8°), while the accelerometer noise is averaged over about \(\tau\), so it shrinks as \(\tau\) grows. Notice the trade-off: lower \(\alpha\) lets accelerometer noise through, higher \(\alpha\) lets the gyro bias build a steady offset.</div>
+</div>
+
+<p>The complementary filter has relatives. A <b>Kalman filter</b> does the same blending but computes the optimal weighting from models of each sensor's noise, and can also estimate the gyro bias as a state, which removes the drift offset entirely. For full 3D orientation, the <b>Madgwick</b> and <b>Mahony</b> filters fuse gyro, accelerometer and (optionally) magnetometer into a quaternion efficiently enough for an 8-bit microcontroller. Several modern IMUs (BNO055, BNO085, ICM-20948 with its DMP) run fusion on the chip and just hand you a quaternion.</p>
+
+<aside class="callout tip"><span class="ct">💡 Practical IMU tips</span>
+<ul>
+  <li>Calibrate the gyro bias at start-up: average 1–2 seconds of readings while the robot is still, and subtract.</li>
+  <li>Use the IMU's built-in digital low-pass filter, and set the output data rate at least a few times higher than your control loop rate.</li>
+  <li>Mount it near the robot's centre of rotation, rigidly, and away from motors (vibration) and high-current wires (magnetic fields).</li>
+  <li>Use the data-ready interrupt pin, or a hardware timer, so samples arrive at a fixed \(\Delta t\). Jitter in \(\Delta t\) is an error in the gyro integral.</li>
+</ul>
+</aside>
+
+<h3>Distance sensors: sound, light and lasers</h3>
+<p>Robots also need to know how far away things are. Three technologies dominate at hobby scale.</p>
+<p><b>Ultrasonic</b> rangers like the HC-SR04 send a short 40 kHz chirp and time the echo. You give a 10 µs pulse on TRIG; the module sends the burst and raises ECHO, holding it high until the echo returns. Sound travels to the object and back, so</p>
+$$d = \frac{v_{\text{sound}}\;t_{\text{echo}}}{2}, \qquad v_{\text{sound}} \approx 331.3 + 0.606\,T_{^\circ\mathrm C}\ \text{m/s}.$$
+<p>At 20 °C, \(v = 343\) m/s, so each centimetre of range is about 58 µs of echo pulse. The beam is wide (about 15–30°), soft or angled surfaces may not reflect, and two sensors can hear each other's chirps. But it's cheap and works on glass, which defeats optical sensors.</p>
+
+<figure class="widget" id="fig-sonar">
+  <div id="w-sonar"></div>
+  <div id="w-sonar-ctl"></div>
+  <figcaption><b>Figure 8.12</b> HC-SR04 timing. The top trace is TRIG, the middle shows the 40 kHz burst and its echo, and the bottom is the ECHO pulse your code measures. Try: move the obstacle and watch the ECHO width scale at 58 µs/cm; change the air temperature and see how much error you'd get if your code assumed 20 °C.</figcaption>
+</figure>
+
+<figure class="widget" id="fig-sonar-sch">
+  <div id="w-sonar-sch"></div>
+  <figcaption><b>Figure 8.13</b> Connecting a 5 V HC-SR04 to a 3.3 V ESP32. TRIG accepts 3.3 V logic directly, but ECHO swings to 5 V, so a 1 kΩ / 2 kΩ divider brings it down to 3.3 V. (Chapter 6 covers level shifting in general.)</figcaption>
+</figure>
+
+<div class="ex" data-id="sonar-num" data-kind="num" data-answer="1.0" data-tol="2%" data-unit="m">
+  <div class="q">At 20 °C, an HC-SR04 returns an ECHO pulse of 5.83 ms. How far away is the obstacle?</div>
+  <div class="hint">Don't forget the round trip.</div>
+  <div class="explain">\(d = 343 \times 0.00583/2 \approx 1.00\) m.</div>
+</div>
+
+<p><b>Time-of-flight (ToF)</b> sensors such as ST's VL53L0X and VL53L1X do the same with infrared laser light (940 nm). Light covers a metre in 3.3 ns, far too fast to time with a counter, so these chips use arrays of single-photon avalanche diodes (SPADs) and statistical timing histograms built in silicon. You just read millimetres over I²C. Ranges are tens of centimetres up to a few metres depending on the model, lighting and target colour, with a narrow field of view. Watch out: many share a fixed I²C address, so to use several you hold all but one in reset (XSHUT pin) and reassign addresses one at a time at start-up.</p>
+<p><b>LiDAR</b> scanners spin a laser rangefinder to sweep a 360° plane, producing thousands of points per second for mapping and SLAM. Budget units use either triangulation (a laser spot imaged onto a sensor at an angle, as in the RPLIDAR A1) or direct time-of-flight (as in the LD06/LD19 family). They talk UART and are the standard sensor for ROS-based mobile robots.</p>
+</section>
+
+<section>
+<h2 id="pid">PID control in depth</h2>
+
+<p>Now we close the loop. You want a wheel to turn at 60 rad/s. You could look up the voltage that gives 60 rad/s and apply it (<b>open loop</b>), but the battery sags, the floor tilts, the gearbox warms up, and the speed wanders. <b>Feedback</b> fixes this: measure the speed, compute the <b>error</b> \(e = r - y\) between the setpoint \(r\) and the measurement \(y\), and let the error decide the motor command \(u\). The <b>PID</b> controller decides with three terms:</p>
+
+<div class="formula">
+$$u(t) = K_p\,e(t) + K_i\!\int_0^t e(\tau)\,d\tau + K_d\,\frac{de(t)}{dt}$$
+<p>Proportional: react to the present error. Integral: react to the accumulated past error. Derivative: react to the error's trend, a prediction of the near future.</p>
+</div>
+
+<h3>Intuition for each term</h3>
+<p><b>P</b> is a spring. The further you are from the target, the harder you push. Raising \(K_p\) makes the response faster and stiffer, but too much makes it overshoot and oscillate, especially when the system has delay or inertia. And a P controller alone usually leaves a <b>steady-state error</b>: to make any output (say 4 V to overcome friction and load), it needs a nonzero error, because \(u = K_p e\). A speed loop with only P always settles a bit below the setpoint.</p>
+<p><b>I</b> is persistence. As long as any error remains, the integral keeps growing, pushing the output up until the error is exactly zero. At that point the integral holds whatever value is needed (the 4 V) by itself. Integral action is what removes steady-state error. Its price is phase lag: the integral reacts late, which adds overshoot and can destabilise the loop if \(K_i\) is too large.</p>
+<p><b>D</b> is damping, like a shock absorber. If the error is shrinking fast, the derivative term is negative and brakes the approach before you overshoot. It lets you use a larger \(K_p\) without oscillation. Its price is <b>noise</b>: differentiation amplifies high-frequency noise, and a quantised encoder signal is mostly high-frequency noise.</p>
+
+<aside class="callout physics"><span class="ct">⚛️ Why a position loop needs D and a speed loop often doesn't</span>
+<p>A motor's speed responds to voltage like an RC circuit: a first-order lag with the mechanical time constant \(\tau_m\). A first-order plant with P or PI control can't oscillate on its own, so speed loops are usually PI. Position is the <em>integral</em> of speed, which adds a second integrator. With P control alone, \(\tau_m\ddot\theta + \dot\theta = K K_p (r - \theta)\) is a mass on a spring with weak damping: raise \(K_p\) and it rings. D adds a term proportional to \(\dot\theta\), which is exactly a damper. This is why position loops are usually PD or PID, and speed loops PI.</p>
+</aside>
+
+<figure class="widget wide" id="fig-pid">
+  <div id="w-pid"></div>
+  <div id="w-pid-u"></div>
+  <div id="w-pid-ctl"></div>
+  <div class="ch8-note" id="w-pid-note"></div>
+  <figcaption><b>Figure 8.14</b> A discrete-time PID controller driving a simulated DC motor (\(\tau_m = 0.1\) s, 10 rad/s per volt, output limited to ±12 V). The top plot is setpoint and response; the bottom plot is the controller output, saturating at the rails. At \(t = 1\) s a load torque is applied. Try: (1) in the speed loop, P alone leaves an error; add I to remove it; (2) give it a big I and watch <b>integral windup</b> during saturation, then enable anti-windup; (3) in the position loop, raise \(K_p\) until it rings, then add \(K_d\); (4) turn on sensor noise and see what D does to the output; (5) lower the loop rate.</figcaption>
+</figure>
+
+<div class="ex" data-id="pid-task" data-kind="task">
+  <div class="q">In Figure 8.14's <b>speed loop</b>: tune it so the response has <b>less than 5% overshoot</b>, <b>settles within 2% by 0.25 s</b>, and returns to the setpoint within 2% before the end after the load step (no steady-state error).</div>
+  <div class="explain">A PI controller with anti-windup does it, for example \(K_p \approx 0.7\)–\(2\) with \(K_i \approx 10 K_p\). Choosing \(K_i/K_p \approx 1/\tau_m = 10\) places the controller's zero on the motor's pole, a classic trick (pole–zero cancellation). Without anti-windup, the integral charges up while the output is pinned at 12 V and causes overshoot.</div>
+</div>
+
+<h3>Integral windup</h3>
+<p>Real actuators saturate: the H-bridge can't produce more than the battery voltage. During a big step, the controller asks for 60 V, gets 12 V, and the error stays large for a while. Meanwhile the integral keeps accumulating, "winding up" to a huge value. When the output finally reaches the setpoint, the integral is still huge, so the output keeps pushing and overshoots badly, and the integral only unwinds once the error has been negative for as long as it was positive. The fix is <b>anti-windup</b>. The simplest form is <em>conditional integration</em> (clamping): don't integrate when the output is saturated in the direction the error would push it. Another is <em>back-calculation</em>, which bleeds the integral by the amount of saturation.</p>
+
+<h3>Derivative kick and derivative noise</h3>
+<p>If you differentiate the <em>error</em>, a step change in setpoint produces an infinite derivative for one sample: the output spikes ("derivative kick"). Since the setpoint is something you change deliberately, differentiate only the <em>measurement</em>: use \(-K_d\,dy/dt\) instead of \(K_d\,de/dt\). The two are identical when the setpoint is constant. For noise, low-pass filter the derivative term with a time constant a few times shorter than the loop's response, or get velocity from a better source (a gyro for a balancing robot, rather than differentiating an angle).</p>
+
+<div class="ex" data-id="pid-windup" data-kind="mc">
+  <div class="q">A robot arm's position loop overshoots massively after big moves but behaves well on small moves. The PWM output hits 100% during big moves. What's the most likely cause?</div>
+  <ol class="opts">
+    <li>\(K_d\) is too large</li>
+    <li data-correct>Integral windup during actuator saturation</li>
+    <li>The encoder resolution is too low</li>
+    <li>The loop runs too fast</li>
+  </ol>
+  <div class="explain">The size-dependence is the giveaway: only large moves saturate the output, and saturation is when the integral winds up. Add clamping or back-calculation anti-windup, or limit how much the integral can accumulate.</div>
+</div>
+
+<h3>Tuning procedure</h3>
+<p>Formal methods exist (Ziegler–Nichols, loop shaping on a Bode plot, model-based design), but for hobby robots this manual recipe works well:</p>
+<ol>
+  <li>Make it safe. Limit the output, add an emergency stop, and lift the wheels off the ground.</li>
+  <li>Set \(K_i = K_d = 0\). Raise \(K_p\) until the response is quick with slight overshoot (speed loop) or begins to ring (position loop).</li>
+  <li>For a position loop, add \(K_d\) until the ringing is damped. Then try raising \(K_p\) a bit more, and repeat.</li>
+  <li>Add \(K_i\) slowly until the steady-state error disappears in a reasonable time. If overshoot grows, back off.</li>
+  <li>Test with disturbances: push it, add load, change the battery voltage. Test large and small steps. Leave a margin: back every gain off by 20–30% from "just stable".</li>
+</ol>
+
+<div class="ex" data-id="pid-sort" data-kind="sort">
+  <div class="q">Which PID term is the best first remedy for each symptom?</div>
+  <div class="bins">
+    <div data-bin="p">Raise \(K_p\)</div>
+    <div data-bin="i">Add / raise \(K_i\)</div>
+    <div data-bin="d">Add / raise \(K_d\)</div>
+  </div>
+  <ul class="items">
+    <li data-bin="i">Speed settles at 95% of the setpoint and stays there</li>
+    <li data-bin="d">Position overshoots and rings several times before settling</li>
+    <li data-bin="p">Response is stable but sluggish, with no overshoot at all</li>
+    <li data-bin="i">A steady load (a ramp) makes the robot sag below its target</li>
+    <li data-bin="d">Raising \(K_p\) any further makes the arm oscillate</li>
+    <li data-bin="p">The system barely reacts to errors</li>
+  </ul>
+  <div class="explain">Steady-state error → integral. Ringing → derivative damping. Sluggishness → more proportional gain. In practice everything interacts, so retest after each change.</div>
+</div>
+
+<h3>Discrete time: the controller is a loop in your firmware</h3>
+<p>The equation above is continuous; your microcontroller isn't. It samples the sensor every \(\Delta t\), computes, and holds the output until the next sample. Replace the integral with a running sum and the derivative with a difference:</p>
+$$I_k = I_{k-1} + K_i\,e_k\,\Delta t, \qquad D_k = -K_d\,\frac{y_k - y_{k-1}}{\Delta t}, \qquad u_k = \mathrm{clamp}(K_p e_k + I_k + D_k).$$
+<p>The most important rule is that <b>\(\Delta t\) must be constant</b>. The gains are tuned for one rate, so jitter changes the effective gains from loop to loop. Run the loop from a hardware timer or a FreeRTOS task with <code>vTaskDelayUntil</code>, never with <code>delay()</code> plus however long your code happened to take. As a rule of thumb, sample 10–20× faster than the fastest behaviour you want to control: 100 Hz–1 kHz for wheel speed, 200 Hz–1 kHz for balancing, 10–40 kHz for FOC current loops.</p>
+
+<aside class="callout dev"><span class="ct">👩‍💻 A production-shaped PID in C++</span>
+<pre><code>struct PID {
+  float kp, ki, kd, outMin, outMax;
+  float integ = 0, prevMeas = 0, dFilt = 0;
+  float dAlpha = 0.2f;                 // derivative low-pass, 0..1 (1 = no filtering)
+  float update(float setpoint, float meas, float dt) {
+    float e = setpoint - meas;
+    float p = kp * e;
+    float dRaw = -(meas - prevMeas) / dt;          // derivative on measurement: no kick
+    dFilt += dAlpha * (dRaw - dFilt);  prevMeas = meas;
+    float d = kd * dFilt;
+    float u = p + integ + d;
+    // anti-windup: integrate only if not pushing further into saturation
+    bool satHi = u &gt;= outMax, satLo = u &lt;= outMin;
+    if (!(satHi &amp;&amp; e &gt; 0) &amp;&amp; !(satLo &amp;&amp; e &lt; 0)) integ += ki * e * dt;
+    integ = constrain(integ, outMin, outMax);
+    return constrain(p + integ + d, outMin, outMax);
+  }
+};
+
+// FreeRTOS task: fixed 200 Hz loop
+void controlTask(void*) {
+  TickType_t last = xTaskGetTickCount();
+  const float dt = 0.005f;
+  for (;;) {
+    float speed = readEncoderSpeed();       // rad/s
+    float volts = pid.update(target, speed, dt);
+    motorVolts(volts);                      // duty = volts / batteryVolts
+    vTaskDelayUntil(&amp;last, pdMS_TO_TICKS(5));
+  }
+}</code></pre>
+<p>Two details are easy to miss. The integral is stored <em>already multiplied by</em> \(K_i\), so changing \(K_i\) while running doesn't make the output jump. And <code>motorVolts</code> divides by the <em>measured</em> battery voltage, so the loop gain doesn't change as the battery drains.</p>
+</aside>
+</section>
+
+<section>
+<h2 id="balance">Putting it together: a self-balancing robot and differential drive</h2>
+
+<p>A two-wheeled self-balancing robot is an <b>inverted pendulum</b> on wheels, the classic unstable system. The body's centre of mass sits at height \(l\) above the axle. Tilt it by \(\theta\) and gravity's torque tips it further, faster the further it leans. The only way to recover is to drive the wheels <em>under</em> the falling body, exactly as you'd balance a broom on your palm. For small angles the linearised dynamics are</p>
+$$\ddot\theta = \frac{g}{l}\,\theta - \frac{a}{l},$$
+<p>where \(a\) is the wheels' acceleration. Without control (\(a=0\)), the solution grows like \(e^{t\sqrt{g/l}}\). For \(l = 0.3\) m, the time constant \(\sqrt{l/g}\) is 0.17 s: a small tilt grows 2.7× every 0.17 s. Your loop has to act well inside that time.</p>
+
+<p>Use a PD controller on the angle, \(a = K_p\theta + K_d\dot\theta\), and substitute:</p>
+$$\ddot\theta + \frac{K_d}{l}\,\dot\theta + \frac{K_p - g}{l}\,\theta = 0.$$
+<p>That's a damped spring, stable only if <b>\(K_p > g\)</b> (the wheels must out-accelerate gravity's tipping effect) and <b>\(K_d > 0\)</b> (there must be damping). Within those limits, larger \(K_p\) makes it stiffer and larger \(K_d\) calmer. The angle comes from the complementary filter, and \(\dot\theta\) straight from the gyro, which is much cleaner than differentiating the angle. Real robots then add a slower <em>outer</em> loop on wheel speed or position, which tilts the angle setpoint slightly to drive the robot back to where it started. Otherwise a robot that balances perfectly still drifts across the room.</p>
+
+<figure class="widget wide" id="fig-balance">
+  <div id="w-bal"></div>
+  <div id="w-bal-ctl"></div>
+  <div class="ch8-note" id="w-bal-note"></div>
+  <figcaption><b>Figure 8.15</b> A self-balancing robot (\(l = 0.3\) m, wheel acceleration limited to ±12 m/s², 200 Hz loop with a little sensor noise). It starts tilted by 5°. Try: with the default gains it falls; the condition above says \(K_p\) must exceed 9.81. Raise \(K_p\), add \(K_d\), and press <b>Restart</b>. Then turn on <b>gusts</b> and press <b>Push</b> to test it. The speed term \(K_v\) is the outer loop that stops the robot from running away.</figcaption>
+</figure>
+
+<div class="ex" data-id="bal-task" data-kind="task">
+  <div class="q">In Figure 8.15, with <b>gusts on</b>, keep the robot upright for <b>10 seconds</b> after a restart.</div>
+  <div class="explain">Something like \(K_p \approx 30\), \(K_d \approx 3\), \(K_i = 0\), \(K_v \approx 0.5\)–\(1\) works. Too little \(K_d\) and it oscillates until it saturates the wheels; too much \(K_p\) with heavy sensor noise and the wheels jitter. A real robot also has motor lag and backlash, so expect to retune on hardware.</div>
+</div>
+
+<h3>Differential drive kinematics</h3>
+<p>Most small robots steer like a tank: two independently driven wheels on one axle (plus a caster, or balancing). If the left and right wheels move at speeds \(v_L\) and \(v_R\), and the wheels are \(b\) apart (the track width), the robot's forward speed and turning rate are</p>
+$$v = \frac{v_R + v_L}{2}, \qquad \omega = \frac{v_R - v_L}{b}, \qquad R = \frac{v}{\omega} = \frac{b}{2}\cdot\frac{v_R + v_L}{v_R - v_L}.$$
+<p>Equal speeds drive straight; opposite speeds spin in place; anything else follows an arc of radius \(R\). Going the other way, from a desired \((v, \omega)\) to wheel speeds, is \(v_{R,L} = v \pm \omega b/2\). That inverse is what your high-level code calls; each wheel then gets its own PID speed loop on its encoder. Integrating \((v,\omega)\) over time gives <b>odometry</b>, the robot's estimate of where it is, which slowly drifts with wheel slip, just like the gyro.</p>
+
+<figure class="widget" id="fig-diff">
+  <div id="w-diff"></div>
+  <div id="w-diff-ctl"></div>
+  <figcaption><b>Figure 8.16</b> Differential-drive kinematics. Set the left and right wheel speeds and watch the robot trace its path; the dashed circle is the instantaneous turning circle of radius \(R\). Try: equal speeds, then equal and opposite, then one wheel stopped (the robot pivots about that wheel).</figcaption>
+</figure>
+
+<div class="ex" data-id="diff-num" data-kind="num" data-answer="0.375" data-tol="2%" data-unit="m">
+  <div class="q">A robot has a track width of 0.15 m. The left wheel runs at 0.2 m/s and the right at 0.3 m/s. What is the radius of the arc it drives (measured to the robot's centre)?</div>
+  <div class="hint">\(v = (v_R+v_L)/2\), \(\omega = (v_R - v_L)/b\), \(R = v/\omega\).</div>
+  <div class="explain">\(v = 0.25\) m/s, \(\omega = 0.1/0.15 = 0.667\) rad/s, \(R = 0.25/0.667 = 0.375\) m, turning left (counter-clockwise), towards the slower wheel.</div>
+</div>
+
+<aside class="callout lab"><span class="ct">🔧 Lab: an encoder-based speed loop, then a balancing robot</span>
+<p><b>Parts:</b> ESP32 dev board, DRV8833 or TB6612 module, two N20 or 25 mm gearmotors with Hall encoders, MPU-6050 or ICM-42688 breakout, 2S LiPo with a fuse, a 5 V buck for logic, a chassis (two decks of plywood or a 3D print with the battery on top: a high centre of mass is easier to balance, because \(\sqrt{l/g}\) gets longer).</p>
+<ol>
+  <li><b>Characterise the motor.</b> Measure winding resistance with a multimeter (rotate the shaft a few times and take the lowest reading, which is when the brushes contact well). Spin the motor at a known PWM, record no-load speed from the encoder, and compute \(k = (V - I_0R)/\omega_0\). Compare with your speed–torque model.</li>
+  <li><b>Open-loop step.</b> Apply a step from 0 to 50% duty and log encoder speed at 200 Hz over serial. Fit the first-order response to find \(\tau_m\). This is the plant you're controlling.</li>
+  <li><b>Speed PI loop.</b> Implement the PID struct above at a fixed 200 Hz. Start with \(K_i/K_p = 1/\tau_m\). Plot setpoint and speed in the Arduino serial plotter. Pinch the wheel: the integral should restore the speed. Disable anti-windup and command a big step to see windup for yourself.</li>
+  <li><b>Scope it.</b> Probe the motor terminals and a 0.1 Ω shunt in the ground lead at 1 kHz and at 20 kHz PWM. Compare current ripple with Figure 8.5.</li>
+  <li><b>Balance.</b> Implement the complementary filter (\(\alpha \approx 0.98\) at 200 Hz) on the IMU. Feed angle and gyro rate to a PD loop whose output is a wheel acceleration (integrate it to a speed setpoint for the two inner speed loops). Hold the robot near upright, raise \(K_p\) until it fights back, add \(K_d\) until it stops oscillating, then add a slow outer speed loop.</li>
+</ol>
+<p><b>Expect:</b> to find that motor deadband (the minimum duty at which the motor moves at all) and gearbox backlash matter more than anything in the simulation. Add a small deadband compensation, and keep the loop rate high.</p>
+</aside>
+
+
+<aside class="callout ref"><span class="ct">📚 Go deeper</span>
+<ul>
+  <li><b>Austin Hughes &amp; Bill Drury, <i>Electric Motors and Drives: Fundamentals, Types and Applications</i></b> (Newnes; 4th ed. 2013, 5th ed. 2019). Chapter 1 (motor fundamentals: the BIL force, torque, back-EMF and the energy-conversion argument) and the chapters on conventional d.c. motors and d.c. motor drives cover the brushed motor model at exactly this level, with very little maths; later chapters cover stepping motors and permanent-magnet brushless machines.</li>
+  <li><b>Brian Douglas, <i>Control Systems Lectures</i></b> (YouTube) and MATLAB's <i>Understanding PID Control</i> video series that he presents. The clearest intuitive treatment of PID, integral windup, derivative filtering and loop tuning.</li>
+  <li><b>Kevin Lynch &amp; Frank Park, <i>Modern Robotics: Mechanics, Planning, and Control</i></b> (Cambridge, 2017; free PDF and Coursera course from Northwestern). Chapter 11 (robot control) and Chapter 13 (wheeled mobile robots, including differential-drive kinematics and odometry).</li>
+  <li><b>Gordon McComb, <i>Robot Builder's Bonanza</i></b> (5th ed., McGraw-Hill, 2018). Practical chapters on choosing and mounting DC motors, servos and steppers, and on sensors for navigation.</li>
+  <li><b>SimpleFOC documentation</b> (docs.simplefoc.com): its "theory corner" explains FOC, Clarke/Park transforms and the cascaded loops; the getting-started guides walk through a gimbal motor build.</li>
+  <li><b>Brett Beauregard, "Improving the Beginner's PID"</b> blog series (brettbeauregard.com), the walkthrough behind the Arduino PID library: sample time, derivative kick, windup and on-the-fly tuning changes, one fix per post.</li>
+  <li><b>Sebastian Madgwick, "An efficient orientation filter for inertial and inertial/magnetic sensor arrays"</b> (2010 report). The original Madgwick filter paper, with code.</li>
+  <li>Datasheets worth reading end to end: TI <b>DRV8833</b>, Allegro <b>A4988</b>, Trinamic/ADI <b>TMC2209</b>, TDK InvenSense <b>MPU-6050</b> or <b>ICM-42688-P</b>, ST <b>VL53L1X</b>.</li>
+</ul>
+</aside>
+</section>
+
+</main>
+<script src="../assets/vendor/katex/katex.min.js"></script>
+<script src="../assets/vendor/katex/auto-render.min.js"></script>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/ch08-robotics.js"></script>
+</body>
+</html>

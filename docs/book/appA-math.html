@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A · Math Toolkit — Sparks & Circuits</title>
+<meta name="description" content="SI prefixes, rearranging formulas, exponentials and time constants, logs and decibels, derivatives and integrals, Euler's method, sine waves and RMS, complex numbers and phasors, vectors, and node equations as matrices.">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+  .ma-canvas { touch-action: none; cursor: grab; }
+  .ma-tex { text-align: center; font-size: 1.1rem; min-height: 2.6em; padding: 6px 0; overflow-x: auto; }
+  .ma-mat { overflow-x: auto; padding: 4px 0; }
+</style>
+</head>
+<body data-book="adult" data-chapter="appA-math">
+<main class="chapter">
+
+<header class="chapter-head">
+  <p class="kicker">Appendix A</p>
+  <h1>Math Toolkit</h1>
+  <p class="lede">Electronics uses a small, friendly slice of mathematics: powers of ten, exponentials, logarithms, a little calculus, sine waves, complex numbers and a matrix or two. If you've written a game loop or a physics engine, you already know most of it under different names. This appendix rebuilds each tool from intuition, with a widget to play with.</p>
+</header>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="prefixes">Prefixes, scientific notation and orders of magnitude</h2>
+
+<p>Component values in a single circuit routinely span fifteen orders of magnitude: a 10 pF capacitor, a 10 MΩ resistor, a 10 µA sleep current, a 10 A motor. Writing these as plain decimals is hopeless, so engineers use <b>scientific notation</b>, \(a\times10^{n}\), and its friendlier cousin, <b>engineering notation</b>, where \(n\) is always a multiple of 3 and gets a letter prefix:</p>
+
+<table>
+  <tr><th>Prefix</th><th>Symbol</th><th>Factor</th><th>Typical sighting</th></tr>
+  <tr><td>giga</td><td>G</td><td>\(10^{9}\)</td><td>2.4 GHz BLE and Wi-Fi</td></tr>
+  <tr><td>mega</td><td>M</td><td>\(10^{6}\)</td><td>16 MHz crystal, 1 MΩ scope input</td></tr>
+  <tr><td>kilo</td><td>k</td><td>\(10^{3}\)</td><td>4.7 kΩ I²C pull-up, 400 kHz bus</td></tr>
+  <tr><td>—</td><td></td><td>\(10^{0}\)</td><td>3.3 V, 1 A</td></tr>
+  <tr><td>milli</td><td>m</td><td>\(10^{-3}\)</td><td>20 mA LED, 50 mΩ shunt</td></tr>
+  <tr><td>micro</td><td>µ (often typed u)</td><td>\(10^{-6}\)</td><td>10 µF bulk cap, 5 µA deep sleep</td></tr>
+  <tr><td>nano</td><td>n</td><td>\(10^{-9}\)</td><td>100 nF decoupling cap, 10 ns edge</td></tr>
+  <tr><td>pico</td><td>p</td><td>\(10^{-12}\)</td><td>22 pF crystal load cap</td></tr>
+</table>
+
+<p>Schematics often put the prefix where the decimal point would go, because a printed decimal point can vanish in a photocopy: <code>4k7</code> means 4.7 kΩ, <code>2R2</code> means 2.2 Ω and <code>1n5</code> means 1.5 nF. Resistors also use a three-digit code on SMD parts: <code>472</code> means \(47\times10^{2} = 4700\ \Omega\).</p>
+
+<p>The single most useful arithmetic habit is to <b>multiply the mantissas and add the exponents</b>. For example, 4.7 kΩ × 2 mA \(= 4.7\times10^{3}\times2\times10^{-3} = 9.4\times10^{0}\) = 9.4 V. Kilo and milli cancel. The pairs that cancel, k·m, M·µ and G·n, are worth memorising, because they show up constantly: kΩ × mA = V, and MΩ × µF = s (a time constant).</p>
+
+<figure class="widget">
+  <div id="f-orders"></div>
+  <figcaption><b>Figure A.1</b> A logarithmic ruler of electronics, from picoseconds to gigahertz. Drag the slider and the pointer moves one <em>decade</em> (factor of 10) per tick; the readouts show the same number in scientific and engineering notation. Notice how evenly spaced the decades are: on a log scale, multiplying is moving a fixed distance.</figcaption>
+</figure>
+
+<div class="ex" data-id="prefix-order" data-kind="order">
+  <div class="q">Put these quantities in order from smallest to largest.</div>
+  <ol class="items">
+    <li>22 pF</li>
+    <li>100 nF</li>
+    <li>4.7 µF</li>
+    <li>0.01 F</li>
+    <li>1.5 F</li>
+  </ol>
+  <div class="explain">22 pF = \(2.2\times10^{-11}\), 100 nF = \(10^{-7}\), 4.7 µF = \(4.7\times10^{-6}\), 0.01 F = 10 mF = \(10^{-2}\), and 1.5 F (a supercapacitor). Always convert to powers of ten before comparing; "100 n" is smaller than "4.7 µ" even though 100 &gt; 4.7.</div>
+</div>
+
+<div class="ex" data-id="prefix-num" data-kind="num" data-answer="0.0141" data-tol="2%" data-unit="W">
+  <div class="q">A 470 Ω resistor carries 5.47 mA. What power does it dissipate? (\(P = I^2R\))</div>
+  <div class="hint">\((5.47\times10^{-3})^2 \times 470\). Square the mantissa, double the exponent.</div>
+  <div class="explain">\(I^2 = 29.9\times10^{-6}\ \text{A}^2\), times 470 gives \(1.41\times10^{-2}\) W = 14.1 mW. A standard 0.25 W resistor is fine. You can type <code>14.1m</code>.</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="algebra">Rearranging formulas</h2>
+
+<p>An equation is a balance: whatever you do to one side, do to the other, and it stays true. Rearranging a formula to isolate an unknown is the same as <b>inverting a function</b>, which you've done in code many times. Each operation applied to the unknown has to be undone in reverse order, like popping a stack:</p>
+
+<ul>
+  <li>Something <b>added</b> to the unknown gets subtracted from both sides.</li>
+  <li>Something <b>multiplying</b> the unknown divides both sides.</li>
+  <li>A <b>square</b> is undone by a square root; an <b>exponential</b> by a logarithm (next sections).</li>
+</ul>
+
+<p><b>Worked example.</b> An LED circuit obeys \(V_s = IR + V_F\). Solve for \(R\). The unknown \(R\) is multiplied by \(I\), and then \(V_F\) is added. Undo in reverse: subtract \(V_F\), then divide by \(I\):</p>
+$$V_s - V_F = IR \quad\Longrightarrow\quad R = \frac{V_s - V_F}{I}.$$
+
+<p><b>Second example.</b> Power in a resistor is \(P = V^2/R\). What voltage gives 0.25 W in 100 Ω? Multiply both sides by \(R\) to get \(V^2 = PR\), then take the square root: \(V = \sqrt{PR} = \sqrt{25} = 5\) V. Notice the square root has two answers, ±5 V. Physics tells you which one you want: here either polarity dissipates the same power.</p>
+
+<p>Always finish with a <b>units check</b>. If your rearranged formula for a resistance comes out in V·A, you've made a mistake: \(\text{V}/\text{A} = \Omega\), while \(\text{V}\cdot\text{A} = \text{W}\).</p>
+
+<figure class="widget">
+  <div id="f-algebra"></div>
+  <figcaption><b>Figure A.2</b> Formula explorer. Choose a formula and which quantity to solve for. The rearranged formula appears, and the result is computed from the sliders. Try solving the voltage divider for \(R_2\): it's the one people get wrong.</figcaption>
+</figure>
+
+<aside class="callout myth"><span class="ct">⚠️ Skip the "formula triangle"</span>
+<p>Many tutorials teach a V-I-R triangle you cover with your thumb. It works for exactly one formula shape (\(a = bc\)) and teaches nothing that transfers. The two rules above work for every formula in this book, including the ones with sums, squares and exponentials.</p>
+</aside>
+
+<div class="ex" data-id="alg-mc" data-kind="mc">
+  <div class="q">The RC cutoff frequency is \(f_c = \dfrac{1}{2\pi RC}\). You want \(f_c = 1\) kHz with \(C = 100\) nF. Which expression gives \(R\)?</div>
+  <ol class="opts">
+    <li>\(R = 2\pi f_c C\)</li>
+    <li data-correct>\(R = \dfrac{1}{2\pi f_c C}\)</li>
+    <li>\(R = \dfrac{2\pi C}{f_c}\)</li>
+    <li>\(R = \dfrac{f_c}{2\pi C}\)</li>
+  </ol>
+  <div class="explain">Multiply both sides by \(R\), then divide both sides by \(f_c\): \(R = 1/(2\pi f_c C) = 1/(2\pi\cdot10^3\cdot10^{-7}) \approx 1.59\ \text{k}\Omega\). The formula is symmetric in \(R\) and \(C\), which is a good memory aid.</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="exponentials">Exponentials, \(e\) and the time constant</h2>
+
+<p>Many quantities in nature change at a rate proportional to how much of them there is. Money with compound interest grows faster when there is more of it. A capacitor discharging through a resistor loses charge faster when there's more charge (higher voltage, more current). Anything with this property follows an <b>exponential</b>.</p>
+
+<h3>Where \(e\) comes from</h3>
+<p>Suppose a bank pays 100% interest per year. Compounded once, \(\$1\) becomes \(\$2\). Compounded twice (50% each half year): \(1.5^2 = 2.25\). Monthly: \((1 + 1/12)^{12} \approx 2.613\). Every second: still about 2.718. The limit as you compound more and more often is a specific number:</p>
+<div class="formula">
+$$e = \lim_{n\to\infty}\left(1 + \frac1n\right)^n = 2.718\,281\,8\ldots$$
+<p>Euler's number. \(e^x\) is the result of growing continuously at a rate equal to your current size, for "time" \(x\).</p>
+</div>
+
+<p>The special property of \(e^x\) is that its slope equals its value: \(\frac{d}{dx}e^{x} = e^{x}\). That's why it solves every "rate proportional to amount" problem.</p>
+
+<h3>Decay and the time constant τ</h3>
+<p>A capacitor \(C\) discharging through a resistor \(R\) follows</p>
+<div class="formula">
+$$v(t) = V_0\,e^{-t/\tau}, \qquad \tau = RC$$
+<p>Exponential decay. Charging toward \(V_s\) is the mirror image: \(v(t) = V_s\left(1 - e^{-t/\tau}\right)\).</p>
+</div>
+<p>The <b>time constant</b> τ sets the timescale. A handful of numbers are worth memorising:</p>
+<table>
+  <tr><th>Time</th><th>Decay \(e^{-t/\tau}\) (left)</th><th>Charge \(1 - e^{-t/\tau}\) (reached)</th></tr>
+  <tr><td>1τ</td><td>36.8%</td><td><b>63.2%</b></td></tr>
+  <tr><td>2τ</td><td>13.5%</td><td>86.5%</td></tr>
+  <tr><td>3τ</td><td>5.0%</td><td>95.0%</td></tr>
+  <tr><td>4τ</td><td>1.8%</td><td>98.2%</td></tr>
+  <tr><td>5τ</td><td>0.7%</td><td><b>99.3%</b></td></tr>
+</table>
+<p>Engineers treat <b>5τ as "done"</b>. Another handy fact: the initial slope of the curve, extended as a straight line, reaches the final value after exactly one τ. Exponentials never actually arrive, but after 5τ the remaining 0.7% is usually smaller than the tolerance of your components.</p>
+
+<figure class="widget">
+  <div id="f-exp"></div>
+  <figcaption><b>Figure A.3</b> Charging and discharging curves. Adjust \(R\) and \(C\) (τ = RC is shown) and switch between charge and discharge. The dots mark 1τ to 5τ; the dashed line is the initial tangent, which hits the final value at exactly 1τ. Hover to read values.</figcaption>
+</figure>
+
+<div class="ex" data-id="exp-task" data-kind="task">
+  <div class="q">In Figure A.3, in <b>charge</b> mode, pick \(R\) and \(C\) so the capacitor reaches 63% of the supply at <b>t = 2 ms</b> (within 5%).</div>
+  <div class="explain">63% is reached at exactly one time constant, so you need \(RC = 2\) ms: for example 2 kΩ with 1 µF, or 20 kΩ with 100 nF. A button debounce filter or a power-on reset circuit is designed exactly this way.</div>
+</div>
+
+<div class="ex" data-id="exp-num" data-kind="num" data-answer="95.0" data-tol="0.3" data-unit="%">
+  <div class="q">An ESP32's EN pin has a 10 kΩ pull-up and a 1 µF capacitor to ground. What percentage of the final voltage has the pin reached 30 ms after power-up?</div>
+  <div class="hint">τ = RC = 10 ms, so 30 ms is 3τ. Compute \(1 - e^{-3}\).</div>
+  <div class="explain">\(1 - e^{-3} = 1 - 0.0498 = 0.950\), so 95.0%. That delay holds the chip in reset until the supply is stable.</div>
+</div>
+
+<aside class="callout lab"><span class="ct">🔧 Lab: measure a time constant with an ADC</span>
+<p>Parts: a 100 kΩ resistor, a 10 µF capacitor, an Arduino or ESP32. Connect a GPIO pin → 100 kΩ → capacitor → GND, and connect the capacitor's top to an ADC pin. Expected τ = RC = 1 s.</p>
+<ol>
+  <li>Set the GPIO low for 5 s (discharge), then high, and log <code>millis()</code> and the ADC reading every 20 ms for 5 s over serial.</li>
+  <li>Plot the data (a spreadsheet works). Find the time at which the reading reaches 63% of its final value: that's τ. Compare it with RC, remembering that electrolytic capacitors are often ±20%.</li>
+  <li>Take \(\ln\) of the remaining gap, \(\ln(V_\text{final} - v)\), and plot it against time. It should be a straight line of slope \(-1/\tau\): logarithms turn exponentials into lines, which is the most reliable way to measure τ.</li>
+</ol>
+</aside>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: the exponential moving average</span>
+<p>The classic smoothing filter <code>avg += alpha * (x - avg)</code> is an RC low-pass filter in code. Each step closes a fixed fraction of the remaining gap, which is exactly exponential behaviour, with a time constant of about <code>dt / alpha</code>. You'll see this equivalence made precise in the Euler section below.</p>
+</aside>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="logs">Logarithms, decibels and log axes</h2>
+
+<p>A logarithm answers "what power?": \(\log_{10}(1000) = 3\) because \(10^3 = 1000\). It's the inverse of the exponential, and it turns multiplication into addition:</p>
+$$\log(ab) = \log a + \log b, \qquad \log(a^n) = n\log a, \qquad \ln x = \log_e x.$$
+<p>That property is why gains in a signal chain are expressed in a log unit: cascaded amplifiers <em>multiply</em> their gains, and in log units you just <em>add</em> them. Logarithms also solve for time in exponentials. How long until an RC charge reaches 90%? Set \(1 - e^{-t/\tau} = 0.9\), so \(e^{-t/\tau} = 0.1\), and take \(\ln\) of both sides: \(t = \tau\ln 10 \approx 2.3\tau\).</p>
+
+<h3>Decibels</h3>
+<p>The decibel compares two <em>powers</em> on a log scale:</p>
+<div class="formula">
+$$G_\text{dB} = 10\log_{10}\frac{P_2}{P_1} = 20\log_{10}\frac{V_2}{V_1}$$
+<p>Power ratios use 10 log; voltage (or current) ratios use 20 log. They give the same dB because \(P \propto V^2\), and the square becomes a factor of 2 outside the log.</p>
+</div>
+
+<p>Landmarks to memorise: <b>+3 dB ≈ double the power</b> (×1.41 voltage); <b>+6 dB ≈ double the voltage</b> (×4 power); <b>+10 dB = 10× power</b>; <b>+20 dB = 10× voltage</b> (100× power). Negative dB means attenuation. A filter's cutoff frequency is defined as its <b>−3 dB point</b>, where the output power has dropped to half and the voltage to \(1/\sqrt2 \approx 70.7\%\).</p>
+
+<p>Absolute levels use a fixed reference: <b>dBm</b> is power relative to 1 mW. A BLE radio transmitting at 0 dBm sends 1 mW; at +8 dBm it sends 6.3 mW; a received signal of −90 dBm is 1 picowatt. A link budget is then just addition and subtraction.</p>
+
+<figure class="widget">
+  <div id="f-db"></div>
+  <figcaption><b>Figure A.4</b> Decibels vs. ratio on a logarithmic x-axis. On log axes, \(10\log\) and \(20\log\) become straight lines. Drag the ratio slider and compare the power and voltage interpretations. Watch the landmarks: ×2 power is +3 dB, ×2 voltage is +6 dB, and 0.707 voltage is −3 dB.</figcaption>
+</figure>
+
+<div class="ex" data-id="db-num" data-kind="num" data-answer="-6.02" data-tol="0.05" data-unit="dB">
+  <div class="q">A voltage divider halves a signal's voltage. What is its gain in dB?</div>
+  <div class="hint">Voltage ratio, so use \(20\log_{10}(0.5)\).</div>
+  <div class="explain">\(20\log_{10}0.5 = 20\times(-0.301) = -6.02\) dB. Two such dividers in a row (if they didn't load each other) would give −12 dB: in dB, gains add.</div>
+</div>
+
+<div class="ex" data-id="db-multi" data-kind="multi">
+  <div class="q">At a low-pass filter's −3 dB cutoff frequency... (select all that apply)</div>
+  <ol class="opts">
+    <li data-correct>the output power is about half the passband power</li>
+    <li>the output voltage is half the passband voltage</li>
+    <li data-correct>the output voltage is about 70.7% of the passband voltage</li>
+    <li>the signal is completely blocked</li>
+  </ol>
+  <div class="explain">\(-3\) dB means \(10^{-3/10} \approx 0.501\) in power and \(10^{-3/20} \approx 0.708\) in voltage. Half the <em>voltage</em> would be −6 dB. A first-order filter keeps falling gradually beyond cutoff, at −20 dB per decade.</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="calculus">Derivatives and integrals, by intuition</h2>
+
+<h3>The derivative is a rate</h3>
+<p>The <b>derivative</b> \(dv/dt\) is the slope of a graph at a point: how fast \(v\) changes per unit time. Numerically, it's what you get from <code>(v[n+1] - v[n]) / dt</code> as <code>dt</code> shrinks toward zero. Physically, it's a speedometer reading: the rate right now, not the average over the trip.</p>
+
+<p>Two derivatives run all of electronics:</p>
+<div class="formula">
+$$i_C = C\,\frac{dv}{dt}, \qquad v_L = L\,\frac{di}{dt}$$
+<p>A capacitor's current is proportional to how fast its voltage changes; an inductor's voltage is proportional to how fast its current changes.</p>
+</div>
+<p>Read them as rules about <em>slopes</em>. A flat voltage means no capacitor current, however high the voltage. A steep voltage edge means a big current spike. That's why a fast digital edge driving a capacitive load draws large current pulses even though the average current is tiny. You only need a few derivative rules: \(\frac{d}{dt}(at) = a\), \(\frac{d}{dt}e^{-t/\tau} = -\frac1\tau e^{-t/\tau}\), and \(\frac{d}{dt}\sin\omega t = \omega\cos\omega t\).</p>
+
+<figure class="widget">
+  <div id="f-deriv"></div>
+  <figcaption><b>Figure A.5</b> The derivative as a slope. The top curve is a capacitor voltage; <b>drag along the plot</b> (or use the slider) to move the tangent point. The lower curve is the capacitor current \(i = C\,dv/dt\): its value at any time is the slope of the voltage curve there. Pick different waveforms and see where the current peaks and where it crosses zero.</figcaption>
+</figure>
+
+<div class="ex" data-id="deriv-task" data-kind="task">
+  <div class="q">In Figure A.5, choose the <b>sine</b> waveform and move the tangent point to a time where the capacitor current is <b>zero</b> (within 2% of its peak).</div>
+  <div class="explain">The current is zero at the peaks and troughs of the voltage, where the slope is flat. It's largest where the voltage crosses zero, where the slope is steepest. So for a capacitor, the current sine is shifted a quarter cycle (90°) <em>ahead</em> of the voltage. That 90° shift is what complex impedance encodes.</div>
+</div>
+
+<div class="ex" data-id="icap-num" data-kind="num" data-answer="0.05" data-tol="2%" data-unit="A">
+  <div class="q">A 10 µF capacitor's voltage rises linearly from 0 to 5 V in 1 ms. What current flows into it during the ramp?</div>
+  <div class="hint">\(dv/dt = 5\ \text{V} / 1\ \text{ms}\). Multiply by \(C\).</div>
+  <div class="explain">\(i = 10\times10^{-6}\times 5/10^{-3} = 0.05\) A = 50 mA. Make the ramp 100× faster (10 µs) and the current is 5 A. This is why capacitive loads need inrush limiting.</div>
+</div>
+
+<h3>The integral is accumulation</h3>
+<p>The <b>integral</b> is the reverse: it adds up a rate over time to get a total. If current is the rate at which charge flows, then the charge delivered between \(t_0\) and \(t_1\) is the <b>area under the current curve</b>:</p>
+<div class="formula">
+$$Q = \int_{t_0}^{t_1} i(t)\,dt, \qquad v_C(t) = v_C(0) + \frac1C\int_0^t i\,dt$$
+<p>Numerically: <code>Q += i * dt</code> in a loop. This is exactly what a battery "fuel gauge" chip does with its current-sense resistor (coulomb counting).</p>
+</div>
+<p>Battery capacity in mAh is an integral too: 2000 mAh means the area under the current-vs-time curve is 2 A·h = 7200 C. The derivative and integral undo each other (the fundamental theorem of calculus), which is why \(i = C\,dv/dt\) and \(v = \frac1C\int i\,dt\) say the same thing.</p>
+
+<figure class="widget">
+  <div id="f-integ"></div>
+  <figcaption><b>Figure A.6</b> The integral as an area. Choose a current waveform and drag the end time. The shaded area is the charge delivered so far (the readout), and the second curve shows that running total. Into a 100 µF capacitor, that charge becomes the voltage \(Q/C\). Note that for a symmetric sine, the area over a full cycle is zero.</figcaption>
+</figure>
+
+<div class="ex" data-id="charge-num" data-kind="num" data-answer="6e-6" data-tol="2%" data-unit="C">
+  <div class="q">A sensor draws a constant 2 mA for a 3 ms measurement burst. How much charge does it draw from its supply capacitor?</div>
+  <div class="hint">Area of a rectangle: current × time.</div>
+  <div class="explain">\(Q = 2\times10^{-3}\times3\times10^{-3} = 6\times10^{-6}\) C = 6 µC. From a 100 µF capacitor with no other supply, the voltage would drop by \(Q/C = 60\) mV. Type <code>6u</code>.</div>
+</div>
+
+<div class="ex" data-id="calc-sort" data-kind="sort">
+  <div class="q">Is each quantity a rate (derivative) or an accumulated total (integral)?</div>
+  <div class="bins">
+    <div data-bin="d">📈 Rate (derivative)</div>
+    <div data-bin="i">🧮 Total (integral)</div>
+  </div>
+  <ul class="items">
+    <li data-bin="d">Current, given charge vs. time</li>
+    <li data-bin="i">Battery mAh used on a trip</li>
+    <li data-bin="d">A slew rate in V/µs</li>
+    <li data-bin="i">Energy in J, given power vs. time</li>
+    <li data-bin="d">Inductor voltage, from its current</li>
+    <li data-bin="i">Capacitor voltage, from its current</li>
+  </ul>
+  <div class="explain">Rates are slopes; totals are areas. Current is \(dQ/dt\), slew rate is \(dv/dt\), and \(v_L = L\,di/dt\). Charge used, energy \(\int P\,dt\) and capacitor voltage \(\frac1C\int i\,dt\) are accumulations.</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="euler">A differential equation, solved in a loop</h2>
+
+<p>Combine the capacitor law with Ohm's law and you get a <b>differential equation</b>: an equation relating a quantity to its own rate of change. For a capacitor charged from \(V_s\) through \(R\), the current is \((V_s - v)/R\), and that current equals \(C\,dv/dt\):</p>
+$$C\frac{dv}{dt} = \frac{V_s - v}{R} \qquad\Longrightarrow\qquad \frac{dv}{dt} = \frac{V_s - v}{\tau}.$$
+<p>Read it as a rule: <em>the voltage moves toward \(V_s\) at a speed proportional to how far away it is</em>. The exact solution is the exponential from earlier, \(v = V_s(1 - e^{-t/\tau})\). But you don't need to know that to solve it. A developer can simply simulate it, and this is how SPICE and every game physics engine work at heart. <b>Euler's method</b> takes small time steps and uses the current slope to predict the next value:</p>
+
+<pre><code>// Forward Euler for an RC circuit
+let v = 0;                  // capacitor starts empty
+const tau = R * C, dt = tau / 10;
+for (let t = 0; t &lt; 5 * tau; t += dt) {
+  const dvdt = (Vs - v) / tau;   // the physics: slope right now
+  v = v + dvdt * dt;             // step forward along that slope
+  plot(t + dt, v);
+}</code></pre>
+
+<p>Rewrite the update as <code>v += (dt/tau) * (Vs - v)</code> and you have the exponential moving average from the earlier callout, with <code>alpha = dt/tau</code>. Each step closes a fraction \(dt/\tau\) of the gap, so the error shrinks by a factor \((1 - dt/\tau)\) per step. That factor tells you everything about the method's behaviour:</p>
+<ul>
+  <li>\(dt \ll \tau\): the factor is close to 1 and the result tracks the exact curve closely. The error shrinks in proportion to \(dt\) (a "first-order" method).</li>
+  <li>\(\tau &lt; dt &lt; 2\tau\): the factor is negative, so the solution overshoots and <b>oscillates</b> around \(V_s\), though it still converges.</li>
+  <li>\(dt &gt; 2\tau\): the factor has magnitude above 1, so each step overshoots more: the simulation is <b>unstable</b> and blows up. The circuit didn't change; the numerics did.</li>
+</ul>
+
+<figure class="widget">
+  <div id="f-euler"></div>
+  <figcaption><b>Figure A.7</b> Euler's method vs. the exact solution for an RC charge. Increase the step size \(dt/\tau\) and watch the dots drift from the exact curve, then oscillate, then explode beyond \(dt = 2\tau\). The readout shows the per-step error factor \(1 - dt/\tau\).</figcaption>
+</figure>
+
+<div class="ex" data-id="euler-task" data-kind="task">
+  <div class="q">In Figure A.7, find a step size where the Euler solution <b>oscillates around the final value but still converges</b>.</div>
+  <div class="explain">Any \(dt/\tau\) between 1 and 2 does it: the factor \(1 - dt/\tau\) is between −1 and 0, so each step overshoots by a shrinking amount. Real simulators use smarter "implicit" methods (backward Euler, trapezoidal) that stay stable at any step size, which is why LTspice doesn't explode on stiff circuits.</div>
+</div>
+
+<div class="ex" data-id="euler-num" data-kind="num" data-answer="0.95" data-tol="1%" data-unit="V">
+  <div class="q">Run two Euler steps by hand: \(V_s = 5\) V, \(v_0 = 0\), and \(dt/\tau = 0.1\). What is \(v\) after the second step?</div>
+  <div class="hint">Step 1: \(v_1 = 0 + 0.1\times(5 - 0)\). Step 2: \(v_2 = v_1 + 0.1\times(5 - v_1)\).</div>
+  <div class="explain">\(v_1 = 0.5\) V, then \(v_2 = 0.5 + 0.1\times4.5 = 0.95\) V. The exact value at \(t = 0.2\tau\) is \(5(1 - e^{-0.2}) = 0.906\) V. Euler with a coarse step overestimates here because it uses the slope at the <em>start</em> of each step, which is the steepest.</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="sines">Sine waves, frequency, phase and RMS</h2>
+
+<p>A point going round a circle at constant speed, seen from the side, traces a <b>sine wave</b>. Alternating voltages, radio carriers and the vibrations of a speaker are sine waves (or sums of them), so it pays to name the parts precisely:</p>
+<div class="formula">
+$$v(t) = A\sin(\omega t + \varphi), \qquad \omega = 2\pi f, \qquad T = \frac1f$$
+<p>\(A\) is the amplitude (peak), \(f\) the frequency in hertz (cycles per second), \(T\) the period, \(\omega\) the angular frequency in radians per second, and \(\varphi\) the phase in radians, which shifts the wave in time.</p>
+</div>
+<p>Why radians? Because one full cycle is \(2\pi\) radians, and with angles in radians the calculus stays clean: \(\frac{d}{dt}\sin\omega t = \omega\cos\omega t\), with no stray factors. Degrees are fine for talking (a 90° phase shift is \(\pi/2\) rad), but formulas want radians. A phase of \(\varphi\) radians is a time shift of \(\varphi/\omega\).</p>
+
+<h3>RMS: the "equivalent DC" value</h3>
+<p>What DC voltage would heat a resistor as much as a given AC waveform? Power is \(v^2/R\), so we need the <b>average of \(v^2\)</b>, then take the square root to get back to volts: the <b>root of the mean of the square</b>, RMS.</p>
+<p>For a sine: \(\sin^2 x = \tfrac12(1 - \cos 2x)\), and the \(\cos 2x\) part averages to zero over a cycle. So the mean of \(A^2\sin^2\) is \(A^2/2\), and</p>
+<div class="formula">
+$$V_\text{RMS} = \sqrt{\frac1T\int_0^T v^2\,dt} = \frac{A}{\sqrt2} \approx 0.707\,A \quad\text{(sine only)}$$
+<p>A square wave of amplitude \(A\) has RMS \(A\); a triangle has \(A/\sqrt3\). Cheap multimeters assume a sine; "true RMS" meters really compute the integral.</p>
+</div>
+<p>Mains "230 V" is an RMS value; the peak is \(230\sqrt2 \approx 325\) V. In code, RMS is <code>Math.sqrt(samples.reduce((s, x) =&gt; s + x*x, 0) / samples.length)</code>.</p>
+
+<figure class="widget">
+  <div id="f-sine"></div>
+  <figcaption><b>Figure A.8</b> Anatomy of a sine wave. Adjust amplitude, frequency and phase of the blue wave (the grey one is a fixed reference). The shaded orange area is \(v^2\) (scaled): its average is the dashed line, and the RMS level is its square root. Try making the blue wave lead the reference by exactly 90°.</figcaption>
+</figure>
+
+<div class="ex" data-id="rms-num" data-kind="num" data-answer="229.8" data-tol="0.5%" data-unit="V">
+  <div class="q">A mains sine wave peaks at 325 V. What is its RMS value?</div>
+  <div class="hint">Divide the peak by \(\sqrt2\).</div>
+  <div class="explain">\(325/1.4142 \approx 229.8\) V, which is the "230 V" on the label. It means 325 V peak across a 100 Ω heater makes the same heat as 230 V DC would.</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="complex">Complex numbers and phasors</h2>
+
+<p>In a circuit driven by a sine wave, every voltage and current is a sine at the same frequency. Only two things differ from one signal to another: the amplitude and the phase. Complex numbers are the bookkeeping device that tracks both at once, and they turn calculus on sine waves into simple multiplication.</p>
+
+<h3>The imaginary unit</h3>
+<p>Define a number \(j\) with \(j^2 = -1\). (Mathematicians write \(i\); engineers use \(j\) because \(i\) is current.) A <b>complex number</b> \(z = a + jb\) has a real part \(a\) and an imaginary part \(b\). Draw it as a point (or arrow) in the plane, with real horizontal and imaginary vertical. Then it also has a <b>magnitude</b> and an <b>angle</b>:</p>
+<div class="formula">
+$$|z| = \sqrt{a^2 + b^2}, \qquad \angle z = \operatorname{atan2}(b, a), \qquad z = |z|\,e^{j\angle z}$$
+<p>Rectangular and polar forms. The link is Euler's formula, \(e^{j\theta} = \cos\theta + j\sin\theta\): a unit arrow at angle \(\theta\).</p>
+</div>
+<p>The magic is in multiplication. Multiplying two complex numbers <b>multiplies their magnitudes and adds their angles</b>. Multiplying by \(j\) is a 90° rotation (do it twice and you get \(-1\), a 180° turn, consistent with \(j^2 = -1\)).</p>
+
+<h3>Phasors: sine waves as rotating arrows</h3>
+<p>A sine wave \(A\cos(\omega t + \varphi)\) is the shadow (real part) of an arrow of length \(A\) rotating at \(\omega\) and starting at angle \(\varphi\): \(\operatorname{Re}\{A e^{j\varphi}e^{j\omega t}\}\). Every signal in the circuit rotates at the same \(\omega\), so we can drop the shared \(e^{j\omega t}\) and keep just \(A e^{j\varphi}\), the <b>phasor</b>. Adding sines of the same frequency becomes adding arrows tip-to-tail, far easier than trigonometric identities.</p>
+
+<figure class="widget">
+  <div id="f-phasor"></div>
+  <figcaption><b>Figure A.9</b> Phasors. Two arrows, \(V\) (blue) and \(I\) (orange), rotate together in the complex plane; their shadows on the real axis trace the waveforms on the right. Their sum (green) is just the arrow sum, and its shadow is the sum of the waveforms. Change the phase difference: at 90° the sum's amplitude is \(\sqrt{A_1^2 + A_2^2}\), not \(A_1 + A_2\).</figcaption>
+</figure>
+
+<h3>Impedance</h3>
+<p>Here's the payoff. For a phasor current \(I e^{j\omega t}\), differentiating just multiplies by \(j\omega\). So \(v = L\,di/dt\) becomes \(V = j\omega L\,I\), and \(i = C\,dv/dt\) becomes \(I = j\omega C\,V\). Each component obeys a complex Ohm's law, \(V = ZI\), with an <b>impedance</b>:</p>
+<div class="formula">
+$$Z_R = R, \qquad Z_L = j\omega L, \qquad Z_C = \frac{1}{j\omega C} = -\frac{j}{\omega C}$$
+<p>The magnitude \(|Z|\) gives the ratio of amplitudes (in ohms); the angle gives the phase shift between voltage and current. Series impedances add; parallel ones combine like parallel resistors. Chapter 3 builds filters from this.</p>
+</div>
+
+<figure class="widget">
+  <div id="f-imp"></div>
+  <figcaption><b>Figure A.10</b> The impedance of a resistor in series with a capacitor or inductor, plotted in the complex plane. Change the frequency (log slider) and watch the arrow swing: a capacitor's reactance shrinks as frequency rises, an inductor's grows. The readouts give \(|Z|\) and its phase.</figcaption>
+</figure>
+
+<div class="ex" data-id="mag-num" data-kind="num" data-answer="5" data-tol="1%" data-unit="Ω">
+  <div class="q">A component has impedance \(Z = 3 + j4\ \Omega\). What is its magnitude \(|Z|\)?</div>
+  <div class="explain">\(\sqrt{3^2 + 4^2} = 5\ \Omega\), and the angle is \(\operatorname{atan}(4/3) \approx 53°\): the voltage leads the current by 53°, so the component is inductive. A 1 V amplitude sine drives 0.2 A amplitude through it.</div>
+</div>
+
+<div class="ex" data-id="xc-num" data-kind="num" data-answer="159.15" data-tol="1%" data-unit="Ω">
+  <div class="q">What is the magnitude of the impedance of a 1 µF capacitor at 1 kHz?</div>
+  <div class="hint">\(|Z_C| = 1/(2\pi f C)\).</div>
+  <div class="explain">\(1/(2\pi\times1000\times10^{-6}) = 159.2\ \Omega\). At 100 kHz it's 1.59 Ω and at 1 MHz 0.16 Ω, which is why capacitors short out high-frequency noise (decoupling).</div>
+</div>
+
+<div class="ex" data-id="j-text" data-kind="text" data-answer="90|90°|90deg|90degrees|ninety|+90|plus 90">
+  <div class="q">Multiplying a complex number by \(j\) rotates its arrow counter-clockwise by how many degrees? (A number.)</div>
+  <div class="hint">\(j\) itself is the unit arrow pointing straight up, at angle 90°, and multiplying adds angles.</div>
+  <div class="explain">90°. Do it twice and you've turned 180°, pointing the opposite way: that's \(j^2 = -1\). This is why an inductor's voltage (\(j\omega L\,I\)) leads its current by 90°.</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="vectors">Vectors, dot and cross products</h2>
+
+<p>Fields and forces have direction as well as size, so they're <b>vectors</b>: \(\vec a = (a_x, a_y, a_z)\). Adding vectors adds components. Two kinds of multiplication matter in electromagnetism, and each has a clear geometric meaning.</p>
+
+<p>The <b>dot product</b> \(\vec a\cdot\vec b = a_xb_x + a_yb_y + a_zb_z = |a||b|\cos\theta\) is a <em>number</em>: how much of one vector lies along the other. It's largest when they're parallel, zero when perpendicular and negative when opposed. Work is a dot product, \(W = \vec F\cdot\vec d\), and so is voltage: \(V = -\int\vec E\cdot d\vec\ell\). Only the part of the field along your path counts.</p>
+
+<p>The <b>cross product</b> \(\vec a\times\vec b\) is a <em>vector</em> perpendicular to both, with magnitude \(|a||b|\sin\theta\), the area of the parallelogram they span. Its direction follows the right-hand rule: fingers from \(\vec a\) toward \(\vec b\), thumb along \(\vec a\times\vec b\). It's largest when the vectors are perpendicular and zero when parallel. Electromagnetism is full of cross products: the magnetic force on a moving charge \(\vec F = q\vec v\times\vec B\) (motors), the energy flow \(\vec S = \vec E\times\vec B/\mu_0\) (Chapter 1), and torque \(\vec\tau = \vec r\times\vec F\).</p>
+
+<figure class="widget">
+  <div id="f-vec"></div>
+  <figcaption><b>Figure A.11</b> Dot and cross products. <b>Drag the tips</b> of \(\vec a\) (blue) and \(\vec b\) (orange). The green segment is the projection of \(\vec b\) onto \(\vec a\) (the dot product divided by \(|a|\)); the shaded parallelogram's area is the cross product's magnitude, and ⊙ / ⊗ shows whether it points out of or into the screen. Make them perpendicular and watch the dot product hit zero.</figcaption>
+</figure>
+
+<div class="ex" data-id="dot-num" data-kind="num" data-answer="2" data-tol="0.01" data-unit="">
+  <div class="q">Compute \(\vec a\cdot\vec b\) for \(\vec a = (3, 4)\) and \(\vec b = (2, -1)\).</div>
+  <div class="explain">\(3\times2 + 4\times(-1) = 6 - 4 = 2\). It's positive but small, so the vectors are about 79° apart (\(\cos\theta = 2/(5\sqrt5)\)).</div>
+</div>
+
+<div class="ex" data-id="cross-mc" data-kind="mc">
+  <div class="q">A wire carries current in the \(+x\) direction through a magnetic field pointing in \(+y\). The force on the moving positive charges is along \(\vec v\times\vec B\). Which way is the force on the wire?</div>
+  <ol class="opts">
+    <li data-correct>\(+z\)</li>
+    <li>\(-z\)</li>
+    <li>\(+y\)</li>
+    <li>There is no force; current and field are perpendicular</li>
+  </ol>
+  <div class="explain">\(\hat x\times\hat y = \hat z\). The force is perpendicular to both the current and the field, and largest when they are perpendicular. This is the force that turns every electric motor.</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="matrices">Node equations as a matrix</h2>
+
+<p>Kirchhoff's current law at every node of a circuit gives one linear equation per unknown node voltage. Linear equations are what matrices are for. Take a two-node circuit: a source \(V_s\) feeds node 1 through \(R_1\); \(R_2\) connects node 1 to ground; \(R_3\) connects node 1 to node 2; and \(R_4\) connects node 2 to ground. Write "currents leaving each node sum to zero", using conductances \(G = 1/R\):</p>
+$$\text{node 1:}\quad G_1(v_1 - V_s) + G_2 v_1 + G_3(v_1 - v_2) = 0$$
+$$\text{node 2:}\quad G_3(v_2 - v_1) + G_4 v_2 = 0$$
+<p>Collect the terms for each unknown:</p>
+<div class="formula">
+$$\begin{pmatrix} G_1 + G_2 + G_3 & -G_3 \\ -G_3 & G_3 + G_4 \end{pmatrix}\begin{pmatrix} v_1 \\ v_2 \end{pmatrix} = \begin{pmatrix} G_1 V_s \\ 0 \end{pmatrix}$$
+<p>\(\mathbf{G}\,\mathbf{v} = \mathbf{i}\). The conductance matrix has a simple pattern: each diagonal entry sums the conductances touching that node, and each off-diagonal entry is minus the conductance joining the two nodes.</p>
+</div>
+
+<p>Because of that pattern, a program can build the matrix by "stamping" each component into it: a resistor between nodes \(a\) and \(b\) adds \(G\) to entries \((a,a)\) and \((b,b)\) and subtracts \(G\) from \((a,b)\) and \((b,a)\). Then a single <b>Gaussian elimination</b> solves for all node voltages at once. That's precisely what this book's <code>W.solveDC</code> does, with one extension (modified nodal analysis): each voltage source adds an extra row and column for its unknown current. Diodes are handled by guessing on/off, solving, checking and repeating. SPICE works the same way, re-stamping a linearised version of each nonlinear part on every iteration.</p>
+
+<pre><code>// Gaussian elimination (no pivoting shown, for clarity)
+for (let c = 0; c &lt; n; c++)
+  for (let r = c + 1; r &lt; n; r++) {
+    const f = A[r][c] / A[c][c];
+    for (let k = c; k &lt; n; k++) A[r][k] -= f * A[c][k];
+    b[r] -= f * b[c];
+  }
+for (let r = n - 1; r &gt;= 0; r--) {         // back-substitution
+  let s = b[r];
+  for (let k = r + 1; k &lt; n; k++) s -= A[r][k] * x[k];
+  x[r] = s / A[r][r];
+}</code></pre>
+
+<figure class="widget">
+  <div id="f-matrix"></div>
+  <div id="f-matrix-tex" class="ma-mat"></div>
+  <div id="f-matrix-ctl"></div>
+  <figcaption><b>Figure A.12</b> The two-node circuit and its conductance matrix, live. Change the resistors and watch the matrix entries update. The solution is computed twice, once by solving the 2×2 system directly (Cramer's rule) and once by <code>W.solveDC</code>; they agree. Make \(R_3\) huge and the off-diagonal terms vanish: the nodes decouple.</figcaption>
+</figure>
+
+<div class="ex" data-id="matrix-num" data-kind="num" data-answer="2" data-tol="1%" data-unit="V">
+  <div class="q">With \(V_s = 10\) V and all four resistors equal to 1 kΩ in the circuit of Figure A.12, what is \(v_2\)?</div>
+  <div class="hint">With \(G = 1\) mS everywhere: \(3v_1 - v_2 = 10\) and \(-v_1 + 2v_2 = 0\). Substitute \(v_1 = 2v_2\).</div>
+  <div class="explain">\(v_1 = 2v_2\), so \(6v_2 - v_2 = 10\), giving \(v_2 = 2\) V and \(v_1 = 4\) V. Check with KCL at node 1: 6 mA in through \(R_1\), 4 mA out through \(R_2\), 2 mA out through \(R_3\). ✓</div>
+</div>
+
+<aside class="callout ref"><span class="ct">📚 Go deeper</span>
+<ul>
+  <li><b>Horowitz &amp; Hill, <i>The Art of Electronics</i></b> (3rd ed.), Appendix A "Math Review": the minimum math for circuits, in their brisk style.</li>
+  <li><b>Silvanus P. Thompson, <i>Calculus Made Easy</i></b> (1910, with later revisions by Martin Gardner): still the friendliest introduction to derivatives and integrals; free online in its original edition.</li>
+  <li><b>MIT 6.002 Circuits and Electronics</b> (Agarwal, MIT OCW): the lectures on nodal analysis, first-order RC/RL transients and the impedance model.</li>
+  <li><b>MIT 18.03 Differential Equations</b> (MIT OCW): first-order linear equations, complex exponentials and sinusoidal response, with Euler's method in the early recitations.</li>
+  <li><b><i>The Feynman Lectures on Physics</i>, Vol. I</b>, Ch. 22 "Algebra" (the derivation of \(e^{j\theta}\) Feynman called "our jewel") and Ch. 23 "Resonance" (complex numbers applied to oscillators).</li>
+  <li><b>Kuphaldt, <i>Lessons in Electric Circuits</i>, Vol. II (AC)</b>, Ch. 2 "Complex numbers": an engineering-focused walkthrough of phasors and impedance.</li>
+  <li><b>3Blue1Brown, <i>Essence of Linear Algebra</i> and <i>Essence of Calculus</i></b> (video series): geometric intuition for matrices, dot/cross products, derivatives and \(e\).</li>
+</ul>
+</aside>
+</section>
+
+</main>
+<script src="../assets/vendor/katex/katex.min.js"></script>
+<script src="../assets/vendor/katex/auto-render.min.js"></script>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/appA-math.js"></script>
+</body>
+</html>

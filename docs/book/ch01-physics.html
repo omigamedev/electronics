@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1 · How Current Really Flows — Sparks & Circuits</title>
+<meta name="description" content="Charge, fields, voltage as energy per charge, drift velocity vs. signal speed, where energy travels, resistance from the inside, Kirchhoff, capacitance, inductance and real sources.">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+  .c1-canvas { touch-action: none; cursor: grab; }
+  .c1-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .85rem; color: var(--muted); margin: 6px 0 0; }
+  .c1-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .c1-stack > * + * { margin-top: 10px; }
+  .c1-note { font-size: .85rem; color: var(--muted); margin: 6px 0 0; }
+  table.c1-tab td:first-child, table.c1-tab th:first-child { white-space: nowrap; }
+</style>
+</head>
+<body data-book="adult" data-chapter="ch01-physics">
+<main class="chapter">
+
+<header class="chapter-head">
+  <p class="kicker">Chapter 1</p>
+  <h1>How Current Really Flows</h1>
+  <p class="lede">Most tutorials treat electricity as water in pipes and move on. That picture works until a motor resets your microcontroller, a relay kills a transistor, or a long ground wire makes a sensor lie. This chapter builds the real picture: charges, fields, energy, and the two conservation laws that everything else in this book rests on.</p>
+</header>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="charge">Charge and the electric field</h2>
+
+<p>Start with the one fact everything else is built on. Some particles carry a property called <b>electric charge</b>. It comes in two flavours, which Benjamin Franklin arbitrarily named <i>positive</i> and <i>negative</i>. Like charges repel and unlike charges attract. Protons carry a charge of \(+e\) and electrons carry \(-e\), where</p>
+
+<div class="formula">
+$$e = 1.602 \times 10^{-19}\ \text{C}$$
+<p>The elementary charge. The coulomb (C) is the SI unit of charge; one coulomb is about \(6.24\times10^{18}\) electrons' worth.</p>
+</div>
+
+<p>Charge is <b>quantised</b>: every isolated charge you will ever meet is a whole multiple of \(e\). In circuits there are so many electrons that this graininess is invisible, a bit like how you don't notice individual bytes when you stream a movie. Charge is also <b>conserved</b>: you can move it around and you can separate it, but you can never create or destroy net charge. Rubbing a balloon on your hair doesn't make charge. It moves some electrons from your hair to the balloon, so the balloon ends up negative and your hair ends up equally positive.</p>
+
+<p>Ordinary matter is almost perfectly neutral. A copper wire holds about \(10^{29}\) free electrons per cubic metre, and an equal number of positive ions locked into a crystal lattice. That balance matters a lot. As we'll see, the forces between charges are so strong that even a tiny imbalance produces huge effects. Circuits never "fill up" with charge. They push the existing electrons around while staying almost perfectly neutral everywhere.</p>
+
+<h3>Coulomb's law</h3>
+<p>Two point charges \(q_1\) and \(q_2\) a distance \(r\) apart push on each other with a force</p>
+<div class="formula">
+$$F = k\,\frac{q_1 q_2}{r^2}, \qquad k = \frac{1}{4\pi\varepsilon_0} \approx 8.99\times 10^{9}\ \mathrm{N\,m^2/C^2}$$
+<p>Coulomb's law. A positive \(F\) means repulsion (like charges) and a negative \(F\) means attraction. \(\varepsilon_0 = 8.854\times10^{-12}\) F/m is the permittivity of free space.</p>
+</div>
+
+<p>Two things about this formula shape everything later. First, it's an <b>inverse-square law</b>: double the distance and the force drops to a quarter. Second, the constant \(k\) is enormous. Two protons repel each other electrically about \(10^{36}\) times more strongly than they attract each other by gravity. Electricity is not a subtle force. Matter only <em>looks</em> electrically quiet because positive and negative charges cancel so precisely.</p>
+
+<figure class="widget">
+  <div id="f-coulomb"></div>
+  <figcaption><b>Figure 1.1</b> Coulomb force between two charges vs. distance (log–log axes). Change the charges and watch the whole curve shift up or down. The slope never changes: on log–log axes an inverse-square law is a straight line falling two decades for every decade of distance. Hover to read values. The dashed line is the weight of a 1 g paperclip, for scale.</figcaption>
+</figure>
+
+<details class="deep"><summary>Worked example: how big is a coulomb, really?</summary>
+<p>Imagine you could put \(+1\) C on one small sphere and \(-1\) C on another, one metre apart. The attraction would be</p>
+$$F = 8.99\times10^9 \cdot \frac{1\cdot 1}{1^2} \approx 9\times10^{9}\ \text{N},$$
+<p>about the weight of a million tonnes. You will never see a coulomb of <em>separated</em> charge. Yet a 1 A current moves a coulomb past a point every second. That's possible only because the moving electrons are always accompanied by the stationary positive ions of the metal, so the wire stays neutral. Current is charge that <em>moves</em>, not charge that <em>piles up</em>.</p>
+</details>
+
+<div class="ex" data-id="coulomb-num" data-kind="num" data-answer="0.899" data-tol="2%" data-unit="N">
+  <div class="q">Two small spheres each carry \(+1\ \mu\text{C}\) and sit 10 cm apart. What is the repulsive force between them?</div>
+  <div class="hint">\(F = k q_1 q_2 / r^2\) with \(q = 10^{-6}\) C and \(r = 0.1\) m. Mind the square.</div>
+  <div class="explain">\(F = 8.99\times10^9 \times (10^{-6})^2 / (0.1)^2 = 8.99\times10^9 \times 10^{-12} / 10^{-2} \approx 0.90\) N. That's about the weight of a 90 g apple, from just a microcoulomb, which is \(6\times10^{12}\) electrons out of the roughly \(10^{23}\) in each sphere.</div>
+</div>
+
+<h3>From force to field</h3>
+<p>Coulomb's law describes "action at a distance": charge A somehow knows where charge B is. Faraday found a better way to think about it, and modern physics confirms it. Each charge sets up an <b>electric field</b> \(\vec E\) in the space around it. Any other charge responds to the field <em>at its own location</em>. Formally, the field is the force per unit charge that a small test charge \(q\) would feel:</p>
+
+<div class="formula">
+$$\vec E = \frac{\vec F}{q}, \qquad |\vec E_{\text{point}}| = k\,\frac{Q}{r^2}, \qquad \vec F = q\vec E$$
+<p>The field is a vector at every point in space. Its unit is N/C, which (as you'll see shortly) is the same as volts per metre, V/m.</p>
+</div>
+
+<p>Fields from several charges simply add as vectors. This is the <b>superposition</b> principle, and it's why circuit analysis can be linear. The field isn't just bookkeeping, either. It carries energy and momentum, and changes in it travel outward at the speed of light. When you close a switch, it's the field that rearranges itself through the circuit, and that's why the bulb lights almost instantly even though, as we'll compute, the electrons themselves crawl.</p>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: a field is a precomputed lookup table</span>
+<p>Instead of every charge looping over every other charge (an \(O(n^2)\) "action at a distance" computation), you compute the field once on a grid. Each charge then does an \(O(1)\) lookup of the field where it sits. Physics actually works this way: the field is a real, local thing, and updates to it propagate at a finite speed, like cache invalidations rippling through a distributed system at speed \(c\).</p>
+</aside>
+
+<figure class="widget wide">
+  <div id="f-field"></div>
+  <figcaption><b>Figure 1.2</b> The electric field of point charges. Small arrows show the field direction (brighter means stronger), and the lines trace the path a free positive charge would follow. <b>Drag</b> the charges and the crosshair probe; tap a charge without dragging to flip its sign. The readouts show the field and the potential (voltage relative to "infinitely far away") at the probe. Try the presets, then add your own charges.</figcaption>
+</figure>
+
+<p>Some rules about field lines to read from the figure:</p>
+<ul>
+  <li>Lines start on positive charges and end on negative charges (or run off to infinity). They never cross, because the field has only one direction at each point.</li>
+  <li>Where lines crowd together the field is strong. Near a point charge, the density goes as \(1/r^2\).</li>
+  <li>Between two like charges there's a point where the fields cancel exactly. A charge placed there feels no force (although it's an unstable spot).</li>
+  <li>Close to a <em>dipole</em> (a + and − pair) the field is intense. Far away, the two contributions nearly cancel and the field falls off faster, as \(1/r^3\). Every neutral atom, molecule and circuit board looks like a dipole or something weaker from far away. That's why your circuits mostly leave each other alone.</li>
+</ul>
+
+<div class="ex" data-id="field-task" data-kind="task">
+  <div class="q">In Figure 1.2, choose the <b>"Two like charges"</b> preset and drag the probe to the point where the field is (almost) zero: below 5% of the field you'd get 10 cm from one charge alone.</div>
+  <div class="explain">For equal like charges, the null point is exactly halfway between them, where the two pushes are equal and opposite. If the charges were unequal, the null point would shift toward the <em>smaller</em> charge. The potential there is <em>not</em> zero, though. Zero field means the potential is <em>flat</em> there, not that it is zero. Hold onto that distinction: it's the difference between voltage and field.</div>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="voltage">Voltage is energy per charge</h2>
+
+<p>Here is the most important sentence in this chapter: <b>voltage is energy per unit charge</b>. Specifically, the voltage between points A and B is the work you'd have to do to carry one coulomb of positive charge from B to A against the electric field:</p>
+
+<div class="formula">
+$$V_{AB} = V_A - V_B = \frac{W_{B\to A}}{q}, \qquad 1\ \text{V} = 1\ \frac{\text{J}}{\text{C}}$$
+<p>A volt is a joule per coulomb. A 9 V battery gives every coulomb that passes through it 9 joules of energy.</p>
+</div>
+
+<h3>The gravity analogy, done properly</h3>
+<p>Lift a mass \(m\) through a height \(h\) and you store energy \(mgh\). The energy <em>per kilogram</em> is \(gh\), which depends only on height and not on how heavy the object is. Voltage is the electrical version of "\(gh\)": a property of <em>places</em>, not of the charges that happen to be there. A battery is an escalator that lifts charges to a higher electrical "altitude". Resistors are bumpy ramps where they roll back down, turning that altitude into heat.</p>
+
+<p>Field and voltage are linked the same way slope and height are. The field points <em>downhill</em> in potential, and its strength is how steep the hill is:</p>
+<div class="formula">
+$$E_x = -\frac{dV}{dx} \qquad\Longleftrightarrow\qquad V_A - V_B = \int_A^B \vec E\cdot d\vec\ell$$
+<p>The field is the slope of the potential, and the potential difference is the field integrated along a path. This is why V/m = N/C. For a uniform field, \(E = V/d\).</p>
+</div>
+
+<p>A quick sanity check on scale: the 3.3 V across the gate oxide of a transistor a few nanometres thick is a field of roughly \(10^9\) V/m, close to the breakdown limit of the oxide. Meanwhile 3.3 V along a 10 cm PCB trace is only 33 V/m. Same voltage, wildly different fields. <b>Thin insulators are where voltage ratings come from.</b></p>
+
+<details class="deep"><summary>Why is the integral path-independent? (KVL in disguise)</summary>
+<p>For fields made by static charges, the work done going from A to B doesn't depend on the route. If it did, you could go out by one path and back by another and gain energy each lap, which would be a perpetual-motion machine. Mathematically, the line integral of \(\vec E\) around any closed loop is zero:</p>
+$$\oint \vec E\cdot d\vec\ell = 0 \quad\text{(static fields)}.$$
+<p>That's what makes "the voltage at a point" well-defined once you've picked a reference, and it's exactly <b>Kirchhoff's Voltage Law</b>: around any loop, the voltage rises and drops add to zero. Keep the word <em>static</em> in mind. When magnetic fields change, the loop integral is no longer zero (Faraday's law), and that's where inductors, transformers and "ground bounce" come from. We'll get there.</p>
+</details>
+
+<h3>The electron-volt</h3>
+<p>When a single electron falls through a potential difference of one volt, it gains energy \(eV = 1.602\times10^{-19}\ \text{J}\). Physicists call this amount one <b>electron-volt</b> (eV). It's the natural energy unit for anything on the scale of atoms. A red LED emits photons of about 1.9 eV, which is why it needs about 1.9 V across it before it lights. Silicon's band gap is 1.12 eV, and chemical bonds are a few eV. Battery voltages of 1.2–4.2 V aren't a coincidence: they're chemical-bond energies divided by \(e\).</p>
+
+<div class="ex" data-id="ev-num" data-kind="num" data-answer="5.29e-19" data-tol="2%" data-unit="J">
+  <div class="q">An electron moves from the GND pin to the 3.3 V pin of an ESP32 through the chip's internal circuitry. How much energy (in joules) does it lose to the circuit? (Use \(e = 1.602\times10^{-19}\) C.)</div>
+  <div class="hint">Energy = charge × voltage. In eV the answer is simply 3.3 eV; convert to joules.</div>
+  <div class="explain">\(W = eV = 1.602\times10^{-19} \times 3.3 = 5.29\times10^{-19}\) J, or 3.3 eV. The electron "falls uphill" in voltage because its charge is negative: it moves toward higher potential, losing potential energy as it goes. (Type it as <code>5.29e-19</code>.)</div>
+</div>
+
+<h3>Voltage is always <em>between two points</em></h3>
+<p>Height is only meaningful relative to something: sea level, the floor, the table. Likewise "the voltage at node X" is shorthand for "the voltage between node X and the reference node". That reference is called <b>ground</b>, and it is a <em>choice</em>, not a physical substance. We usually pick the battery's negative terminal because it makes most numbers positive, but physics doesn't care.</p>
+
+<figure class="widget">
+  <div id="f-ground"></div>
+  <div id="f-ground-ctl"></div>
+  <figcaption><b>Figure 1.3</b> Ground is a choice. A 9 V battery drives three resistors in series. The tags show each node's voltage <em>relative to the node you choose as ground</em> (marked ⏚). Switch the reference and every node voltage changes, but the voltage <em>across</em> each resistor and the current don't change at all.</figcaption>
+</figure>
+
+<div class="ex" data-id="ground-task" data-kind="task">
+  <div class="q">In Figure 1.3, pick the reference node that makes the battery's <b>+ terminal</b> read exactly <b>+3 V</b>.</div>
+  <div class="explain">With R1 = R2 = R3 = 1 kΩ and 9 V, each resistor drops 3 V. Choosing node A (between R1 and R2) as ground makes the + terminal read +3 V, node B read −3 V and the battery − read −6 V. Real systems do this all the time: a ±12 V op-amp supply is just a 24 V supply with ground chosen in the middle.</div>
+</div>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "ground is where current goes to disappear"</span>
+<p>Current doesn't flow <em>into</em> ground and vanish. Ground is just the node we chose to call 0 V. Every electron that enters the ground net leaves it again and returns to the source (we'll make this rigorous with KCL). The word "ground" is overloaded, too. <b>Earth ground</b> is a literal connection to the soil through your building's wiring. <b>Chassis ground</b> is a metal enclosure. <b>Signal ground</b> or GND on your PCB is simply the reference node. A battery-powered robot has no connection to the earth at all and works perfectly well.</p>
+</aside>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: ground is the epoch</span>
+<p>A Unix timestamp only means something relative to 1970-01-01. Time <em>differences</em> don't depend on the epoch at all. Voltages are the same: node voltages are timestamps, and the voltage across a component is a duration. Bugs appear when two subsystems silently assume different epochs. In electronics that's two boards whose "grounds" differ by half a volt because of current in the wire between them.</p>
+</aside>
+
+<p>Two consequences follow straight from "voltage is between two points". First, a bird sitting on a single 10 kV power line is perfectly safe: both feet are at the same potential, so there's no voltage <em>across</em> the bird and no current through it. Second, voltage without a path drives nothing. A 9 V battery on your desk has 9 V across its terminals and zero current. <b>Current needs both a voltage and a closed path</b>, a point we'll make rigorous with Kirchhoff's laws.</p>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="current">Current: what moves, which way, and how fast</h2>
+
+<p><b>Current</b> is the rate at which charge passes through a surface, such as the cross-section of a wire:</p>
+<div class="formula">
+$$I = \frac{dQ}{dt}, \qquad 1\ \text{A} = 1\ \frac{\text{C}}{\text{s}} \approx 6.24\times10^{18}\ \text{electrons per second}$$
+<p>One ampere is one coulomb per second. An LED at 10 mA passes about \(6\times10^{16}\) electrons every second.</p>
+</div>
+
+<h3>Conventional current vs. electron flow</h3>
+<p>In 1747 Franklin had to guess which fluid moved, and he picked the positive one. When J.J. Thomson discovered the electron in 1897, it turned out that in metal wires the moving carriers are negative, flowing from the − terminal to the + terminal, the opposite of Franklin's arrow. Nobody changed the convention, and it doesn't matter:</p>
+
+<ul>
+  <li><b>Conventional current</b> flows from + to − through the external circuit, as if positive charges were moving. Every schematic symbol, datasheet and equation in this book uses it: the arrow in a diode symbol, the arrow on a transistor's emitter, the sign of \(I\) in \(V = IR\).</li>
+  <li><b>Electron flow</b> is what physically happens in a metal: electrons drift from − to +.</li>
+</ul>
+<p>A positive charge moving right and a negative charge moving left produce <em>identical</em> currents, identical magnetic fields and identical heating. Externally the two are indistinguishable. (The Hall effect is the exception that lets you tell; we'll meet it with current sensors.) In semiconductors both kinds of carrier really do move: electrons one way and "holes" (missing electrons, which act as positive charges) the other way.</p>
+
+<figure class="widget">
+  <div id="f-conv"></div>
+  <div id="f-conv-ctl"></div>
+  <figcaption><b>Figure 1.4</b> The same circuit seen two ways. Orange dots are conventional current (from + around to −); blue dots are the electrons actually drifting in the copper (from − around to +). Toggle between the views. Close the switch to start the flow. Both pictures predict exactly the same current and brightness.</figcaption>
+</figure>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "electrons flow out of the battery and are used up by the bulb"</span>
+<p>The bulb doesn't consume electrons. Exactly as many leave the bulb as enter it, every nanosecond. What the bulb consumes is <em>energy</em>: each coulomb going through it drops from a high potential to a low one, and the difference becomes heat and light. Likewise, a battery doesn't "contain" the electrons that flow in the circuit. Those were already in the wires. The battery contains <em>chemical energy</em> and acts as a pump that keeps a potential difference across its terminals.</p>
+</aside>
+
+<h3>How fast do the electrons move? Deriving the drift velocity</h3>
+<p>Picture a wire of cross-sectional area \(A\) containing \(n\) free electrons per cubic metre, each with charge \(q\). Suppose they all drift along the wire with average velocity \(v_d\). In a time \(\Delta t\), every carrier within a distance \(v_d\,\Delta t\) of some cross-section will pass through it. Those carriers occupy a cylinder of volume \(A\, v_d\, \Delta t\), so the charge that passes is</p>
+$$\Delta Q = n\,q\,(A\,v_d\,\Delta t) \quad\Longrightarrow\quad I = \frac{\Delta Q}{\Delta t} = n\,q\,A\,v_d.$$
+
+<div class="formula">
+$$v_d = \frac{I}{n\,q\,A}, \qquad J = \frac{I}{A} = n\,q\,v_d$$
+<p>Drift velocity from current. \(J\) is the <b>current density</b> (A/m²), the quantity that really decides whether a wire or trace overheats.</p>
+</div>
+
+<p><b>Worked example.</b> Copper has one free electron per atom. Its density is 8.96 g/cm³ and its molar mass is 63.5 g/mol, so</p>
+$$n = \frac{8960\ \text{kg/m}^3}{0.0635\ \text{kg/mol}} \times 6.022\times10^{23}\ \text{mol}^{-1} \approx 8.5\times10^{28}\ \text{m}^{-3}.$$
+<p>Take a typical hookup wire of 0.5 mm² (about 20 AWG) carrying 1 A:</p>
+$$v_d = \frac{1}{8.5\times10^{28} \times 1.602\times10^{-19} \times 0.5\times10^{-6}} = \frac{1}{6810}\ \text{m/s} \approx 1.5\times10^{-4}\ \text{m/s} = 0.15\ \text{mm/s}.$$
+<p>That's slower than a snail. At this speed an individual electron needs nearly <b>two hours</b> to travel one metre of wire. A thin PCB trace (0.25 mm wide, 35 µm thick copper, so \(8.75\times10^{-9}\) m²) carrying the same 1 A has the same electrons squeezed through a much smaller area, so they drift faster: about 8 mm/s. That's still a slow walk.</p>
+
+<figure class="widget">
+  <div id="f-drift"></div>
+  <div id="f-drift-ctl"></div>
+  <figcaption><b>Figure 1.5</b> Drift velocity in copper vs. current for several conductors (log–log axes). Pick a conductor and current with the controls; the dot marks your operating point, and the readouts show how long one electron takes to cross 1 m. Notice that even a thin trace at several amps stays in the cm/s range.</figcaption>
+</figure>
+
+<div class="ex" data-id="drift-num" data-kind="num" data-answer="1.47e-4" data-tol="3%" data-unit="m/s">
+  <div class="q">A 1 mm² copper wire carries 2 A to a servo. What is the electrons' drift velocity? Use \(n = 8.5\times10^{28}\ \text{m}^{-3}\).</div>
+  <div class="hint">\(v_d = I/(nqA)\) with \(A = 1\ \text{mm}^2 = 10^{-6}\ \text{m}^2\).</div>
+  <div class="explain">\(v_d = 2 / (8.5\times10^{28}\times1.602\times10^{-19}\times10^{-6}) = 2/13\,617 \approx 1.47\times10^{-4}\) m/s, about 0.15 mm/s. Doubling the current and doubling the area cancel out compared with the worked example. You can type <code>0.147m</code> or <code>1.47e-4</code>.</div>
+</div>
+
+<h3>So why does the light come on instantly?</h3>
+<p>If electrons crawl at a fraction of a millimetre per second, how does a lamp at the far end of a 10 m cable light within nanoseconds of the switch closing? Because the wire is <b>already full</b> of mobile electrons. Closing the switch doesn't send electrons from the battery to the lamp. It changes the <em>electric field</em>, and that change propagates along the wires as an electromagnetic wave at a large fraction of the speed of light. Wherever the wave arrives, the local electrons (including the ones already in the lamp filament) start drifting at once.</p>
+
+<p>The classic picture is a tube packed with marbles: push one in at one end and a marble pops out of the other end almost immediately, even though each marble moved only a little. The push travels as a compression wave, much faster than any marble. With electrons, the "push" is the electromagnetic field, and it travels through the space around and between the conductors at</p>
+<div class="formula">
+$$v_{\text{signal}} = \frac{c}{\sqrt{\varepsilon_r}} \approx 0.5\text{–}0.7\,c$$
+<p>where \(\varepsilon_r\) is the relative permittivity of the insulation around the wires. In free space that's 30 cm/ns; on an FR-4 circuit board it's roughly 15–18 cm/ns; in typical coax about 20 cm/ns.</p>
+</div>
+
+<p>Notice what sets the signal speed: the <em>insulator</em> (\(\varepsilon_r\)), not the copper. The wave lives in the dielectric between the conductors, and the conductors just guide it. This sounds like a curiosity, but it's the foundation of high-speed PCB design. Chapter 9 will route traces over a solid ground plane precisely because the signal is the field in the gap between trace and plane.</p>
+
+<figure class="widget wide">
+  <div id="f-marbles"></div>
+  <div id="f-marbles-ctl"></div>
+  <figcaption><b>Figure 1.6</b> Signal vs. drift. The loop of wire is full of electrons (dots). Close the switch: the bright field front races around the loop in both directions and the lamp lights as soon as it arrives, while the highlighted electron barely moves. The animation exaggerates the drift a lot; the readouts give real numbers for a loop of the chosen length. Try a 1000 km wire: the lamp still lights within milliseconds.</figcaption>
+</figure>
+
+<div class="ex" data-id="signal-mc" data-kind="mc">
+  <div class="q">You close a switch connecting a battery to an LED through 3 m of wire on each side. Roughly when does the LED start to glow?</div>
+  <ol class="opts">
+    <li>After about 6 hours, when the first electrons from the battery reach the LED</li>
+    <li>After about 1 second, the time sound would take</li>
+    <li data-correct>After a few tens of nanoseconds, the time for the electromagnetic field to travel along the wires</li>
+    <li>Exactly instantaneously; nothing can be measured</li>
+  </ol>
+  <div class="explain">The field change travels at roughly 2/3 of the speed of light, about 20 cm/ns, so 3 m takes about 15 ns (plus a little for the wave to settle). The electrons that light the LED were already inside it. Hours is the time for one particular electron to drift that far. Nothing physical is ever truly instantaneous.</div>
+</div>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: latency vs. throughput, and packets vs. bits</span>
+<p>The signal speed is <b>latency</b>: how soon the far end learns that something changed. The drift velocity is closer to the speed of an individual byte buffered in a pipe: irrelevant to latency. A fibre link has millisecond latency even though no single photon you sent ever arrives at "your" destination socket in any meaningful sense. What travels is the <em>information</em> (the field change), not the medium.</p>
+</aside>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="energy">Where the energy actually flows</h2>
+
+<p>If the electrons carry so little momentum and move so slowly, how does energy get from the battery to the lamp? Let's check whether the electrons could be carrying it as kinetic energy. In our 1 A, 0.5 mm² wire, each electron's drift kinetic energy is \(\tfrac12 m v_d^2 = \tfrac12 (9.1\times10^{-31})(1.5\times10^{-4})^2 \approx 10^{-38}\) J. A metre of wire holds about \(4\times10^{22}\) free electrons, so the total drift kinetic energy is about \(4\times10^{-16}\) J. The wire delivers, say, 5 W to a lamp. The electrons' kinetic energy is off by a factor of roughly \(10^{16}\) from what's needed. Whatever carries the energy, it isn't the electrons' motion.</p>
+
+<p>The answer, worked out by John Henry Poynting in 1884, is that energy flows through the <b>electromagnetic field in the space around the wires</b>. Wherever there is both an electric field \(\vec E\) and a magnetic field \(\vec B\), energy flows with a power density (watts per square metre) given by the <b>Poynting vector</b>:</p>
+
+<div class="formula">
+$$\vec S = \frac{1}{\mu_0}\,\vec E\times\vec B$$
+<p>\(\vec S\) points perpendicular to both fields (right-hand rule; see the <a href="appA-math.html#vectors">cross product</a> in Appendix A). Its unit is W/m².</p>
+</div>
+
+<p>Apply it to a battery driving a resistor through two long wires:</p>
+<ul>
+  <li>The <b>electric field</b> runs from the + wire across the gap to the − wire. The surface charges on the wires set it up, because the wires are at different voltages.</li>
+  <li>The <b>magnetic field</b> circles each wire because current flows in it. Between the wires, the fields of the outgoing and returning currents point the same way and reinforce each other.</li>
+  <li>Their cross product, \(\vec S\), points <b>along the wires, from the battery toward the resistor</b>. It's strongest in the gap between the wires and weaker outside them.</li>
+</ul>
+<p>At the battery, \(\vec S\) points <em>out</em> of the cell. At the resistor, it points <em>into</em> the resistor's surface from the sides. The wires act as guide rails: they shape the fields, and the energy flows through the space between them.</p>
+
+<figure class="widget wide">
+  <div id="f-poynting"></div>
+  <div id="f-poynting-ctl"></div>
+  <figcaption><b>Figure 1.7</b> Energy flow in a simple circuit (a qualitative picture, top view). Toggle the layers: <b>E</b> (from + wire to − wire), <b>B</b> (⊗ into the page between the wires), and <b>S</b>, the energy flow, which streams out of the battery and into the resistor through the space around the wires. Turn on "lossy wire" to see a little energy enter the wires themselves, where it becomes heat.</figcaption>
+</figure>
+
+<details class="deep"><summary>Derivation: the Poynting flux in a coaxial cable equals exactly \(VI\)</summary>
+<p>A coaxial cable is the cleanest case. An inner conductor of radius \(a\) carries current \(I\) out, and an outer shield of radius \(b\) carries it back. There's a voltage \(V\) between them. Between the conductors (\(a &lt; r &lt; b\)) the fields are:</p>
+$$E(r) = \frac{V}{r\ln(b/a)}\ \ (\text{radial}), \qquad B(r) = \frac{\mu_0 I}{2\pi r}\ \ (\text{circling the axis}).$$
+<p>They're perpendicular, so \(|\vec S| = EB/\mu_0\), and \(\vec S\) points along the cable. Integrate over the annulus between the conductors, made of rings of area \(2\pi r\,dr\):</p>
+$$P = \int_a^b \frac{1}{\mu_0}\cdot\frac{V}{r\ln(b/a)}\cdot\frac{\mu_0 I}{2\pi r}\cdot 2\pi r\,dr = \frac{VI}{\ln(b/a)}\int_a^b \frac{dr}{r} = VI.$$
+<p>The power flowing <em>through the insulating gap</em> is exactly the \(P = VI\) you know from circuit theory. None flows inside the copper (except the tiny part that heats it). The circuit formula \(P = VI\) is a shortcut for this field integral.</p>
+<p>At a resistor of length \(L\) and radius \(a\), the field along its surface is \(E = V/L\) and the magnetic field at its surface is \(B = \mu_0 I/(2\pi a)\). \(\vec S\) points radially <em>inward</em>, with magnitude \(EB/\mu_0 = VI/(2\pi a L)\). Multiply by the side area \(2\pi a L\) and you get exactly \(VI = I^2R\) flowing into the resistor, where it becomes heat.</p>
+</details>
+
+<aside class="callout physics"><span class="ct">⚛️ So is it "wrong" to say current carries energy?</span>
+<p>Not for circuit work. Circuit theory is a brilliant compression of electromagnetism that's exact as long as the circuit is small compared with the wavelength of the signals. You can keep using \(P = VI\) forever. The field picture earns its keep in three places you'll meet in this book: (1) signals on PCB traces, where the energy rides in the dielectric between trace and ground plane, so a gap in the plane breaks the "pipe"; (2) radio and BLE antennas, where the fields detach and leave; and (3) understanding why a loop with a large area radiates and picks up noise. The phrase to remember: <b>the wires guide the energy; the fields carry it.</b></p>
+</aside>
+
+<div class="ex" data-id="poynting-mc" data-kind="mc">
+  <div class="q">A 12 V battery drives a heater through a long pair of parallel wires. Where does the energy that heats the heater travel?</div>
+  <ol class="opts">
+    <li>Inside the copper, carried by the kinetic energy of the drifting electrons</li>
+    <li>Inside the copper, carried by electrons "bumping" each other like marbles</li>
+    <li data-correct>Through the electromagnetic field in the space around and between the wires, entering the heater through its surface</li>
+    <li>Through the ground</li>
+  </ol>
+  <div class="explain">The drift kinetic energy is negligible (roughly \(10^{16}\) times too small). The Poynting vector \(\vec E\times\vec B/\mu_0\) is largest in the gap between the wires, points from source to load, and enters the heater from the side. Its total integrates to exactly \(VI\).</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="resistance">Resistance from the inside</h2>
+
+<p>Why does copper resist current at all, and why does pushing current through it make heat? The classic model, due to Paul Drude (1900), gets the essentials right with nothing more than Newton's second law.</p>
+
+<h3>The Drude picture</h3>
+<p>The free electrons in a metal aren't sitting still. They zip around randomly at enormous speeds, around \(1.6\times10^{6}\) m/s in copper. (This is a quantum effect called the Fermi velocity; Drude thought it was ordinary thermal motion, but the bookkeeping comes out the same.) Their directions are random, so the <em>average</em> velocity is zero and there's no current. Every so often, on average once every \(\tau\) seconds, an electron scatters off something: a lattice vibration (a <i>phonon</i>), an impurity atom or a crystal defect. Each collision scrambles its direction.</p>
+
+<p>Now apply a field \(E\) along the wire. Between collisions every electron accelerates, with \(a = qE/m\) (opposite to the field, since \(q = -e\)). On average it has accelerated for a time \(\tau\) since its last collision, so it has picked up an extra velocity</p>
+$$v_d = \frac{eE\tau}{m}.$$
+<p>That small, steady bias on top of the huge random motion is the drift velocity. Each collision then hands the extra kinetic energy over to the lattice, which shakes it. That shaking is <b>heat</b>. Combine this with \(J = nev_d\) from the previous section:</p>
+
+<div class="formula">
+$$J = \underbrace{\frac{n e^2 \tau}{m}}_{\sigma}\,E \qquad\Longrightarrow\qquad J = \sigma E, \qquad \rho = \frac{1}{\sigma} = \frac{m}{n e^2 \tau}$$
+<p>Ohm's law in its microscopic form. Current density is proportional to field. The conductivity \(\sigma\) (S/m) and its inverse, the resistivity \(\rho\) (Ω·m), are properties of the <em>material</em>.</p>
+</div>
+
+<p>Let's run the numbers backwards for copper. Its measured resistivity is \(\rho = 1.72\times10^{-8}\ \Omega\,\text{m}\), so</p>
+$$\tau = \frac{m}{n e^2 \rho} = \frac{9.11\times10^{-31}}{8.5\times10^{28}\,(1.602\times10^{-19})^2\,(1.72\times10^{-8})} \approx 2.4\times10^{-14}\ \text{s}.$$
+<p>An electron scatters roughly 40 trillion times a second and travels about \(1.6\times10^{6}\times2.4\times10^{-14}\approx 40\) nm between collisions (the <b>mean free path</b>), about 150 atomic spacings. Heat the metal and the lattice vibrates harder, collisions become more frequent, \(\tau\) shrinks and \(\rho\) rises. For copper the rise is about 0.39% per °C, so a trace at 100 °C has about 30% more resistance than at 20 °C.</p>
+
+<figure class="widget wide">
+  <div id="f-drude"></div>
+  <div id="f-drude-ctl"></div>
+  <figcaption><b>Figure 1.8</b> A Drude-model metal. Grey dots are lattice ions; blue dots are free electrons moving randomly and scattering (flashes). One electron leaves a trail. Turn on the field and the electrons acquire a small net drift <em>against</em> it. Raise the temperature (more collisions) and the drift for the same field drops, so the resistance rises. The bar compares the average drift with the random speed. Speeds are scaled to be visible; the real random motion is about \(10^{10}\) times the drift.</figcaption>
+</figure>
+
+<div class="ex" data-id="drude-order" data-kind="order">
+  <div class="q">Put the microscopic story of a resistor heating up in order.</div>
+  <ol class="items">
+    <li>A voltage across the resistor creates a field inside it</li>
+    <li>Free electrons accelerate in the field between collisions</li>
+    <li>They gain a little extra kinetic energy (the drift)</li>
+    <li>A collision hands that energy to the lattice</li>
+    <li>The lattice vibrates harder: the resistor gets warm</li>
+  </ol>
+  <div class="explain">This cycle repeats about \(10^{13}\) times per second per electron. The macroscopic result is \(P = VI = I^2R\): each coulomb that falls through the voltage \(V\) gives up \(V\) joules, all of it as heat.</div>
+</div>
+
+<h3>From material to component: \(R = \rho L / A\)</h3>
+<p>Take a uniform wire of length \(L\) and cross-section \(A\) with voltage \(V\) across it. The field inside is \(E = V/L\), and the current is \(I = JA = \sigma E A\). Divide:</p>
+<div class="formula">
+$$R = \frac{V}{I} = \frac{V}{\sigma (V/L) A} = \rho\,\frac{L}{A}$$
+<p>Twice as long means twice the resistance (two resistors in series). Twice the area means half the resistance (two in parallel).</p>
+</div>
+
+<table class="c1-tab">
+  <tr><th>Material</th><th>\(\rho\) at 20 °C (Ω·m)</th><th>Where you meet it</th></tr>
+  <tr><td>Silver</td><td>\(1.59\times10^{-8}\)</td><td>Contacts, some solders</td></tr>
+  <tr><td>Copper</td><td>\(1.72\times10^{-8}\)</td><td>Wire, PCB traces</td></tr>
+  <tr><td>Gold</td><td>\(2.44\times10^{-8}\)</td><td>Connector plating (for corrosion resistance, not conductivity)</td></tr>
+  <tr><td>Aluminium</td><td>\(2.8\times10^{-8}\)</td><td>Power lines, bond wires</td></tr>
+  <tr><td>Tin–lead solder</td><td>\(\approx 1.5\times10^{-7}\)</td><td>Every joint</td></tr>
+  <tr><td>Nichrome</td><td>\(1.1\times10^{-6}\)</td><td>Heaters, hot-wire cutters</td></tr>
+  <tr><td>Silicon (pure)</td><td>\(\approx 2\times10^{3}\)</td><td>Doped by factors of millions to make transistors</td></tr>
+  <tr><td>FR-4, glass</td><td>\(&gt;10^{12}\)</td><td>Insulators</td></tr>
+</table>
+<p>The range is staggering, more than 20 orders of magnitude. No other everyday physical property varies that much, and it's why "conductor" and "insulator" are such clean categories.</p>
+
+<h3>Wire gauge, PCB traces and why thin things get hot</h3>
+<p>American Wire Gauge (AWG) numbers run backwards: bigger number, thinner wire. Every 3 gauges halves the cross-section, and so doubles the resistance per metre.</p>
+<table class="c1-tab">
+  <tr><th>AWG</th><th>Area (mm²)</th><th>Resistance (mΩ/m)</th><th>Typical use</th></tr>
+  <tr><td>30</td><td>0.051</td><td>338</td><td>Wire-wrap, bodge wires</td></tr>
+  <tr><td>26</td><td>0.13</td><td>133</td><td>Servo leads, ribbon cable</td></tr>
+  <tr><td>22</td><td>0.33</td><td>53</td><td>Breadboard jumpers, signals</td></tr>
+  <tr><td>18</td><td>0.82</td><td>21</td><td>Small motors, 2–5 A</td></tr>
+  <tr><td>14</td><td>2.1</td><td>8.3</td><td>Drone battery leads</td></tr>
+  <tr><td>12</td><td>3.3</td><td>5.2</td><td>High-current ESC and battery leads</td></tr>
+</table>
+
+<p>The heat generated in a length of conductor is \(P = I^2R = I^2\rho L/A\). Per unit volume, it's</p>
+$$\frac{P}{\text{volume}} = \frac{I^2 \rho L/A}{A L} = \rho J^2.$$
+<p>Heating goes with the <em>square</em> of the current density. Halve a trace's width at the same current and each cubic millimetre of copper makes four times as much heat, while there's less surface to shed it. That's why a 0.2 mm signal trace accidentally carrying motor current turns into a fuse. PCB copper is specified by weight: "1 oz" copper is 35 µm thick. A useful trick is to think in <b>squares</b>: a 1 oz trace has a <em>sheet resistance</em> of \(\rho/t = 1.72\times10^{-8}/35\times10^{-6} \approx 0.49\ \text{m}\Omega\) per square, whatever the size of the square. A trace 0.25 mm wide and 100 mm long is 400 squares, so about 0.2 Ω.</p>
+
+<figure class="widget">
+  <div id="f-trace"></div>
+  <div id="f-trace-ctl"></div>
+  <figcaption><b>Figure 1.9</b> PCB trace calculator. Set the trace width, copper weight, length and current. The plot shows power dissipated vs. current (a parabola, because \(P = I^2R\)), with your operating point marked. The readouts give resistance, voltage drop, power and current density. Watch the power quadruple when you double the current.</figcaption>
+</figure>
+
+<aside class="callout warn"><span class="ct">⚠️ Voltage drop is a bug, not just a loss</span>
+<p>A 0.25 mm trace carrying 2 A drops 0.4 V over 10 cm. Feed an ESP32 through it and the 3.3 V at the regulator becomes 2.9 V at the chip. The trace also burns 0.8 W, enough to discolour the board over time. A rough rule from the IPC-2221 charts for an outer 1 oz layer with a 10 °C temperature rise: about 0.3 mm for 1 A and about 1.4 mm for 3 A. Use an online IPC-2152 calculator for real designs, and use copper pours for anything carrying motor current.</p>
+</aside>
+
+<div class="ex" data-id="trace-num" data-kind="num" data-answer="0.786" data-tol="3%" data-unit="W">
+  <div class="q">A 1 oz (35 µm) PCB trace is 0.25 mm wide and 10 cm long, and it carries 2 A. How much power does it dissipate? Use \(\rho = 1.72\times10^{-8}\ \Omega\,\text{m}\).</div>
+  <div class="hint">\(A = 0.25\times10^{-3}\times35\times10^{-6}\) m². Then \(R = \rho L/A\) and \(P = I^2R\).</div>
+  <div class="explain">\(A = 8.75\times10^{-9}\ \text{m}^2\), so \(R = 1.72\times10^{-8}\times0.1/8.75\times10^{-9} = 0.197\ \Omega\) and \(P = 2^2\times0.197 \approx 0.79\) W, which would get uncomfortably hot. (The square-counting shortcut gives the same answer: 400 squares × 0.49 mΩ.)</div>
+</div>
+
+<div class="ex" data-id="trace-task" data-kind="task">
+  <div class="q">In Figure 1.9, set <b>1 oz</b> copper, a length of <b>10 cm</b> and a current of <b>3 A</b>. Then find a trace width that keeps the voltage drop <b>below 50 mV</b>, without going wider than 3.5 mm.</div>
+  <div class="explain">You need \(R &lt; 0.05/3 = 16.7\ \text{m}\Omega\), so about 34 squares or fewer over 100 mm: a width of at least about 2.95 mm. Thicker copper (2 oz) halves the required width. That's why power boards often use heavier copper, or short, fat pours.</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="kirchhoff">Conservation laws: Kirchhoff and the return path</h2>
+
+<p>Circuit theory rests on two conservation laws. You have already met both in disguise.</p>
+
+<h3>Kirchhoff's Current Law: charge is conserved</h3>
+<p>A circuit <b>node</b> is a junction of wires. Charge can't be created or destroyed, and (as we saw from Coulomb's enormous constant) it can't pile up at a node in any noticeable amount either, because even a tiny excess would create an enormous field that pushes it away. So at every instant:</p>
+<div class="formula">
+$$\sum I_{\text{in}} = \sum I_{\text{out}} \qquad\text{or}\qquad \sum_k I_k = 0$$
+<p>KCL. Whatever flows into a node flows out. It holds for any closed surface too: a whole PCB, a chip, a robot.</p>
+</div>
+
+<h3>Kirchhoff's Voltage Law: energy is conserved</h3>
+<p>Walk around any closed loop in a circuit, adding the voltage rises (across sources) and subtracting the drops (across loads). You end up back where you started, at the same potential, so the sum is zero:</p>
+<div class="formula">
+$$\sum_{\text{loop}} V_k = 0$$
+<p>KVL. A charge that goes once around a loop gains energy in the sources and loses exactly the same amount in the loads. It's \(\oint \vec E\cdot d\vec\ell = 0\) from the voltage section, written for lumped components.</p>
+</div>
+
+<figure class="widget">
+  <div id="f-kcl"></div>
+  <div id="f-kcl-ctl"></div>
+  <figcaption><b>Figure 1.10</b> KCL and KVL, live. A 5 V supply feeds node N through R1, and the current splits into three branches. Drag the sliders: the branch currents change, but the tags always satisfy \(I_1 = I_2 + I_3 + I_4\), and the sum of drops around any loop equals 5 V. Watch the return wire at the bottom: <em>all</em> the current comes back to the source.</figcaption>
+</figure>
+
+<details class="deep"><summary>When does KCL fail? (And why it doesn't, really)</summary>
+<p>Put a capacitor in a branch. Charge flows <em>into</em> one plate and an equal amount flows <em>out of</em> the other, but no charge crosses the gap. Is KCL broken across the gap? Maxwell fixed this by noticing that the changing electric field between the plates acts exactly like a current, the <b>displacement current</b> \(\varepsilon_0\, d\Phi_E/dt\). Include it and current is continuous everywhere. In circuit terms we treat the capacitor as a two-terminal element whose current \(i = C\,dv/dt\) goes in one leg and out the other, and KCL holds at every node.</p>
+<p>KVL is the one that genuinely bends: if a changing magnetic flux threads your loop, \(\oint \vec E\cdot d\vec\ell = -d\Phi_B/dt \neq 0\). Circuit theory handles this by putting all the flux inside components called inductors and assuming there's none anywhere else. When that assumption fails, as in a big loop near a motor, you get "mysterious" induced noise.</p>
+</details>
+
+<h3>Current always returns to its source</h3>
+<p>Combine KCL with the fact that sources only <em>pump</em> charge and don't create it, and you get the most practically important idea in this chapter: <b>every ampere that leaves a source's + terminal comes back into its − terminal</b>. Current flows in closed loops, always. There is no such thing as "sending current to ground". The ground wire carries the <em>return</em> current, and it carries all of it.</p>
+
+<p>This sounds obvious, but forgetting it causes a whole family of real bugs. Consider a robot where the motor and the microcontroller share a ground wire back to the battery. The motor's 3 A return current flows through that wire's small resistance and creates a voltage drop. The microcontroller's "0 V" is now several hundred millivolts above the battery's −, and it bounces every time the motor current changes.</p>
+
+<figure class="widget">
+  <div id="f-return"></div>
+  <div id="f-return-ctl"></div>
+  <figcaption><b>Figure 1.11</b> Shared vs. separate return paths. The motor and the MCU (drawing 80 mA) are powered from the same battery. In <b>shared</b> mode, both return currents flow through one ground wire with resistance \(R_w\), so the MCU's ground rises by \((I_M + I_{MCU})R_w\). Switch to <b>separate</b> returns (a "star" ground) and only the MCU's own current shifts its ground. Increase the motor current and wire resistance and watch the tag.</figcaption>
+</figure>
+
+<div class="ex" data-id="return-num" data-kind="num" data-answer="0.154" data-tol="2%" data-unit="V">
+  <div class="q">A motor draws 3 A and an MCU draws 80 mA. Both return to the battery through one shared 50 mΩ ground wire. The MCU measures an analog sensor whose ground is connected directly at the battery's − terminal. By how much is the MCU's ground shifted relative to the sensor's ground?</div>
+  <div class="hint">The shared wire carries both return currents. Use \(V = IR\).</div>
+  <div class="explain">\((3 + 0.08)\times 0.05 = 0.154\) V. A 12-bit ADC on a 3.3 V range has 0.8 mV steps, so this error is nearly 200 counts, and it changes with motor load. The fix is to separate the high-current return from the signal ground and join them at one point (a star ground), or to use a solid ground plane. Chapters 5 and 9 return to this.</div>
+</div>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: KCL is a balanced ledger; return paths are the forgotten callback</span>
+<p>KCL is double-entry bookkeeping: every debit at a node has a matching credit, and the books always balance. The return path is like the response to an HTTP request. Everyone thinks about the request (the + wire to the load), but the response must come back along <em>some</em> route. If you don't design that route, the system picks one for you, and it may go through your sensitive analog ground. At high frequencies, the return current hugs the path directly beneath the signal trace, since that's the path of least <em>inductance</em>. Chapter 9 builds PCB layout on this one idea.</p>
+</aside>
+
+<div class="ex" data-id="kvl-sort" data-kind="sort">
+  <div class="q">Which conservation law does each statement come from?</div>
+  <div class="bins">
+    <div data-bin="kcl">⚡ KCL (charge)</div>
+    <div data-bin="kvl">🔋 KVL (energy)</div>
+  </div>
+  <ul class="items">
+    <li data-bin="kcl">Two LEDs in series carry the same current</li>
+    <li data-bin="kvl">Two LEDs in parallel have the same voltage across them</li>
+    <li data-bin="kcl">The ground wire carries the sum of all load currents</li>
+    <li data-bin="kvl">In a series string, the drops add up to the supply voltage</li>
+    <li data-bin="kcl">The battery's current equals the sum of the branch currents</li>
+    <li data-bin="kvl">Going around a loop and back to the start, you're back at the same potential</li>
+  </ul>
+  <div class="explain">Statements about how <em>current</em> splits or adds at junctions are KCL (charge can't pile up). Statements about how <em>voltage</em> divides around loops are KVL (energy per charge is path-independent). Chapter 2 turns these two laws into a systematic method that solves any circuit.</div>
+</div>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="capacitance">Capacitance: energy in the electric field</h2>
+
+<p>Take two metal plates of area \(A\), separated by a small gap \(d\), and connect them to a battery. Electrons flow off one plate and onto the other until the voltage between the plates equals the battery voltage. Now one plate holds \(+Q\) and the other \(-Q\). The device as a whole is still neutral. What it "stores" is <em>separated</em> charge, and with it energy in the field between the plates.</p>
+
+<h3>Deriving \(C = \varepsilon_0 A/d\)</h3>
+<p>A large flat sheet with charge per area \(\sigma = Q/A\) produces a uniform field \(\sigma/2\varepsilon_0\) on each side (this follows from Gauss's law). Between two oppositely charged plates the two fields add, and outside they cancel. So the field is uniform between the plates and nearly zero outside:</p>
+$$E = \frac{\sigma}{\varepsilon_0} = \frac{Q}{\varepsilon_0 A}, \qquad V = Ed = \frac{Qd}{\varepsilon_0 A}.$$
+<p>The charge is proportional to the voltage. The constant of proportionality is the <b>capacitance</b>:</p>
+<div class="formula">
+$$Q = CV, \qquad C = \frac{\varepsilon_0\varepsilon_r A}{d}, \qquad 1\ \text{F} = 1\ \frac{\text{C}}{\text{V}}$$
+<p>Big plates and a small gap give large capacitance. An insulator (dielectric) with relative permittivity \(\varepsilon_r\) multiplies it: its molecules polarise and partly cancel the field, so more charge fits at the same voltage.</p>
+</div>
+
+<p>Capacitance depends only on geometry and material, not on the voltage. A farad is huge. Two 1 cm² plates 0.1 mm apart in air make just 8.85 pF. Real capacitors cheat in two ways. A multilayer ceramic capacitor (MLCC) stacks hundreds of layers a micron or two thick, using a ceramic with \(\varepsilon_r\) in the thousands. An electrolytic capacitor uses an oxide layer only nanometres thick as its dielectric, grown on etched foil with a hugely enlarged surface. (That's also why electrolytics are polarised: reverse the voltage and the oxide dissolves.)</p>
+
+<h3>Energy: \(\tfrac12 CV^2\)</h3>
+<p>Charging a capacitor takes work, because each new bit of charge \(dq\) has to be pushed against the voltage \(v = q/C\) that's already there. Add it all up:</p>
+$$W = \int_0^{Q} v\,dq = \int_0^{Q}\frac{q}{C}\,dq = \frac{Q^2}{2C} = \frac12 CV^2.$$
+<p>The ½ appears because the early charge is moved against a small voltage and only the last bit against the full \(V\). You can also compute the same energy from the field: the energy density of an electric field is \(\tfrac12\varepsilon_0 E^2\), and multiplying by the volume \(Ad\) gives \(\tfrac12\varepsilon_0 (V/d)^2 Ad = \tfrac12 CV^2\). The energy really is <em>in the field</em> between the plates.</p>
+
+<div class="formula">
+$$U = \frac12 CV^2, \qquad i = C\,\frac{dv}{dt}$$
+<p>Stored energy, and the capacitor's defining current–voltage relation (differentiate \(Q = CV\)). See <a href="appA-math.html#calculus">derivatives</a> in Appendix A.</p>
+</div>
+
+<p>The second formula is the one that runs your circuits. It says <b>a capacitor resists changes in voltage</b>. To change its voltage quickly you need a large current, and an instantaneous jump would need infinite current. So a capacitor across a supply rail acts as a tiny local reservoir. When a chip suddenly draws a burst of current (an ESP32's radio switching on, say), the capacitor supplies it within nanoseconds, long before the regulator, centimetres away, can react. That's the whole story of <b>decoupling capacitors</b>, which Chapter 3 develops.</p>
+
+<figure class="widget wide">
+  <div id="f-cap"></div>
+  <div id="f-cap-ctl"></div>
+  <div id="f-cap-plot"></div>
+  <figcaption><b>Figure 1.12</b> A parallel-plate capacitor. Change the plate area, gap, dielectric and voltage. Notice that the <em>field</em> (line density) depends only on \(V/d\), while the <em>charge</em> (the ± count) also grows with the area. Then press <b>Charge</b> or <b>Discharge</b> through the resistor \(R\): the plot shows the voltage rising along an exponential with time constant \(\tau = RC\), and the current starting high and dying away.</figcaption>
+</figure>
+
+<div class="ex" data-id="cap-num" data-kind="num" data-answer="8.85e-12" data-tol="2%" data-unit="F">
+  <div class="q">Two 1 cm × 1 cm copper pads face each other across a 0.1 mm air gap. What is their capacitance? (\(\varepsilon_0 = 8.854\times10^{-12}\) F/m.)</div>
+  <div class="hint">\(C = \varepsilon_0 A/d\) with \(A = 10^{-4}\ \text{m}^2\) and \(d = 10^{-4}\ \text{m}\).</div>
+  <div class="explain">\(C = 8.854\times10^{-12}\times10^{-4}/10^{-4} = 8.85\) pF. Put FR-4 (\(\varepsilon_r\approx4.4\)) in the gap and you get about 39 pF. This is the kind of parasitic capacitance that exists between every pair of traces and planes on a PCB. Type <code>8.85p</code>.</div>
+</div>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: a capacitor is a buffer</span>
+<p>A capacitor is like a queue between a producer (the regulator) and a bursty consumer (the CPU). It absorbs short spikes in demand so the producer only has to keep up with the <em>average</em>. A bigger buffer smooths more, but it takes longer to fill at startup (inrush current) and costs more space. As with buffers, <em>where</em> you put it matters as much as how big it is: a decoupling capacitor 5 cm away from the chip is like a cache on the wrong side of the network.</p>
+</aside>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="inductance">Magnetism and inductance: energy in the magnetic field</h2>
+
+<p>In 1820 Hans Christian Ørsted noticed a compass needle twitch when he switched on a current in a nearby wire. That was the first evidence that electricity and magnetism are one subject. <b>Moving charge makes a magnetic field.</b> Around a long straight wire, the field lines are circles, and their strength falls off with distance:</p>
+
+<div class="formula">
+$$B = \frac{\mu_0 I}{2\pi r}, \qquad \mu_0 = 4\pi\times10^{-7}\ \text{T·m/A}$$
+<p>The field of a long straight wire. Its direction follows the right-hand rule: thumb along the current, fingers curl along \(\vec B\). The unit is the tesla (T).</p>
+</div>
+
+<p>For a feel of the scale: 1 A at 1 cm gives \(B = 2\times10^{-5}\) T = 20 µT, comparable to the Earth's field (25–65 µT). That's why a compass near a battery lead goes haywire, and why a magnetometer (an IMU's compass) must sit away from motor and battery wires. Wind the wire into a coil of \(N\) turns and the fields of the turns add up. Inside a long solenoid of length \(\ell\) the field is uniform: \(B = \mu_0 N I/\ell\). Fill the coil with iron or ferrite, with relative permeability \(\mu_r\) in the hundreds or thousands, and the field multiplies again. That's an electromagnet, the heart of every relay, solenoid, motor and speaker.</p>
+
+<h3>Faraday's law: a changing field makes a voltage</h3>
+<p>The reverse effect is subtler. A <em>steady</em> magnetic field through a loop of wire does nothing. A <em>changing</em> one induces a voltage (an EMF) around the loop, proportional to how fast the <b>magnetic flux</b> \(\Phi = BA\) through the loop changes:</p>
+<div class="formula">
+$$\mathcal{E} = -N\,\frac{d\Phi}{dt}$$
+<p>Faraday's law of induction, for a coil of \(N\) turns. The minus sign is <b>Lenz's law</b>: the induced current flows in the direction whose own magnetic field <em>opposes</em> the change.</p>
+</div>
+
+<p>Lenz's law is energy conservation again. If the induced current <em>helped</em> the change, a tiny nudge would grow without limit and you'd get free energy. Instead, nature pushes back. Push a magnet into a coil and the coil becomes a magnet that repels it. Pull the magnet out and the coil attracts it. Either way you have to do work, and that work is exactly the electrical energy delivered to the circuit. This is every generator, and every motor spinning as a generator.</p>
+
+<figure class="widget wide">
+  <div id="f-faraday"></div>
+  <div id="f-faraday-ctl"></div>
+  <figcaption><b>Figure 1.13</b> Faraday's law. <b>Drag the magnet</b> through the coil (or switch on "auto"). The meter and the trace show the induced EMF, which is proportional to the <em>rate of change</em> of flux, not the flux itself. Hold the magnet still inside the coil: the flux is at its maximum, but the EMF is zero. Move faster and the voltage goes up. The coil's end lights up as a pole that opposes the magnet's motion (Lenz).</figcaption>
+</figure>
+
+<h3>Self-inductance: a coil fights changes in its own current</h3>
+<p>Now the key step. A coil carrying current makes its own magnetic flux. If that current changes, its own flux changes, and by Faraday's law that induces a voltage <em>in the coil itself</em>, opposing the change. The flux is proportional to the current, so we write \(N\Phi = LI\), which defines the <b>inductance</b> \(L\). Then:</p>
+<div class="formula">
+$$v = L\,\frac{di}{dt}, \qquad L_{\text{solenoid}} = \frac{\mu_0\mu_r N^2 A}{\ell}, \qquad 1\ \text{H} = 1\ \frac{\text{V·s}}{\text{A}}$$
+<p>The inductor's defining relation, the mirror image of the capacitor's \(i = C\,dv/dt\). \(L\) grows with the <em>square</em> of the turns because more turns make more flux <em>and</em> each turn links that flux.</p>
+</div>
+
+<p>Read it like the capacitor equation with the roles swapped: <b>an inductor resists changes in current</b>. To change its current quickly takes a large voltage, and an instantaneous change would take an infinite one. An inductor behaves like a flywheel: current is its momentum. It takes effort to spin it up, and once it's spinning it wants to keep going.</p>
+
+<p>The energy stored in the magnetic field comes from integrating power while the current ramps up from zero:</p>
+$$U = \int v\,i\,dt = \int L\frac{di}{dt}\,i\,dt = \int_0^{I} L\,i\,di = \frac12 LI^2.$$
+<p>Like the capacitor's energy, this lives in the field: the magnetic energy density is \(B^2/2\mu_0\).</p>
+
+<h3>The inductive kick</h3>
+<p>Here is why this matters on your robot. A relay coil, motor or solenoid is an inductor carrying current. Your microcontroller switches it off through a transistor. The current wants to keep flowing, and \(v = L\,di/dt\) says that forcing it to stop in a few nanoseconds requires an enormous voltage. The coil <em>generates</em> that voltage. Its free end flies up to whatever it takes to keep the current going, which can be hundreds or thousands of volts, until something breaks down: the transistor (which dies), or the air across a mechanical switch (which arcs and pits the contacts).</p>
+
+<p>The cure is to give the current somewhere to go. A <b>flyback diode</b> across the coil, pointing "backwards" (cathode to the positive supply), does nothing while the coil is on. At switch-off the coil's voltage reverses, the diode conducts, and the current circulates around the loop formed by coil and diode, decaying gently as the coil's resistance turns the stored \(\tfrac12LI^2\) into heat. The switch never sees more than the supply plus one diode drop.</p>
+
+<figure class="widget">
+  <div id="f-kick"></div>
+  <div id="f-kick-ctl"></div>
+  <div id="f-kick-plot"></div>
+  <figcaption><b>Figure 1.14</b> Inductive kick when a relay coil is switched off at \(t = 0\). With <b>no clamp</b>, the open transistor (modelled as 10 kΩ of leakage) is the only path, so the switch node spikes to \(I_0 \times 10\ \text{k}\Omega\). With a <b>diode</b>, the node is clamped to 12.7 V, but the current decays slowly. A <b>diode + 18 V Zener</b> clamps at about 30.7 V and kills the current much faster, so the relay releases faster. Use the time-scale buttons to zoom.</figcaption>
+</figure>
+
+<div class="ex" data-id="kick-task" data-kind="task">
+  <div class="q">In Figure 1.14, with the default coil (\(L\) = 100 mH, \(R\) = 100 Ω), choose a clamp that keeps the switch node's peak <b>below 40 V</b> <em>and</em> brings the coil current to zero in <b>less than 1 ms</b>.</div>
+  <div class="explain">The plain diode clamps at 12.7 V but takes about \(\tau\ln(1 + I_0R/V_F) \approx 2.9\) ms, because only 0.7 V plus the coil's own resistance fights the current. The Zener raises the clamp voltage to about 18.7 V across the coil, so the current dies in about 0.5 ms, while the peak stays around 31 V, safe for a 40 V-rated transistor. Faster release means more voltage: \(v = L\,di/dt\) again. That's the trade-off.</div>
+</div>
+
+<div class="ex" data-id="ind-num" data-kind="num" data-answer="5000" data-tol="2%" data-unit="V">
+  <div class="q">A relay coil of 10 mH carries 0.5 A. A transistor switches the current off in 1 µs, with no flyback diode. Estimate the induced voltage from \(v = L\,di/dt\).</div>
+  <div class="hint">\(di/dt \approx 0.5\ \text{A} / 10^{-6}\ \text{s}\).</div>
+  <div class="explain">\(v = 0.01 \times 0.5/10^{-6} = 5000\) V. In reality the transistor breaks down (avalanches) long before that, absorbing \(\tfrac12LI^2 = 1.25\) mJ in a tiny chip, often fatally. Always put a diode across inductive loads. Type <code>5k</code>.</div>
+</div>
+
+<h3>Why this explains half of robotics</h3>
+<ul>
+  <li><b>Motors.</b> A DC motor is coils in a magnetic field. Current makes torque (the force on moving charge, \(\vec F = q\vec v\times\vec B\)). And because the coils move through the field, the motor is also a generator: it produces a <b>back-EMF</b> proportional to its speed that opposes the supply. A stalled motor has no back-EMF, so only the winding resistance limits its current. That's why <em>start-up and stall currents are 5–10× the running current</em>, as the next section shows.</li>
+  <li><b>Flyback diodes.</b> Every relay, solenoid and brushed motor driven by a transistor needs a path for the inductive current at switch-off. H-bridge motor drivers have the diodes built in (or use the MOSFETs' body diodes).</li>
+  <li><b>Relays.</b> An electromagnet pulls a contact closed. The kick at release is why the diode is mandatory, and why a Zener clamp makes the relay drop out faster.</li>
+  <li><b>Buck converters.</b> The kick, put to work. A switch connects an inductor to the input, letting its current ramp up. When the switch opens, the inductor keeps pushing current into the output through a diode (or a second transistor). The inductor's insistence on continuous current is exactly what lets a switching regulator convert 12 V to 3.3 V at 90% efficiency (Chapter 5).</li>
+  <li><b>Every wire.</b> Any loop of current has inductance, roughly 1 nH per millimetre for a thin wire or trace far from its return path. A 10 cm loop of motor wire switching amps in nanoseconds produces volts of noise. Short, tight loops with the return close by are the antidote.</li>
+</ul>
+
+<div class="ex" data-id="ind-multi" data-kind="multi">
+  <div class="q">Which of these are direct consequences of inductance or Faraday's law? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>A spinning brushed motor generates a voltage that opposes its supply</li>
+    <li data-correct>A transistor driving a relay coil dies without a diode across the coil</li>
+    <li>An LED lights up within nanoseconds of the switch closing</li>
+    <li data-correct>A buck converter keeps delivering output current while its switch is open</li>
+    <li>A thin trace gets hot when it carries a large current</li>
+    <li data-correct>A wireless phone charger transfers power without contact</li>
+  </ol>
+  <div class="explain">Back-EMF, the inductive kick, the buck converter's freewheeling current and the wireless charger's transformer all come from \(\mathcal E = -d\Phi/dt\). The LED's fast turn-on is field propagation (inductance and capacitance together set that speed, but the point there is signal speed). Trace heating is plain resistance, \(I^2R\).</div>
+</div>
+
+<div class="w-grid2">
+<aside class="callout dev"><span class="ct">👩‍💻 Capacitor vs. inductor</span>
+<p>They're duals, like <code>map</code> and <code>reduce</code>, or read and write locks:</p>
+<ul>
+  <li>C: \(i = C\,dv/dt\), stores \(\tfrac12CV^2\) in E, resists changes in <b>voltage</b>, behaves as an open circuit at DC.</li>
+  <li>L: \(v = L\,di/dt\), stores \(\tfrac12LI^2\) in B, resists changes in <b>current</b>, behaves as a short circuit at DC.</li>
+</ul>
+</aside>
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "inductors store current"</span>
+<p>They store <em>energy</em>, \(\tfrac12LI^2\), in the magnetic field. What an inductor won't allow is a sudden <em>change</em> of current. Open the circuit and it will raise the voltage as high as necessary to keep the current flowing for a moment. Likewise, capacitors don't store "charge" (they're neutral overall); they store energy in separated charge.</p>
+</aside>
+</div>
+
+<aside class="callout lab"><span class="ct">🔧 Lab: see the kick</span>
+<p>You need a 5 V relay module <em>without</em> a built-in diode (or a bare relay), a 1N4148 or 1N4007 diode, an NPN transistor (2N3904) with a 1 kΩ base resistor, and a small neon bulb or an oscilloscope.</p>
+<ol>
+  <li>Drive the relay coil from 5 V through the transistor, switched by a GPIO toggling once a second.</li>
+  <li>Put the scope on the collector (10× probe!). At switch-off, look for a spike far above 5 V, usually limited at 40–60 V by the transistor breaking down. A neon bulb (it needs about 70 V to fire) across the coil will flash at each release.</li>
+  <li>Add the diode across the coil (cathode to +5 V). The spike collapses to about 5.7 V. Note that the relay now releases a few milliseconds later.</li>
+</ol>
+<p>Without a scope, use a red LED in series with a 1 kΩ resistor across the coil, oriented like a flyback diode (cathode toward +5 V). It's reverse-biased while the coil is on and flashes only on the kick. Be gentle: an unclamped kick can damage the transistor after many cycles.</p>
+</aside>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="sources">Real sources: internal resistance and brown-outs</h2>
+
+<p>An ideal voltage source holds its voltage whatever current you draw. Real ones don't. A battery is a chemical reaction, and the ions inside it have to move through electrolyte and across electrode surfaces. That journey has resistance. The simplest useful model is an ideal EMF \(\mathcal{E}\) in series with an <b>internal resistance</b> \(R_\text{int}\):</p>
+
+<div class="formula">
+$$V_\text{terminal} = \mathcal{E} - I\,R_\text{int}$$
+<p>Under load, the terminal voltage sags in proportion to the current. The energy lost inside, \(I^2R_\text{int}\), warms the battery.</p>
+</div>
+
+<p>You can measure \(R_\text{int}\) with two readings: the open-circuit voltage (which is \(\mathcal{E}\)) and the voltage at a known load current. Then \(R_\text{int} = (V_\text{oc} - V_\text{load})/I\). Typical values:</p>
+<table class="c1-tab">
+  <tr><th>Source</th><th>Typical \(R_\text{int}\)</th><th>Consequence</th></tr>
+  <tr><td>CR2032 coin cell</td><td>10–40 Ω (more when cold or near empty)</td><td>Can't supply an ESP32's 300+ mA Wi-Fi bursts; fine for a BLE sensor sleeping at µA</td></tr>
+  <tr><td>9 V alkaline</td><td>1–2 Ω</td><td>Poor for motors</td></tr>
+  <tr><td>AA alkaline</td><td>0.1–0.3 Ω fresh, rising as it drains</td><td>Sags badly with servos</td></tr>
+  <tr><td>AA NiMH</td><td>20–50 mΩ</td><td>Much better for motors</td></tr>
+  <tr><td>LiPo cell (RC pack)</td><td>2–20 mΩ</td><td>Can deliver tens of amps and, if shorted, over 100 A</td></tr>
+</table>
+
+<h3>The classic robot bug: the motor resets the MCU</h3>
+<p>Put the pieces together. A <em>stalled</em> (or just-starting) DC motor has no back-EMF, so its current is limited only by its winding resistance and everything in series with it: the wires and the battery's internal resistance. That start-up current can be 5–10 times the running current, and it drags the battery terminal voltage down. If the microcontroller is powered from the same battery through a regulator, its supply sags too. When the rail falls below the <b>brown-out threshold</b> (typically around 2.4–2.8 V for 3.3 V parts, configurable on most MCUs), the chip resets. On reboot it starts the motor again... and resets again. The symptom is a robot that twitches and reboots forever, and it looks exactly like a software bug.</p>
+
+<figure class="widget wide">
+  <div id="f-sag"></div>
+  <div id="f-sag-ctl"></div>
+  <div id="f-sag-plot"></div>
+  <figcaption><b>Figure 1.15</b> Battery sag at motor start, solved live with a DC circuit solver at each time step. A battery pack (cells × 1.5 V, each with internal resistance) feeds a motor (2 Ω winding plus a back-EMF that builds up as it spins) and an MCU behind a 3.3 V regulator with 0.3 V dropout. The motor starts at \(t\) = 20 ms. The plot shows the battery terminal voltage and the MCU rail; the dashed line is the 2.8 V brown-out threshold. Age the cells, change the wiring, and try the fixes.</figcaption>
+</figure>
+
+<div class="ex" data-id="sag-task" data-kind="task">
+  <div class="q">In Figure 1.15, set the cell internal resistance to <b>0.4 Ω or more</b> (tired alkalines). With 3 cells the MCU browns out. Find a fix, changing anything <em>except</em> the internal resistance, so the rail never drops below 2.8 V.</div>
+  <div class="explain">Several fixes work: a fourth cell (more headroom before the regulator drops out), a separate supply for the MCU (its own return path, too!), or both. In real robots the standard recipe is a low-resistance battery (LiPo or NiMH), short thick motor wires, a bulk capacitor near the regulator to ride through short dips, a soft-start PWM ramp so the motor never sees full voltage while stalled, and sometimes a separate battery for the logic.</div>
+</div>
+
+<div class="ex" data-id="sag-num" data-kind="num" data-answer="0.2" data-tol="3%" data-unit="Ω">
+  <div class="q">A 2S LiPo pack reads 8.40 V with no load and 7.60 V while delivering 4.0 A to a motor. What is its internal resistance?</div>
+  <div class="hint">\(R_\text{int} = (V_\text{oc} - V_\text{load})/I\).</div>
+  <div class="explain">\((8.40 - 7.60)/4.0 = 0.20\ \Omega\). That's high for a healthy 2S pack: either the pack is old, or (more likely) the connector and wiring add resistance too. The measurement can't tell which, but you can by measuring right at the cell terminals. At a 20 A stall current this pack would sag by 4 V.</div>
+</div>
+
+<aside class="callout lab"><span class="ct">🔧 Lab: measure internal resistance and watch a brown-out</span>
+<p>Parts: 3×AA holder with alkaline cells, a 4.7 Ω 2 W resistor (or a small DC motor), a multimeter, an Arduino Nano or ESP32 dev board, an LED + 330 Ω.</p>
+<ol>
+  <li>Measure the pack's open-circuit voltage. Connect the 4.7 Ω resistor for a couple of seconds and read the voltage again. Compute \(I = V/4.7\) and \(R_\text{int} = (V_\text{oc} - V)/I\). Repeat with NiMH cells and compare.</li>
+  <li>Power the board's 5 V or VIN pin from the pack and write a sketch that blinks the LED three times at boot, then turns on the motor through a logic-level MOSFET (with a flyback diode!).</li>
+  <li>With fresh cells it should work. Swap in tired cells, or add a 1 Ω resistor in series with the pack to simulate them, and watch for the triple-blink repeating: that's the brown-out reboot loop.</li>
+  <li>Fix it: add a 470–1000 µF capacitor across the board's supply input, ramp the motor PWM up over 200 ms in software, or power the board from a separate pack (connect the grounds!). Which fix works best?</li>
+</ol>
+</aside>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: internal resistance is a rate limit</span>
+<p>An API with a rate limit answers small requests instantly but slows down (or fails) under burst load. A battery's internal resistance is the same: the open-circuit voltage is the advertised capacity, but the deliverable voltage falls with demand. A brown-out reset is an OOM-killer for your MCU, and as with OOM, the fix is usually not in the code that crashed but in the resource it shares.</p>
+</aside>
+</section>
+
+<!-- ============================================================ -->
+<section>
+<h2 id="wrap">Units, analogies and the big picture</h2>
+
+<h3>Units are the type system of physics</h3>
+<p>Every electrical unit is defined from a few others, and checking the units of a formula catches errors just as a type checker does. If you derive a "current" and it comes out in volt-seconds, you have a bug. Here's the whole family, built from the coulomb, the joule and the second:</p>
+<table class="c1-tab">
+  <tr><th>Unit</th><th>Quantity</th><th>Definition</th><th>Equivalent forms</th></tr>
+  <tr><td>A (ampere)</td><td>Current</td><td>C/s</td><td>charge per time</td></tr>
+  <tr><td>V (volt)</td><td>Voltage</td><td>J/C</td><td>W/A, energy per charge</td></tr>
+  <tr><td>Ω (ohm)</td><td>Resistance</td><td>V/A</td><td>V·s/C, \(\sqrt{\text{H/F}}\)</td></tr>
+  <tr><td>W (watt)</td><td>Power</td><td>J/s</td><td>V·A, A²·Ω, V²/Ω</td></tr>
+  <tr><td>F (farad)</td><td>Capacitance</td><td>C/V</td><td>A·s/V, s/Ω</td></tr>
+  <tr><td>H (henry)</td><td>Inductance</td><td>V·s/A</td><td>Ω·s, Wb/A</td></tr>
+  <tr><td>T (tesla)</td><td>Magnetic field</td><td>V·s/m²</td><td>N/(A·m), Wb/m²</td></tr>
+  <tr><td>V/m</td><td>Electric field</td><td>N/C</td><td></td></tr>
+</table>
+
+<p>Two checks that come up all the time. The time constant of an RC circuit is \(RC\), and its units are \(\Omega\cdot\text{F} = \frac{\text{V}}{\text{A}}\cdot\frac{\text{A}\cdot\text{s}}{\text{V}} = \text{s}\). An RL circuit's time constant is \(L/R\): \(\frac{\text{V·s/A}}{\text{V/A}} = \text{s}\). Both are times, as they must be, which is a quick sanity check whenever you meet them.</p>
+
+<div class="ex" data-id="units-text" data-kind="text" data-answer="henry|henries|henrys|H">
+  <div class="q">Dimensional analysis: a quantity measured in <b>volt-seconds per ampere</b> (V·s/A) is better known by which unit name?</div>
+  <div class="hint">Look at \(v = L\,di/dt\) and solve for \(L\).</div>
+  <div class="explain">\(L = v/(di/dt)\), so its units are V/(A/s) = V·s/A, the <b>henry</b>. Likewise \(C = i/(dv/dt)\) gives A·s/V, the farad.</div>
+</div>
+
+<h3>The water analogy, and where it breaks</h3>
+<p>The hydraulic analogy is genuinely useful, and it would be silly to throw it away. But you should know exactly where it stops working:</p>
+<table class="c1-tab">
+  <tr><th>Electrical</th><th>Hydraulic</th><th>Holds up?</th></tr>
+  <tr><td>Voltage</td><td>Pressure difference</td><td>✅ Good, including "it's always between two points"</td></tr>
+  <tr><td>Current</td><td>Flow rate (litres/s)</td><td>✅ Good, including KCL (water is incompressible, like the neutral electron sea)</td></tr>
+  <tr><td>Resistor</td><td>Narrow pipe</td><td>✅ Good for linear (laminar) flow</td></tr>
+  <tr><td>Battery</td><td>Pump</td><td>✅ Good, including internal resistance (a weak pump)</td></tr>
+  <tr><td>Capacitor</td><td>Rubber membrane across a pipe</td><td>✅ Good: flow "through" it without water crossing; a stretched membrane stores energy</td></tr>
+  <tr><td>Inductor</td><td>Heavy paddle wheel or long pipe (water's momentum)</td><td>✅ Good: water hammer is the inductive kick</td></tr>
+  <tr><td>Diode</td><td>Check valve</td><td>⚠️ Roughly; misses the forward voltage's physics</td></tr>
+  <tr><td>Signal speed</td><td>Pressure wave in the water</td><td>❌ The real wave lives in the <em>space around</em> the wires, not in the copper</td></tr>
+  <tr><td>Energy flow</td><td>Carried by the water</td><td>❌ Carried by the fields outside the conductors</td></tr>
+  <tr><td>Magnetic effects</td><td>None</td><td>❌ Water doesn't make a field that deflects a compass or couples into a neighbouring pipe</td></tr>
+  <tr><td>Open circuit</td><td>Closed valve</td><td>⚠️ An open wire end isn't a leak; but high voltages <em>can</em> jump gaps</td></tr>
+</table>
+
+<div class="ex" data-id="analogy-sort" data-kind="sort">
+  <div class="q">Where does the water analogy work, and where does it mislead?</div>
+  <div class="bins">
+    <div data-bin="ok">✅ Analogy works</div>
+    <div data-bin="bad">❌ Analogy misleads</div>
+  </div>
+  <ul class="items">
+    <li data-bin="ok">More pressure across a narrow pipe gives more flow (Ohm's law)</li>
+    <li data-bin="ok">Flow into a junction equals flow out (KCL)</li>
+    <li data-bin="ok">Water hammer when a valve slams shut (inductive kick)</li>
+    <li data-bin="bad">Energy is carried inside the pipe by the moving water</li>
+    <li data-bin="bad">A current in one pipe has no effect on a neighbouring pipe</li>
+    <li data-bin="bad">The signal travels at the speed the water moves</li>
+  </ul>
+  <div class="explain">The analogy captures the <em>circuit-level</em> laws: Ohm, KCL, KVL, and the dynamics of C and L. It fails on everything to do with <em>fields</em>: where energy travels, how fast signals propagate, and how circuits couple to each other through magnetic and electric fields. Those are exactly the effects that cause noise, crosstalk and EMI on real boards.</div>
+</div>
+
+<h3>Summary</h3>
+<ul>
+  <li><b>Charge</b> is conserved and quantised. Like charges repel by Coulomb's inverse-square law, which is enormously strong, so matter stays almost perfectly neutral.</li>
+  <li>The <b>electric field</b> is force per charge. It's real: it carries energy, and changes in it travel at a large fraction of \(c\).</li>
+  <li><b>Voltage</b> is energy per charge (J/C), always measured <em>between two points</em>. Ground is a reference you choose.</li>
+  <li><b>Current</b> is charge per second. Conventional current runs + to −; electrons drift the other way at only <b>mm/s</b>, while <b>signals</b> travel at about half the speed of light.</li>
+  <li><b>Energy</b> flows through the fields around the wires (the Poynting vector); the wires guide it.</li>
+  <li><b>Resistance</b> comes from electrons scattering off the lattice. \(R = \rho L/A\), heating goes as \(I^2R\) (or \(\rho J^2\) per volume), and resistance rises with temperature.</li>
+  <li><b>KCL</b> (charge conservation) and <b>KVL</b> (energy conservation) govern every circuit. <b>Current always returns to its source</b>, so design the return path.</li>
+  <li>A <b>capacitor</b> stores \(\tfrac12CV^2\) in its electric field and resists changes in voltage, \(i = C\,dv/dt\).</li>
+  <li>An <b>inductor</b> stores \(\tfrac12LI^2\) in its magnetic field and resists changes in current, \(v = L\,di/dt\). Interrupt it and it kicks, so give it a diode.</li>
+  <li><b>Real sources</b> have internal resistance. Motor start-up current sags the supply and browns out the MCU.</li>
+</ul>
+
+<aside class="callout ref"><span class="ct">📚 Go deeper</span>
+<ul>
+  <li><b>Kenn Amdahl, <i>There Are No Electrons</i></b>: a playful, deliberately "wrong" picture that builds exactly the intuition this chapter is after. A good first read.</li>
+  <li><b><i>The Feynman Lectures on Physics</i>, Vol. II</b> (free at feynmanlectures.caltech.edu): Ch. 4 (Electrostatics), Ch. 5 (Application of Gauss' law), Ch. 8 (Electrostatic energy), Ch. 13 (Magnetostatics), Ch. 17 (The laws of induction) and especially <b>Ch. 27 (Field energy and field momentum)</b>, where Feynman computes the Poynting flow into a resistor and a charging capacitor.</li>
+  <li><b>MIT 8.02 Electricity and Magnetism</b> (Walter Lewin, MIT OpenCourseWare / YouTube): lectures on Coulomb's law and electric fields, capacitance and dielectrics, Faraday's law and Lenz's law, and inductance. The demonstrations alone are worth it.</li>
+  <li><b>Purcell &amp; Morin, <i>Electricity and Magnetism</i></b> (3rd ed.): Ch. 1–3 (electrostatics, potential, conductors and capacitance), Ch. 4 (electric currents, including the microscopic model of conductivity), Ch. 7 (electromagnetic induction).</li>
+  <li><b>Horowitz &amp; Hill, <i>The Art of Electronics</i></b> (3rd ed.), Ch. 1 "Foundations": voltage and current, resistors, Thevenin, and the first look at capacitors and inductors from a designer's point of view.</li>
+  <li><b>Scherz &amp; Monk, <i>Practical Electronics for Inventors</i></b> (4th ed.), Ch. 2 "Theory": a long, practical tour of current, voltage, resistance, capacitance and inductance with many worked examples.</li>
+  <li><b>Tony Kuphaldt, <i>Lessons in Electric Circuits</i>, Vol. I (DC)</b>, Ch. 1 "Basic concepts of electricity" and the chapters on capacitors and inductors: free, gentle, very clear.</li>
+  <li><b>MIT 6.002 Circuits and Electronics</b> (Anant Agarwal): the first lectures on the "lumped matter discipline", which explains exactly when Kirchhoff's laws are valid and when they aren't.</li>
+</ul>
+</aside>
+</section>
+
+</main>
+<script src="../assets/vendor/katex/katex.min.js"></script>
+<script src="../assets/vendor/katex/auto-render.min.js"></script>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/ch01-physics.js"></script>
+</body>
+</html>

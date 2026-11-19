@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>8 · Saving Sparks — Sparky's Circuit Adventure</title>
+<meta name="description" content="Level 8 of Sparky's Circuit Adventure: batteries and capacitors are buckets for energy, a camera-flash toy, counting, and battery safety and recycling.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+/* kid level page styles (shared pattern, page-local copy) */
+.toy { background: var(--surface2); border: 2px solid var(--line); border-radius: 22px; padding: 12px 10px; margin: 16px 0; text-align: center; }
+.toy svg.art { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.toy .cap { font-size: 1rem; color: var(--muted); margin: 6px auto 0; }
+.toy-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0 4px; }
+.kbtn { font-family: inherit; font-size: 1.25rem; line-height: 1.2; min-width: 56px; min-height: 56px; padding: 6px 14px; border-radius: 18px; border: 3px solid var(--line); border-bottom-width: 6px; background: var(--surface); color: var(--ink); cursor: pointer; touch-action: manipulation; transition: transform .06s, border-color .15s, background .15s; }
+.kbtn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.kbtn:active { transform: translateY(3px); border-bottom-width: 3px; }
+.kbtn.on { border-color: var(--accent); background: var(--accent2); }
+.kbtn.go { background: var(--c3); border-color: color-mix(in srgb, var(--c3) 60%, #000); color: #fff; }
+.kbtn:disabled { opacity: .45; cursor: not-allowed; }
+.kbtn small { display: block; font-size: .8rem; color: var(--muted); }
+.kbtn.go small { color: inherit; opacity: .9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kbtn.go { color: #0b1a12; } }
+:root[data-theme="dark"] .kbtn.go { color: #0b1a12; }
+.ex .opts.emoji > li .lab, .ex .opts .lab { display: block; font-size: 1rem; line-height: 1.2; color: var(--muted); margin-top: 4px; }
+.ex .opts > li svg.mini { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto; }
+.toy .w-controls { justify-content: center; }
+.toy .w-slider { grid-template-columns: max-content 1fr max-content; font-size: 1.15rem; flex-basis: 260px; max-width: 460px; }
+.toy .w-slider input { height: 44px; }
+.toy .w-slider output { font-family: inherit; font-size: 1.05rem; min-width: 2.5em; }
+.toy .w-seg button { font-size: 1.1rem; min-height: 48px; padding: 6px 12px; }
+ol.steps { padding-left: 1.4em; } ol.steps li { margin: 6px 0; }
+.grownup { font-size: .82em; }
+.grownup > div { line-height: 1.5; }
+.card .big-emoji { letter-spacing: .05em; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  body.kid { font-size: 19px; }
+  main.cards > .card { padding: 18px 14px 20px; }
+  .speech { margin-left: 52px; padding: 12px 14px; }
+  .speech .who { left: -54px; font-size: 2.4rem; }
+  body.kid .ex { padding-left: 12px; padding-right: 50px; }
+  .big-emoji { font-size: clamp(2rem, 10.5vw, 3.2rem); }
+}
+main.cards > .card > h2 { padding-right: 48px; }
+
+</style>
+</head>
+<body data-book="kid" data-chapter="k08-store">
+<main class="chapter cards">
+<header class="chapter-head">
+  <p class="kicker">Level 8</p>
+  <h1>🪣 Saving Sparks</h1>
+  <p class="lede">Where does the energy wait until we need it?</p>
+</header>
+
+<section class="card">
+  <h2>🔋 A battery is an energy bucket</h2>
+  <div class="speech say"><span class="who">⚡</span>A battery is like a bucket full of energy. Special stuff inside it gives us our push. When a toy runs, the bucket slowly empties. Some batteries can be filled up again with a charger!</div>
+  <div class="toy">
+    <div id="t-bucket"></div>
+    <div id="t-bucket-ctl" class="toy-row"></div>
+    <p class="cap">▶️ Drive the car until the battery is empty. 🔌 Then charge it up!</p>
+  </div>
+  <div class="ex" data-id="charge" data-kind="task">
+    <div class="q">Use up all the energy, then charge the battery full again!</div>
+    <div class="explain">A rechargeable battery can be emptied and filled again hundreds of times. Phones and tablets use rechargeable batteries.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>📸 The quick bucket</h2>
+  <div class="speech say"><span class="who">⚡</span>A capacitor is a different kind of bucket. It's small, but super quick! It fills up fast and empties in a flash. A camera flash uses one to make a big, bright, quick light.</div>
+  <div class="toy">
+    <div id="t-flash"></div>
+    <div id="t-flash-ctl" class="toy-row"></div>
+    <p class="cap">⚡ Fill the quick bucket. 📸 Then take a photo!</p>
+  </div>
+  <div class="ex" data-id="flash3" data-kind="task">
+    <div class="q">Take 3 flash photos of the cat! 🐱</div>
+    <div class="explain">The capacitor fills up in a second, then dumps all its energy into the flash super fast. Flash!</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🐢 or ⚡?</h2>
+  <div class="ex" data-id="fast" data-kind="mc">
+    <div class="q">Which bucket fills up and empties super fast?</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>⚡<span class="lab">the capacitor</span></li>
+      <li>🔋<span class="lab">the battery</span></li>
+    </ol>
+    <div class="explain">The capacitor is the quick bucket. The battery holds much more energy, but gives it out slowly, for hours.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🔢 Battery counting</h2>
+  <div class="speech say"><span class="who">⚡</span>Let's count batteries! Use your fingers if you like.</div>
+  <div class="big-emoji">🔦 = 🔋🔋🔋</div>
+  <div class="ex" data-id="more" data-kind="num" data-answer="2" data-tol="0">
+    <div class="q">The torch 🔦 needs 3 batteries. You have 1 battery 🔋. How many more do you need?</div>
+    <div class="hint">Hold up 3 fingers. Fold down 1. How many are left?</div>
+    <div class="explain">3 take away 1 is 2. You need 2 more batteries.</div>
+  </div>
+  <div class="big-emoji">🎮 = 🔋🔋<br>🚗 = 🔋🔋🔋</div>
+  <div class="ex" data-id="total" data-kind="num" data-answer="5" data-tol="0">
+    <div class="q">The game 🎮 needs 2 batteries. The car 🚗 needs 3. How many batteries altogether?</div>
+    <div class="hint">Count them all: 🔋🔋 and 🔋🔋🔋.</div>
+    <div class="explain">2 + 3 = 5 batteries.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>⚠️ Sparky's battery rules</h2>
+  <div class="speech say"><span class="who">⚡</span>Batteries are full of energy, so be careful! Keep them away from coins and keys in your pocket. Metal can make a shortcut, and the battery gets HOT. And if a battery looks puffy or leaky, don't touch it!</div>
+  <div class="big-emoji">🔋 + 🔑🪙 = 🔥</div>
+  <div class="ex" data-id="puffy" data-kind="mc">
+    <div class="q">You find a puffy, swollen battery. What do you do?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>🗣️<span class="lab">tell a grown-up</span></li>
+      <li>🔨<span class="lab">squash it</span></li>
+      <li>👅<span class="lab">lick it</span></li>
+    </ol>
+    <div class="explain">Tell a grown-up and don't touch it. Puffy batteries can get very hot or catch fire.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>♻️ Old batteries</h2>
+  <div class="speech say"><span class="who">⚡</span>When a battery is used up, don't put it in the bin! Old batteries have useful metals inside, but also stuff that is bad for the Earth. They go to a special battery recycling box.</div>
+  <div class="ex" data-id="recycle" data-kind="sort">
+    <div class="q">Where does it go? Tap a card, then tap a box.</div>
+    <div class="bins">
+      <div data-bin="r">♻️ Battery recycling box</div>
+      <div data-bin="b">🗑️ Rubbish bin</div>
+    </div>
+    <ul class="items">
+      <li data-bin="r">🔋 old AA battery</li>
+      <li data-bin="r">🪙 old coin battery</li>
+      <li data-bin="r">📱 old phone battery</li>
+      <li data-bin="b">🍌 banana peel</li>
+      <li data-bin="b">🧻 used tissue</li>
+    </ul>
+    <div class="hint">Anything that is a battery goes to the battery box.</div>
+    <div class="explain">All batteries go to the battery recycling box (shops and recycling centres often have one). The banana peel can go in the compost, and the tissue in the bin.</div>
+  </div>
+</section>
+
+<section class="card home">
+  <h2>🏠 Try it at home (with a grown-up)</h2>
+  <div class="speech say"><span class="who">⚡</span>Make a battery from lemons!</div>
+  <p>You need: 🍋 3 or 4 lemons, 🪙 copper coins or copper wire, 🔩 zinc-coated (galvanised) nails or screws, wires with clips, and a 🔴 red LED.</p>
+  <ol class="steps">
+    <li class="say">Squeeze and roll each lemon to make it juicy.</li>
+    <li class="say">Push one coin and one nail into each lemon. Don't let them touch.</li>
+    <li class="say">Join the lemons in a line: the nail of one lemon to the coin of the next.</li>
+    <li class="say">Connect the LED to the two free ends: the long leg to the coin. Turn off the lights and look closely. A tiny glow!</li>
+  </ol>
+  <aside class="callout warn"><span class="ct">⚠️ Careful</span><p>Don't eat the lemons afterwards. Wash your hands. Never cut open a real battery.</p></aside>
+  <aside class="callout tip grownup"><span class="ct">👨‍👩‍👧 For grown-ups</span><div>A battery stores energy chemically and delivers it at a roughly steady voltage until it is depleted; a capacitor stores energy in an electric field (E = ½CV²) and can charge and discharge very quickly, which is why camera flashes, defibrillators and decoupling capacitors use them. Each lemon cell gives about 0.9 V (zinc and copper electrodes in citric acid) but very little current, so you need three or four in series for an LED. Coins and keys in a pocket can short a 9 V battery's terminals; swollen lithium cells are a fire risk. See <a href="../book/ch03-ac.html">Chapter 3</a> (capacitors and RC charging) and <a href="../book/ch05-power.html">Chapter 5: Power for Robots</a> (batteries).</div></aside>
+</section>
+</main>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/kidkit.js"></script>
+<script src="js/k08-store.js"></script>
+</body>
+</html>

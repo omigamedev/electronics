@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>7 · Magnet Magic & Spinning Motors — Sparky's Circuit Adventure</title>
+<meta name="description" content="Level 7 of Sparky's Circuit Adventure: magnets pull and push, invisible magnetic fields, electromagnets, motors and generators.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+/* kid level page styles (shared pattern, page-local copy) */
+.toy { background: var(--surface2); border: 2px solid var(--line); border-radius: 22px; padding: 12px 10px; margin: 16px 0; text-align: center; }
+.toy svg.art { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.toy .cap { font-size: 1rem; color: var(--muted); margin: 6px auto 0; }
+.toy-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0 4px; }
+.kbtn { font-family: inherit; font-size: 1.25rem; line-height: 1.2; min-width: 56px; min-height: 56px; padding: 6px 14px; border-radius: 18px; border: 3px solid var(--line); border-bottom-width: 6px; background: var(--surface); color: var(--ink); cursor: pointer; touch-action: manipulation; transition: transform .06s, border-color .15s, background .15s; }
+.kbtn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.kbtn:active { transform: translateY(3px); border-bottom-width: 3px; }
+.kbtn.on { border-color: var(--accent); background: var(--accent2); }
+.kbtn.go { background: var(--c3); border-color: color-mix(in srgb, var(--c3) 60%, #000); color: #fff; }
+.kbtn:disabled { opacity: .45; cursor: not-allowed; }
+.kbtn small { display: block; font-size: .8rem; color: var(--muted); }
+.kbtn.go small { color: inherit; opacity: .9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kbtn.go { color: #0b1a12; } }
+:root[data-theme="dark"] .kbtn.go { color: #0b1a12; }
+.ex .opts.emoji > li .lab, .ex .opts .lab { display: block; font-size: 1rem; line-height: 1.2; color: var(--muted); margin-top: 4px; }
+.ex .opts > li svg.mini { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto; }
+.toy .w-controls { justify-content: center; }
+.toy .w-slider { grid-template-columns: max-content 1fr max-content; font-size: 1.15rem; flex-basis: 260px; max-width: 460px; }
+.toy .w-slider input { height: 44px; }
+.toy .w-slider output { font-family: inherit; font-size: 1.05rem; min-width: 2.5em; }
+.toy .w-seg button { font-size: 1.1rem; min-height: 48px; padding: 6px 12px; }
+ol.steps { padding-left: 1.4em; } ol.steps li { margin: 6px 0; }
+.grownup { font-size: .82em; }
+.grownup > div { line-height: 1.5; }
+.card .big-emoji { letter-spacing: .05em; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  body.kid { font-size: 19px; }
+  main.cards > .card { padding: 18px 14px 20px; }
+  .speech { margin-left: 52px; padding: 12px 14px; }
+  .speech .who { left: -54px; font-size: 2.4rem; }
+  body.kid .ex { padding-left: 12px; padding-right: 50px; }
+  .big-emoji { font-size: clamp(2rem, 10.5vw, 3.2rem); }
+}
+main.cards > .card > h2 { padding-right: 48px; }
+#t-crank svg { touch-action: none; }
+</style>
+</head>
+<body data-book="kid" data-chapter="k07-magnets">
+<main class="chapter cards">
+<header class="chapter-head">
+  <p class="kicker">Level 7</p>
+  <h1>🧲 Magnet Magic &amp; Spinning Motors</h1>
+  <p class="lede">Invisible pulls, magic nails and things that spin!</p>
+</header>
+
+<section class="card">
+  <h2>🧲 Two ends: N and S</h2>
+  <div class="speech say"><span class="who">⚡</span>A magnet has two ends. One is called North, N. The other is called South, S. Different ends pull together. The same ends push apart!</div>
+  <div class="toy">
+    <div id="t-mag"></div>
+    <div id="t-mag-ctl" class="toy-row"></div>
+    <p class="cap">🔄 Flip the magnet. 🤏 Then push them together.</p>
+  </div>
+  <div class="ex" data-id="stick" data-kind="task">
+    <div class="q">Make the two magnets stick together! (Then try pushing the same ends together, too.)</div>
+    <div class="explain">N and S pull together and click! N and N (or S and S) push each other away.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🤔 Push or pull?</h2>
+  <div class="ex" data-id="nn" data-kind="mc">
+    <div class="q">You hold N next to N. What happens?</div>
+    <ol class="opts emoji grid2">
+      <li>🤗<span class="lab">they pull together</span></li>
+      <li data-correct>🙅<span class="lab">they push apart</span></li>
+    </ol>
+    <div class="explain">Same ends push apart. Different ends pull together. Remember Sparky's balloons? Electric charges do the same trick!</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>✨ The invisible field</h2>
+  <div class="speech say"><span class="who">⚡</span>A magnet pulls with an invisible field all around it. We can't see it… unless we sprinkle tiny bits of iron! They line up and show us the field's secret pattern.</div>
+  <div class="toy">
+    <div id="t-field"></div>
+    <div id="t-field-ctl" class="toy-row"></div>
+    <p class="cap">✨ Tap sprinkle and watch the iron bits line up.</p>
+  </div>
+  <div class="ex" data-id="sprinkle" data-kind="task">
+    <div class="q">Sprinkle iron and see the invisible field!</div>
+    <div class="explain">The lines loop from one end of the magnet to the other. The field is strongest near the ends, where the bits crowd together.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🔩 Electricity makes a magnet!</h2>
+  <div class="speech say"><span class="who">⚡</span>Here's real magic. When we Sparkies zoom around and around a coil of wire, we make a magnet! Wrap the wire around an iron nail, and the nail becomes a magnet too. It's called an electromagnet.</div>
+  <div class="toy">
+    <div id="t-emag"></div>
+    <div id="t-emag-ctl"></div>
+    <p class="cap">🌀 Slide to add more turns of wire. ⚡ Switch it on!</p>
+  </div>
+  <div class="ex" data-id="clips" data-kind="task">
+    <div class="q">Pick up 5 paper clips! 📎</div>
+    <div class="explain">More turns of wire make a stronger magnet. That's why big electromagnets have LOTS of turns.</div>
+  </div>
+  <div class="ex" data-id="off" data-kind="mc">
+    <div class="q">You switch the electricity OFF. What do the paper clips do?</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>👇<span class="lab">they fall down</span></li>
+      <li>🧲<span class="lab">they stay stuck</span></li>
+    </ol>
+    <div class="explain">No electricity, no magnet! Electromagnets can be switched on and off. Giant ones in scrapyards lift whole cars, then drop them.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🌀 Motors spin!</h2>
+  <div class="speech say"><span class="who">⚡</span>A motor has magnets and coils of wire inside. When we flow through the coils, magnets push and pull them round and round. Spin!</div>
+  <div class="speech say"><span class="who">⚡</span>And here's a twist: if YOU turn the motor, it makes electricity! Then it's called a generator. Pick a mode and try both!</div>
+  <div class="toy">
+    <div id="t-crank-ctl" class="toy-row"></div>
+    <div id="t-crank"></div>
+    <div id="t-crank-ctl2" class="toy-row"></div>
+    <p class="cap">🔋 Motor: the battery spins the fan. ✋ Generator: spin the handle round and round to light the bulb!</p>
+  </div>
+  <div class="ex" data-id="crank" data-kind="task">
+    <div class="q">✋ Be a generator: crank fast enough to light the bulb brightly!</div>
+    <div class="explain">Spinning magnets near coils of wire push Sparkies along. That's how a wind-up torch works, and how big power stations make electricity!</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🚗 Motors everywhere</h2>
+  <div class="ex" data-id="motor" data-kind="mc">
+    <div class="q">What does a motor do?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>🌀<span class="lab">makes things spin</span></li>
+      <li>❄️<span class="lab">makes things cold</span></li>
+      <li>🎨<span class="lab">paints pictures</span></li>
+    </ol>
+    <div class="explain">Motors spin wheels, fans, drills, toy cars and robot arms.</div>
+  </div>
+  <div class="ex" data-id="gen" data-kind="mc">
+    <div class="q">You turn a motor by hand, really fast. What can it do?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>💡<span class="lab">make electricity</span></li>
+      <li>🍪<span class="lab">bake cookies</span></li>
+      <li>🧊<span class="lab">make ice</span></li>
+    </ol>
+    <div class="explain">A spinning motor is a generator: it makes electricity. Wind turbines are giant generators turned by the wind!</div>
+  </div>
+</section>
+
+<section class="card home">
+  <h2>🏠 Try it at home (with a grown-up)</h2>
+  <div class="speech say"><span class="who">⚡</span>Make your own electromagnet!</div>
+  <p>You need: 🔩 a big iron nail, a long piece of thin plastic-coated wire, 🔋 one AA battery, 📎 paper clips, and sticky tape.</p>
+  <ol class="steps">
+    <li class="say">Wrap the wire around the nail, round and round, 20 times or more. Leave both ends free.</li>
+    <li class="say">A grown-up strips the plastic off the wire ends.</li>
+    <li class="say">Hold the wire ends on the battery ends for a few seconds, and pick up paper clips!</li>
+    <li class="say">Let go. Do the clips fall? Now try with more turns.</li>
+  </ol>
+  <aside class="callout warn"><span class="ct">⚠️ Careful</span><p>The wire and battery get warm, so only connect for a few seconds at a time. Strong little magnets must never go in mouths. Play with magnets only with a grown-up.</p></aside>
+  <aside class="callout tip grownup"><span class="ct">👨‍👩‍👧 For grown-ups</span><div>Current in a coil makes a magnetic field proportional to the number of turns times the current (ampere-turns); the iron core concentrates it. A DC motor uses the force on current-carrying coils in a magnet's field; spinning it by hand reverses the process (Faraday's law of induction), so it becomes a generator. Two or more small neodymium magnets are a serious hazard if swallowed. The AA "electromagnet" is a near short circuit: keep connections brief. See <a href="../book/ch01-physics.html">Chapter 1</a> (fields and inductance) and <a href="../book/ch08-robotics.html">Chapter 8: Motors, Sensors &amp; Control</a>.</div></aside>
+</section>
+</main>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/kidkit.js"></script>
+<script src="js/k07-magnets.js"></script>
+</body>
+</html>

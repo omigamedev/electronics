@@ -193,7 +193,7 @@
   }
 
   function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; }
-  const norm = (s) => String(s).toLowerCase().replace(/[\s_\-.,'"²]/g, '');
+  const norm = (s) => String(s).toLowerCase().replace(/[\s_,'"²]/g, '').replace(/(?<=[a-z])[-.]|[-.](?=[a-z])/g, '');
 
   const KINDS = {
     mc(ex, ctx) {
@@ -495,6 +495,7 @@
     if (main.classList.contains('cards')) setupCards(main);
     chapterNav(main);
     updateProgress();
+    window.Book._ready = true;
     // copy buttons on code blocks
     document.querySelectorAll('pre > code').forEach((code) => {
       const b = h('button', { class: 'copy-btn', type: 'button' }, 'Copy');

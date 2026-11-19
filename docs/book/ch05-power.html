@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5 · Power for Robots — Sparks & Circuits</title>
+<meta name="description" content="Batteries, LiPo safety, LDOs and buck/boost converters, power budgets, brown-outs, protection, level shifting and USB power for robots.">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+  /* chapter-local styles */
+  .w-status { font: .9rem var(--mono); padding: 4px 10px; border-radius: 8px; background: var(--surface2); display: inline-block; }
+  .w-status.bad { background: var(--bad-bg); color: var(--bad); }
+  .w-status.good { background: var(--good-bg); color: var(--good); }
+  figure .w-seg { flex-wrap: wrap; max-width: 100%; }
+  .budget { width: 100%; font-size: .9rem; }
+  .budget td, .budget th { padding: 5px 6px; vertical-align: middle; }
+  .budget input[type=number] { width: 4.2em; font: inherit; padding: 2px 4px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+  .budget .num { font-family: var(--mono); text-align: right; white-space: nowrap; }
+  .budget tr.off td { opacity: .45; }
+  .budget-out { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 10px; }
+  .budget-out div { background: var(--surface2); border-radius: 10px; padding: 8px 10px; font-size: .88rem; }
+  .budget-out b { display: block; font: 600 1.05rem var(--mono); }
+  .budget-out .bad { background: var(--bad-bg); color: var(--bad); }
+  .budget-warn { margin-top: 8px; font-size: .9rem; }
+</style>
+</head>
+<body data-book="adult" data-chapter="ch05-power">
+<main class="chapter">
+
+<header class="chapter-head">
+  <p class="kicker">Chapter 5</p>
+  <h1>Power for Robots</h1>
+  <p class="lede">Most robot bugs that look like software bugs are power bugs: the ESP32 that reboots whenever the motors start, the servo that twitches when Wi-Fi transmits, the regulator too hot to touch. This chapter follows energy from the battery to the chip: chemistry, regulators, budgets, grounding and protection. It ends with a power board you can trust.</p>
+</header>
+
+<section>
+<h2 id="energy">Energy, power and what the battery label means</h2>
+
+<p>Two quantities get mixed up constantly. <b>Energy</b> is the capacity to do work, measured in joules (J). <b>Power</b> is the <em>rate</em> at which energy is used, measured in watts (1 W = 1 J/s). A battery is an energy store; a motor is a power consumer. How long the robot runs is energy divided by average power. Whether the battery can <em>deliver</em> what the motors ask for in the first second is a question about power, and about the battery's internal resistance.</p>
+
+<p>Recall from <a href="ch01-physics.html">Chapter 1</a> that voltage is energy per unit charge: one volt means one joule for every coulomb that passes. So the energy delivered by a charge \(Q\) moving through a voltage \(V\) is \(E = QV\), and power is \(P = VI\).</p>
+
+<h3>mAh is charge, Wh is energy</h3>
+<p>Battery labels quote <b>capacity</b> in milliamp-hours. One mAh is the charge carried by 1 mA flowing for an hour: \(0.001 \times 3600 = 3.6\) coulombs. A 2200 mAh pack can deliver 2.2 A for one hour, or 220 mA for ten hours (approximately; more on that shortly). But mAh alone does not tell you the energy, because it ignores voltage. Multiply by the nominal voltage to get <b>watt-hours</b>:</p>
+<div class="formula">
+$$E\,[\text{Wh}] = \text{capacity}\,[\text{Ah}] \times V_{\text{nominal}}, \qquad 1\ \text{Wh} = 3600\ \text{J}$$
+<p>A 1S 2200 mAh LiPo (3.7 V) stores 8.1 Wh. A 2S 2200 mAh pack (7.4 V) stores 16.3 Wh: same mAh, twice the energy.</p>
+</div>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: mAh is a request count, Wh is bytes</span>
+<p>Comparing batteries by mAh is like comparing servers by "requests served" without asking how big each request was. The mAh figure counts charge; each unit of charge carries \(V\) joules. When you compare a 1S and a 2S pack, or a battery feeding a regulator, always convert to Wh (or to power, W) first. Regulators conserve <em>power</em>, not current: a 90 % efficient buck converter turning 7.4 V into 5 V draws less current from the battery than it delivers.</p>
+</aside>
+
+<h3>The C-rate</h3>
+<p>Currents are often expressed relative to capacity. For a 2200 mAh pack, <b>1C</b> is 2.2 A (empties it in about an hour), <b>10C</b> is 22 A (about six minutes), and <b>0.5C</b> is 1.1 A. A pack labelled "25C" claims it can deliver 25 × 2.2 = 55 A continuously. Treat such numbers as marketing upper bounds: a well-made pack does it with significant voltage sag and heat, and a cheap one doesn't do it at all. Chargers use the same unit: "charge at 1C" means 2.2 A for this pack.</p>
+
+<div class="ex" data-id="wh-num" data-kind="num" data-answer="16.28" data-tol="2%" data-unit="Wh">
+  <div class="q">How much energy does a 2S (7.4 V nominal) 2200 mAh LiPo store, in watt-hours?</div>
+  <div class="hint">\(E = 2.2\ \text{Ah} \times 7.4\ \text{V}\).</div>
+  <div class="explain">\(E = 2.2 \times 7.4 \approx 16.3\) Wh, about 58.6 kJ. (Airline rules use Wh: under 100 Wh per pack is generally allowed in carry-on luggage.)</div>
+</div>
+
+<div class="ex" data-id="crate-num" data-kind="num" data-answer="37.5" data-tol="1%" data-unit="A">
+  <div class="q">A 1500 mAh pack is rated 25C. What is its claimed maximum continuous current?</div>
+  <div class="explain">\(25 \times 1.5 = 37.5\) A. Plan to use about half of a C-rating continuously if you want the pack to live long and stay cool.</div>
+</div>
+</section>
+
+<section>
+<h2 id="cells">Battery chemistry and the discharge curve</h2>
+
+<p>Inside a lithium-ion cell, lithium ions shuttle between two electrodes through a liquid or gel electrolyte: a graphite anode and a metal-oxide cathode (lithium cobalt oxide, nickel-manganese-cobalt, or iron phosphate). On discharge, the ions travel inside the cell from anode to cathode, while the electrons that were bound to them are forced to take the long way round, through your circuit. The electrolyte lets ions through but not electrons; that is the entire trick. The cell voltage is set by the difference in chemical energy of lithium in the two electrode materials, and it depends on how full each electrode is. That's why a lithium cell's voltage tells you its state of charge.</p>
+
+<table>
+  <tr><th>Chemistry</th><th>Nominal</th><th>Full</th><th>Empty (cut-off)</th><th>Notes</th></tr>
+  <tr><td><b>LiPo / Li-ion</b> (LCO, NMC)</td><td>3.6–3.7 V</td><td>4.20 V</td><td>3.0 V (3.3 V under load is safer)</td><td>About 150–250 Wh/kg. LiPo = pouch cells, high current; 18650/21700 = cylindrical, tougher and higher capacity.</td></tr>
+  <tr><td><b>LiFePO₄</b> (LFP)</td><td>3.2 V</td><td>3.6 V</td><td>2.5 V</td><td>Very flat curve, very safe, long life, lower energy density.</td></tr>
+  <tr><td><b>NiMH</b></td><td>1.2 V</td><td>about 1.4 V</td><td>1.0 V</td><td>AA/AAA rechargeables (Eneloop). Robust and forgiving; four cells ≈ 4.8 V.</td></tr>
+  <tr><td><b>Alkaline</b></td><td>1.5 V</td><td>1.6 V</td><td>0.9 V</td><td>High internal resistance. Fine for a TV remote, poor for motors.</td></tr>
+</table>
+
+<figure class="widget wide">
+  <div id="w-dis"></div>
+  <figcaption><b>Figure 5.1</b> Discharge curves (one cell, terminal voltage while delivering a constant current). Choose a chemistry and drag the discharge rate. At higher C-rates the internal resistance pulls the whole curve down, so the cell hits its cut-off voltage earlier and you get less usable capacity. The dashed line is the open-circuit (resting) voltage.</figcaption>
+</figure>
+
+<p>Look at the lithium curve's shape. It drops quickly from 4.2 V, then sits on a long, gently sloping plateau around 3.6–3.9 V, and finally falls off a cliff below about 3.5 V. Two practical consequences:</p>
+<ul>
+  <li>A <b>battery-voltage monitor</b> (a divider into an ADC) is a decent fuel gauge for lithium cells, but only if you measure while the load is light, or correct for the sag.</li>
+  <li>Once you are on the cliff, there is almost no energy left. Stop at about 3.3–3.5 V per cell under load. Below about 2.5 V, copper from the anode's current collector starts to dissolve, and the cell is permanently damaged. A cell that has been run that flat should not be recharged.</li>
+</ul>
+
+<h3>Internal resistance and voltage sag</h3>
+<p>A real battery behaves like an ideal voltage source (the open-circuit voltage, OCV) in series with a small <b>internal resistance</b> \(R_{int}\). This is Thevenin's theorem from <a href="ch02-dc.html">Chapter 2</a>, applied to a chemical cell: the resistance lumps together the electrolyte, the electrodes, the tabs and the reaction kinetics. So when you draw current, the terminal voltage sags:</p>
+<div class="formula">
+$$V_{term} = V_{OC} - I\,R_{int}, \qquad P_{heat} = I^2 R_{int}$$
+<p>Fresh LiPo cells: roughly 5–30 mΩ per cell, depending on size and quality. A AA alkaline: 150–300 mΩ. Internal resistance rises at low charge, at low temperature, and as the cell ages.</p>
+</div>
+<p>Sag is what resets microcontrollers. A 2S pack resting at 7.6 V with 2 × 40 mΩ of internal resistance, plus 20 mΩ of connectors and wires, drops by 0.1 Ω × 15 A = 1.5 V when four motors stall at once. That's 6.1 V at the terminals, and if anything downstream needs 6.5 V, it resets.</p>
+
+<figure class="widget wide">
+  <div id="w-sag"></div>
+  <div class="w-controls" id="w-sag-ctl"></div>
+  <figcaption><b>Figure 5.2</b> A battery is an ideal source in series with its internal resistance. Choose a pack and its state of charge, then increase the load current. Watch the terminal voltage sag and the internal resistance heat the pack. The bar below shows where the voltage sits relative to the 2S "empty under load" threshold.</figcaption>
+</figure>
+
+<div class="ex" data-id="sag-task" data-kind="task">
+  <div class="q">In Figure 5.2, set the load to <b>at least 20 A</b> and find a pack and state of charge for which the terminal voltage stays <b>above 7.0 V</b>.</div>
+  <div class="explain">Only the low-resistance pack at a healthy state of charge manages it: for example, 2 × 15 mΩ cells plus 10 mΩ of wiring at 20 A sag by only 0.8 V. The cheap pack sags by more than 2 V at the same current, and wastes over 40 W as heat inside itself.</div>
+</div>
+
+<div class="ex" data-id="sag-num" data-kind="num" data-answer="6.4" data-tol="1%" data-unit="V">
+  <div class="q">A 2S pack rests at 7.6 V. Its internal resistance plus wiring totals 80 mΩ. What is the terminal voltage while it supplies 15 A?</div>
+  <div class="hint">\(V = V_{OC} - I R\).</div>
+  <div class="explain">\(7.6 - 15 \times 0.08 = 6.4\) V, and the pack dissipates \(15^2 \times 0.08 = 18\) W internally. That is why packs get warm in hard use.</div>
+</div>
+
+<aside class="callout physics"><span class="ct">⚛️ Why cold batteries are weak</span>
+<p>Internal resistance is largely about how quickly ions move through the electrolyte and react at the electrode surfaces, and those are thermally activated processes (exponential in temperature, like the semiconductor carriers of <a href="ch04-semis.html">Chapter 4</a>). At 0 °C a lithium cell's resistance can be double its room-temperature value. The energy is still there, but you can't get it out quickly. Never <em>charge</em> a lithium cell below 0 °C: the ions can't get into the graphite fast enough and plate out as metallic lithium, which damages the cell and can short it internally.</p>
+</aside>
+</section>
+
+<section>
+<h2 id="packs">Packs: series, parallel, balancing and safety</h2>
+
+<p>Connect cells in <b>series</b> (labelled "S") to add their voltages; connect them in <b>parallel</b> ("P") to add their capacities and current capabilities. A "3S2P" pack has three series groups of two parallel cells: 11.1 V nominal, twice the capacity of one cell. Energy in Wh scales with the total number of cells either way.</p>
+
+<figure class="widget">
+  <div id="w-pack"></div>
+  <figcaption><b>Figure 5.3</b> A pack builder. Choose the cell type and the series and parallel counts. The readouts show the pack's nominal and full voltages, capacity, energy, internal resistance and maximum current. Notice that series cells add resistance while parallel cells divide it.</figcaption>
+</figure>
+
+<div class="ex" data-id="series-mc" data-kind="mc">
+  <div class="q">You connect two 3.7 V, 2000 mAh cells in series. What do you get?</div>
+  <ol class="opts">
+    <li>3.7 V, 4000 mAh, 14.8 Wh</li>
+    <li data-correct>7.4 V, 2000 mAh, 14.8 Wh</li>
+    <li>7.4 V, 4000 mAh, 29.6 Wh</li>
+    <li>3.7 V, 2000 mAh, 7.4 Wh</li>
+  </ol>
+  <div class="explain">Series adds voltage; the same charge flows through both cells, so mAh stays the same. Energy doubles either way: 7.4 V × 2 Ah = 14.8 Wh.</div>
+</div>
+
+<h3>Balancing and the BMS</h3>
+<p>Cells in series carry exactly the same current, but no two cells are identical. One has slightly less capacity or slightly more self-discharge, and after many cycles it ends up at a different state of charge from its neighbours. Charging the pack to 8.4 V total might then put one cell at 4.25 V (overcharged) and the other at 4.15 V. Discharging it to 6.4 V total might push the weak cell to 2.9 V (over-discharged) while the strong one sits at 3.5 V. Imbalance grows unless something corrects it.</p>
+<ul>
+  <li><b>Balance charging</b>: hobby LiPo packs have a separate <b>balance lead</b> that brings out every cell junction. A balance charger measures each cell and bleeds the high ones with small resistors near the end of charge, so every cell finishes at 4.20 V.</li>
+  <li><b>BMS (battery management system)</b>: a board permanently attached to the pack that monitors each cell and disconnects the pack (with MOSFETs) on overcharge, over-discharge, overcurrent or short circuit. Many also balance. Protected 18650 cells and most 1S packs contain a tiny version: a protection IC (such as the DW01A) driving a dual MOSFET.</li>
+</ul>
+
+<h3>Charging lithium: CC then CV</h3>
+<p>Lithium cells are charged in two phases. <b>Constant current</b> (typically 0.5–1C) until the cell reaches 4.20 V, then <b>constant voltage</b> at 4.20 V while the current tapers off. Charging stops when the current falls to about C/10–C/20. No trickle charging: lithium cells must not sit at full voltage with current flowing. On a robot board, a single-cell charger IC handles this: the TP4056 (up to 1 A, set by one resistor) or the MCP73831 (up to 500 mA), both linear chargers, so they get warm at full current.</p>
+
+<aside class="callout warn"><span class="ct">⚠️ LiPo safety, without drama</span>
+<ul>
+  <li>Charge with a proper balance charger, on a non-flammable surface, in a LiPo bag, and stay nearby. Never charge a cold (&lt;0 °C), swollen or damaged pack.</li>
+  <li>A <b>puffy</b> pack has decomposed electrolyte inside. Retire it: discharge it slowly and recycle it.</li>
+  <li>Store at about 3.8 V per cell (storage mode on the charger), not full and not empty.</li>
+  <li>Put a fuse close to the battery connector (see <a href="#protect">Protection</a>). A shorted 2S pack can deliver over 100 A and melt wires within seconds.</li>
+  <li>Use a low-voltage alarm or firmware cut-off so you don't run cells below 3.3 V under load.</li>
+</ul>
+</aside>
+
+<div class="ex" data-id="lipo-multi" data-kind="multi">
+  <div class="q">Which practices are safe and sensible for LiPo packs? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>Storing packs at about 3.8 V per cell between sessions</li>
+    <li>Charging a pack straight after bringing it in from a freezing car</li>
+    <li data-correct>Using a balance charger connected to the balance lead</li>
+    <li>Squeezing a slightly puffy pack back into the robot</li>
+    <li data-correct>Having the firmware stop the motors when a cell reads 3.3 V under load</li>
+    <li>Charging at 4.30 V per cell to get a little more runtime</li>
+  </ol>
+  <div class="explain">Cold charging plates lithium, swelling means the pack is already degraded, and overcharging beyond 4.20 V (unless the cell is an explicitly rated "HV" type) increases the risk of thermal runaway while shortening life.</div>
+</div>
+</section>
+
+<section>
+<h2 id="ldo">Linear regulators and LDOs</h2>
+
+<p>Your battery voltage wanders from 8.4 V down to 6.4 V as a 2S pack discharges; your ESP32 wants 3.3 V ± 10 %. Something must convert one into the other. The simplest converter is a <b>linear regulator</b>: a transistor in series with the load, acting as a variable resistor, controlled by an op-amp (an error amplifier) that compares a fraction of the output voltage with a precise internal reference. That is exactly the negative-feedback loop of <a href="ch04-semis.html#opamp">Chapter 4's op-amps</a>: the error amp turns the pass transistor up or down until the divided output equals the reference.</p>
+
+<p>The series transistor has to drop the difference between input and output, and it carries the whole load current. So it burns:</p>
+<div class="formula">
+$$P_{reg} = (V_{in} - V_{out})\, I_{out} + V_{in} I_q, \qquad \eta = \frac{V_{out} I_{out}}{V_{in}(I_{out} + I_q)} \approx \frac{V_{out}}{V_{in}}$$
+<p>\(I_q\): quiescent current, what the regulator itself consumes (from about 1 µA to 10 mA depending on the part).</p>
+</div>
+<p>A linear regulator cannot do better than \(V_{out}/V_{in}\). From 8.4 V to 3.3 V that is 39 %: 61 % of the energy becomes heat.</p>
+
+<h3>Dropout</h3>
+<p>A regulator also needs some headroom: the input must exceed the output by at least the <b>dropout voltage</b>. Old regulators with an NPN Darlington pass element (the 7805, LM317) need about 2 V. The popular AMS1117 needs about 1.1–1.3 V. A true <b>LDO</b> (low-dropout regulator) uses a P-MOSFET pass element that can be driven fully on, and needs only 100–300 mV: the AP2112K-3.3 drops about 250 mV at 600 mA, and the MCP1700 about 180 mV at 250 mA. Below dropout, the output simply follows the input minus the dropout.</p>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "my 3.3 V regulator works from a 3.7 V LiPo"</span>
+<p>With an AMS1117 and its 1.1 V dropout, a 3.7 V cell gives you about 2.6 V out, below the ESP32's 3.0 V minimum. Even with a 250 mV LDO, a lithium cell under load spends much of its life below 3.55 V, and the rail sags with it. For 1S designs, use an LDO with very low dropout and accept the sag near empty, or use a buck-boost converter.</p>
+</aside>
+
+<h3>Heat: thermal resistance</h3>
+<p>The heat from \(P_{reg}\) must flow from the silicon junction, through the package and the board, into the air. Each step has a <b>thermal resistance</b> in °C/W, which works exactly like electrical resistance: heat flow (watts) is the "current", temperature difference is the "voltage". Junction-to-ambient thermal resistance \(\theta_{JA}\) sums the whole path:</p>
+<div class="formula">
+$$T_J = T_A + P\,\theta_{JA}$$
+<p>Typical \(\theta_{JA}\): SOT-23-5 ≈ 200–250 °C/W; SOT-223 ≈ 60–110 °C/W (heavily dependent on copper area); TO-220 free-standing ≈ 50–65 °C/W. Most regulators shut down near 150–165 °C.</p>
+</div>
+
+<p><b>Worked example.</b> An AMS1117-3.3 in SOT-223, on a modest pad (\(\theta_{JA} \approx 90\) °C/W), powers an ESP32 averaging 250 mA directly from a full 2S pack. \(P = (8.4 - 3.3) \times 0.25 = 1.28\) W. Temperature rise: \(1.28 \times 90 = 115\) °C. At 25 °C ambient the junction reaches 140 °C, and in a sunny 40 °C robot it hits thermal shutdown. Now feed the same LDO from a 5 V buck converter instead: \(P = (5 - 3.3) \times 0.25 = 0.43\) W, a 38 °C rise. Same part, cool and happy.</p>
+
+<figure class="widget wide">
+  <div id="w-ldo"></div>
+  <div class="w-controls" id="w-ldo-ctl"></div>
+  <figcaption><b>Figure 5.4</b> A linear regulator's heat budget. Set the input voltage, the load current and the package. The thermometer shows the junction temperature at a 25 °C ambient. Lower the input below output + dropout and the regulator drops out of regulation.</figcaption>
+</figure>
+
+<div class="ex" data-id="ldo-task" data-kind="task">
+  <div class="q">In Figure 5.4, deliver <b>at least 500 mA</b> at 3.3 V while keeping the junction <b>below 100 °C</b> and the regulator <b>in regulation</b>. You may change the input voltage and the package.</div>
+  <div class="explain">From 7.4 V there's no way: the loss is about 2 W, and even the TO-220 runs above 120 °C. Pre-regulating to 5 V with a buck converter brings the loss to \((5 - 3.3) \times 0.5 = 0.85\) W, and a SOT-223 on a good copper pour (about 60 °C/W) then runs at about 76 °C. This "buck, then LDO" arrangement is the standard robot power architecture.</div>
+</div>
+
+<div class="ex" data-id="ldo-num" data-kind="num" data-answer="1.23" data-tol="2%" data-unit="W">
+  <div class="q">A linear regulator produces 3.3 V at 300 mA from a 7.4 V input. How much power does it dissipate (ignore quiescent current)?</div>
+  <div class="explain">\(P = (7.4 - 3.3) \times 0.3 = 1.23\) W, while the load only gets \(3.3 \times 0.3 = 0.99\) W. Efficiency 45 %.</div>
+</div>
+
+<div class="ex" data-id="tj-num" data-kind="num" data-answer="98.8" data-tol="1.5%" data-unit="°C">
+  <div class="q">That regulator has \(\theta_{JA} = 60\) °C/W and the ambient temperature is 25 °C. What is its junction temperature?</div>
+  <div class="hint">\(T_J = T_A + P\,\theta_{JA}\), with the power from the previous question.</div>
+  <div class="explain">\(T_J = 25 + 1.23 \times 60 \approx 98.8\) °C. Survivable, but too hot to touch, and it gets worse inside an enclosure.</div>
+</div>
+
+<p>LDOs still earn their place: they are quiet (no switching noise), tiny, cheap and simple, and when \(V_{in}\) is close to \(V_{out}\) they are efficient. The MCP1700's 1.6 µA quiescent current makes it a favourite for battery-powered sensors that sleep most of the time. Remember to fit the input and output capacitors the datasheet asks for: some LDOs need a minimum (or maximum) output-capacitor ESR to stay stable, which is the op-amp stability problem again.</p>
+</section>
+
+<section>
+<h2 id="buck">Switching regulators: the buck converter from the inductor up</h2>
+
+<p>A linear regulator throws away the excess voltage as heat. A switching regulator does something cleverer: it chops the input into pulses and uses an inductor to average them, losing almost nothing in the process. Ideal switches and ideal inductors dissipate no power (a closed switch has no voltage across it, an open switch has no current through it, and an inductor only stores and returns energy). So a well-designed buck converter reaches 85–95 % efficiency whatever the voltage ratio.</p>
+
+<h3>Building the buck, one problem at a time</h3>
+<p><b>Step 1: just chop it.</b> Connect a switch from \(V_{in}\) to the output, and turn it on for a fraction \(D\) of each period (the <b>duty cycle</b>). The output is a square wave whose <em>average</em> is \(D\,V_{in}\). That's PWM from <a href="ch03-ac.html">Chapter 3</a>. Averaging it with an RC filter would work, but the resistor would burn exactly the power we were trying to save.</p>
+<p><b>Step 2: average with an inductor.</b> Put an inductor between the switch and the output, and a capacitor across the output. While the switch is on, the inductor has \(V_{in} - V_{out}\) across it, so its current ramps <em>up</em> linearly (\(dI/dt = V/L\)). The capacitor holds the output nearly constant.</p>
+<p><b>Step 3: give the current somewhere to go.</b> When the switch opens, the inductor insists on keeping its current flowing (the inductive kick of <a href="ch04-semis.html#diode-uses">Chapter 4</a>!). So add a diode from ground to the switch node: the "freewheeling" path. Now during the off-time the inductor current flows from ground, through the diode, through the inductor into the load, and the inductor has \(-V_{out}\) across it, so its current ramps <em>down</em>. Modern "synchronous" bucks replace the diode with a second MOSFET, switched in antiphase, to avoid the diode's 0.4 V loss.</p>
+<p><b>Step 4: find the duty cycle.</b> In steady state the inductor current must return to where it started each period, so the ramp up must equal the ramp down. That is <b>volt-second balance</b>: the average voltage across an inductor in steady state is zero.</p>
+<div class="formula">
+$$(V_{in} - V_{out})\,D\,T = V_{out}\,(1 - D)\,T \quad\Longrightarrow\quad D = \frac{V_{out}}{V_{in}}$$
+<p>The buck's ideal conversion ratio. The feedback loop adjusts \(D\) continuously as the battery discharges.</p>
+</div>
+<p><b>Step 5: ripple.</b> During the on-time the current rises by \(\Delta I_L = (V_{in} - V_{out})\,D/(f L)\). The output capacitor absorbs this triangular ripple current, so the output ripple voltage is roughly \(\Delta V \approx \Delta I_L/(8 f C)\) (plus the ripple current times the capacitor's ESR). Designers usually choose \(L\) so that \(\Delta I_L\) is 20–40 % of the full load current.</p>
+<div class="formula">
+$$\Delta I_L = \frac{(V_{in} - V_{out})\,D}{f\,L}, \qquad \Delta V_{out} \approx \frac{\Delta I_L}{8\,f\,C}$$
+</div>
+
+<figure class="widget wide">
+  <div id="w-buck"></div>
+  <div class="w-controls" id="w-buck-ctl"></div>
+  <figcaption><b>Figure 5.5</b> A buck (or boost) converter in slow motion. The circuit animates one switching period every few seconds: orange paths carry current during the on-time, blue during the off-time. Below, the switch-node voltage and the inductor current, with a moving cursor. Change the input and output voltages and watch the duty cycle follow \(V_{out}/V_{in}\); change the inductance and frequency and watch the ripple. Then switch to <b>Boost</b>.</figcaption>
+</figure>
+
+<p><b>Worked example.</b> A 2S pack (8.4 V full) feeds a 5 V, 2 A servo rail through a 500 kHz buck with a 10 µH inductor. \(D = 5/8.4 = 0.595\). \(\Delta I_L = (8.4 - 5) \times 0.595/(500\,000 \times 10\times10^{-6}) = 0.405\) A, which is 20 % of the load: good. With 22 µF of output capacitance, \(\Delta V \approx 0.405/(8 \times 500\,000 \times 22\times10^{-6}) \approx 4.6\) mV. (In practice ceramic capacitors lose much of their capacitance under DC bias, so expect two or three times that.) As the pack sags to 6.4 V, \(D\) rises to 0.78 and the ripple falls.</p>
+
+<div class="ex" data-id="duty-num" data-kind="num" data-answer="0.676" data-tol="2%" data-unit="">
+  <div class="q">An ideal buck converter makes 5 V from a 7.4 V pack. What duty cycle does it run at? (Answer as a fraction, e.g. 0.5.)</div>
+  <div class="explain">\(D = 5/7.4 \approx 0.676\). A real converter runs slightly higher, to make up for its losses.</div>
+</div>
+
+<div class="ex" data-id="ripple-num" data-kind="num" data-answer="0.405" data-tol="3%" data-unit="A">
+  <div class="q">For the buck in the worked example (8.4 V in, 5 V out, 500 kHz, 10 µH), what is the peak-to-peak inductor ripple current?</div>
+  <div class="hint">\(\Delta I_L = (V_{in} - V_{out})\,D/(fL)\) with \(D = V_{out}/V_{in}\).</div>
+  <div class="explain">\((8.4 - 5) \times 0.595 / 5 = 0.405\) A peak to peak. The inductor must be rated for the peak current, \(2 + 0.2 = 2.2\) A, without saturating.</div>
+</div>
+
+<div class="ex" data-id="buck-task" data-kind="task">
+  <div class="q">In Figure 5.5 (buck mode), with \(V_{in}\) = <b>8.4 V</b> and \(V_{out}\) = <b>5.0 V</b>, choose an inductance and frequency that keep the ripple current <b>below 0.3 A</b>, using an inductor <b>no bigger than 22 µH</b>.</div>
+  <div class="explain">The ripple goes as \(1/(fL)\). At 500 kHz you need about 13.5 µH or more; at 1 MHz, 6.8 µH is plenty. Higher frequency allows smaller inductors and capacitors, at the cost of more switching loss.</div>
+</div>
+
+<h3>Boost and buck-boost</h3>
+<p>Rearrange the same parts and you can make a higher voltage. In a <b>boost</b> converter the inductor connects to the input, the switch goes from the inductor's far end to ground, and the diode goes from there to the output. With the switch on, the inductor charges from \(V_{in}\). With it off, the inductor's kick adds to \(V_{in}\) and pushes current through the diode into the output. Volt-second balance gives</p>
+<div class="formula">
+$$V_{in}\,D = (V_{out} - V_{in})(1 - D) \quad\Longrightarrow\quad V_{out} = \frac{V_{in}}{1 - D}, \qquad D = 1 - \frac{V_{in}}{V_{out}}$$
+</div>
+<p>A boost is how a 1S LiPo powers a 5 V servo rail or a USB power bank makes 5 V. Power is conserved, so the input current is larger than the output current: 1 A at 5 V from a 3.7 V cell draws about \(5/(3.7 \times 0.9) \approx 1.5\) A. Note that a plain boost converter has no off switch: its diode connects the input to the output even when the converter is idle, so the output can never fall below \(V_{in}\) minus a diode drop.</p>
+<p>When the input can be either above or below the output (a 1S cell from 4.2 V down to 3.0 V making 3.3 V), you need a <b>buck-boost</b> converter, such as a four-switch type like the TPS63020, or a SEPIC.</p>
+
+<div class="ex" data-id="boost-num" data-kind="num" data-answer="0.26" data-tol="2%" data-unit="">
+  <div class="q">A boost converter makes 5.0 V from a 3.7 V cell. What is its ideal duty cycle?</div>
+  <div class="explain">\(D = 1 - 3.7/5 = 0.26\).</div>
+</div>
+
+<h3>LDO or buck? It depends</h3>
+<figure class="widget wide">
+  <div id="w-eff"></div>
+  <div class="w-controls" id="w-eff-ctl"></div>
+  <figcaption><b>Figure 5.6</b> Efficiency of an LDO and a typical small synchronous buck converter versus input voltage. Choose the output voltage and load current. The LDO follows \(V_{out}/V_{in}\) exactly; the buck stays near 90 % until the load is so light that its own overhead dominates. At microamp loads (a sleeping sensor), a low-\(I_q\) LDO can win.</figcaption>
+</figure>
+
+<h3>Switching noise</h3>
+<p>The price of efficiency is noise. The switch node slams between 0 and \(V_{in}\) in nanoseconds, hundreds of thousands of times a second, and the input current arrives in sharp pulses. That shows up as ripple on the output, spikes at every edge, and radiated interference that can upset radios, ADCs and I²C lines. Good practice:</p>
+<ul>
+  <li>Put the input capacitor right at the converter's VIN and GND pins. In a buck, the loop formed by the input capacitor, the high-side switch and the low-side switch carries the chopped current; keep that "hot loop" tiny.</li>
+  <li>Keep the switch-node copper small and away from sensitive traces and from the ESP32 antenna.</li>
+  <li>For a really quiet analog rail, follow the buck with an LDO, or add an LC filter (a ferrite bead and a capacitor).</li>
+  <li>Prefer modules or reference layouts from the datasheet. Layout is half the design of a switching converter, and <a href="ch09-pcb.html">Chapter 9</a> shows why.</li>
+</ul>
+<p>Common parts you'll meet: the LM2596 (an old 150 kHz buck with big modules, 40 V in), the MP1584 (small 1.5 MHz buck module, up to 28 V in), the MT3608 (cheap boost module), and countless TI/Richtek/MPS synchronous bucks in SOT-23-6 packages for custom boards.</p>
+</section>
+
+<section>
+<h2 id="budget">Power budgets and bulk capacitors</h2>
+
+<p>Before choosing a battery or a regulator, write down every load, its average current and its peak current, and which rail it lives on. Averages size the battery (runtime); peaks size the regulators, the wiring, the fuses and the capacitors. Typical numbers for robot parts:</p>
+<table>
+  <tr><th>Load</th><th>Rail</th><th>Average</th><th>Peak</th></tr>
+  <tr><td>ESP32 / ESP32-S3, Wi-Fi active</td><td>3.3 V</td><td>80–150 mA</td><td>300–500 mA bursts during transmit</td></tr>
+  <tr><td>ESP32, BLE only</td><td>3.3 V</td><td>30–60 mA</td><td>about 130 mA</td></tr>
+  <tr><td>ESP32 deep sleep (bare module)</td><td>3.3 V</td><td>about 10 µA</td><td>(dev boards waste mA in their USB chip and LDO)</td></tr>
+  <tr><td>IMU, ToF sensor, OLED</td><td>3.3 V</td><td>1–25 mA each</td><td>small</td></tr>
+  <tr><td>SG90 micro servo</td><td>5 V</td><td>10 mA idle, 100–250 mA moving</td><td>about 650–750 mA stalled</td></tr>
+  <tr><td>MG996R metal-gear servo</td><td>5–6 V</td><td>0.2–0.5 A moving</td><td>about 2.5 A stalled</td></tr>
+  <tr><td>TT / N20 gear motor (6 V)</td><td>battery</td><td>0.1–0.3 A running</td><td>1–1.5 A at stall or start</td></tr>
+  <tr><td>WS2812B LED, full white</td><td>5 V</td><td>—</td><td>about 60 mA each</td></tr>
+</table>
+
+<figure class="widget wide">
+  <div id="w-budget"></div>
+  <figcaption><b>Figure 5.7</b> A power-budget calculator. Tick the loads on your robot and set their quantities. It sums average and peak currents per rail, converts them back to battery current through the regulators, estimates runtime and dissipation, and flags overloaded parts. Try adding four servos to see why they get their own buck converter.</figcaption>
+</figure>
+
+<h3>Bulk capacitors: covering the peaks</h3>
+<p>Regulators and long battery wires can't respond instantly. When a load suddenly draws more (a Wi-Fi burst, a servo starting), the first microseconds to milliseconds of that current come from capacitors near the load. A capacitor supplying a current \(I\) for a time \(\Delta t\) drops by</p>
+<div class="formula">
+$$\Delta V = \frac{I\,\Delta t}{C} \quad\Longrightarrow\quad C = \frac{I\,\Delta t}{\Delta V}$$
+<p>This is just \(Q = CV\) from <a href="ch03-ac.html">Chapter 3</a>, with \(Q = I\,\Delta t\).</p>
+</div>
+<p>For example, if the ESP32's regulator needs about 50 µs to respond to a 300 mA step, and you can tolerate 0.15 V of droop, you need \(C = 0.3 \times 50\times10^{-6}/0.15 = 100\) µF near the module. That's why Espressif's reference designs put a 10–22 µF capacitor (or more) right at the module's 3.3 V pin, plus 100 nF decoupling. Motor drivers get a few hundred µF of electrolytic capacitance at their supply pins, to absorb the inductive current from the motor's PWM.</p>
+
+<div class="ex" data-id="bulk-num" data-kind="num" data-answer="500e-6" data-tol="2%" data-unit="F">
+  <div class="q">A servo's start draws an extra 2 A for 50 µs before the regulator catches up. You want the rail to droop by no more than 0.2 V. How much bulk capacitance do you need? (Answer in farads or with a prefix, like 330u.)</div>
+  <div class="hint">\(C = I\,\Delta t/\Delta V\).</div>
+  <div class="explain">\(C = 2 \times 50\times10^{-6}/0.2 = 500\) µF. A 470 µF or 680 µF low-ESR electrolytic at the servo connector is typical. Capacitors cannot cover a <em>long</em> overload, though: a stalled servo needs a regulator that can actually supply the current.</div>
+</div>
+
+</section>
+
+<section>
+<h2 id="brownout">Grounds, separate rails and brown-outs</h2>
+
+<p>A <b>brown-out</b> is a supply dip that is not deep enough to look like "power off" but is deep enough to corrupt a processor's operation. Every microcontroller has a <b>brown-out detector</b> (BOD/BOR) that holds it in reset when \(V_{DD}\) falls below a threshold. On the ESP32 it is configurable (roughly 2.4–2.8 V), and the classic symptom is a serial log full of <code>Brownout detector was triggered</code>, followed by a reboot.</p>
+
+<p>Here's the classic story. A robot runs its motors and its ESP32 from one battery, through one pair of thin wires. The firmware starts the motors. A stalled DC motor is just its winding resistance (Chapter 8 explains why), so for the first tens of milliseconds it draws several times its running current. Three things now happen at once:</p>
+<ol>
+  <li>The battery's internal resistance and the wiring drop the supply voltage (\(V = V_{OC} - IR\)).</li>
+  <li>The motor current returns to the battery through the same ground wire as the logic. That wire's resistance lifts the logic ground relative to the battery's negative terminal, so the logic sees an even smaller supply. This is <b>ground bounce</b>, a consequence of the rule from Chapter 1 that every current must return to its source.</li>
+  <li>The regulator, now without enough headroom, drops out, and its output follows its input down.</li>
+</ol>
+<p>The ESP32 resets. Its GPIOs float, the motor driver turns off, the voltage recovers, the ESP32 boots, starts the motors, and resets again: a <b>boot loop</b> that looks exactly like a firmware crash.</p>
+
+<figure class="widget wide">
+  <div id="w-bo"></div>
+  <div class="w-controls" id="w-bo-ctl"></div>
+  <figcaption><b>Figure 5.8</b> A motor start, simulated over 800 ms: battery voltage (orange), the ESP32's 3.3 V rail (blue), motor current in amps (red), and the brown-out threshold (dashed). Press <b>Start motor</b>, then try the fixes one at a time. Which ones actually prevent the reset, and which only clean up noise?</figcaption>
+</figure>
+
+<div class="ex" data-id="bo-task" data-kind="task">
+  <div class="q">In Figure 5.8, keep the <b>4×AA alkaline</b> pack and the AMS1117 regulator, and get the ESP32 through the motor start <b>without a single reset</b>.</div>
+  <div class="explain">Either a star ground (so the motor's return current no longer lifts the logic ground) or a soft-start ramp in firmware (which limits the inrush current) is enough here; using both gives real margin. The bulk capacitor alone cleans up the brush noise but cannot hold the rail up through a sag lasting tens of milliseconds.</div>
+</div>
+
+<h3>The rules</h3>
+<ul>
+  <li><b>Separate motor power from logic power.</b> Motors run straight from the battery through their driver. Logic gets its own regulator (ideally a buck with enough headroom to ride through sag), fed by its own wires from the battery terminals or the main fuse.</li>
+  <li><b>Star ground.</b> Bring the motor driver's ground and the logic ground back to the battery's negative terminal (or one main ground point) on separate wires, so the large, noisy motor current never flows through the logic's ground path. On a PCB, a solid ground plane plus careful placement achieves the same thing (<a href="ch09-pcb.html">Chapter 9</a>).</li>
+  <li><b>Soft-start motors.</b> Ramp the PWM duty over 50–200 ms instead of jumping to 100 %. Your motors, gears and battery all prefer it.</li>
+  <li><b>Bulk capacitance</b> at the motor driver (hundreds of µF) and at the logic regulator absorbs fast spikes and brush noise. It does not fix long sags.</li>
+  <li><b>Pick an LDO with low dropout</b>, or a buck, so the logic rail survives the battery dipping.</li>
+</ul>
+
+<div class="ex" data-id="bo-multi" data-kind="multi">
+  <div class="q">An ESP32 robot reboots whenever its motors start. Which are plausible causes? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>Battery sag from high internal resistance (old or alkaline cells)</li>
+    <li data-correct>Motor return current flowing through the logic's ground wire</li>
+    <li data-correct>A regulator with too much dropout for the sagging input</li>
+    <li>The motor's PWM frequency is above 20 kHz</li>
+    <li data-correct>No flyback diodes, so inductive spikes couple into the supply</li>
+  </ol>
+  <div class="explain">Sag, ground bounce, dropout and inductive spikes are the usual culprits. A PWM frequency above 20 kHz is normal (it moves the whine above hearing); it raises switching loss in the driver, but it doesn't reset the MCU.</div>
+</div>
+</section>
+
+<section>
+<h2 id="protect">Protection: fuses, reverse polarity, transients and inrush</h2>
+
+<p>A robot battery is a large energy store connected to cheap connectors, flexing wires and humans. Protection is cheap insurance.</p>
+
+<h3>Fuses and polyfuses</h3>
+<p>A <b>fuse</b> is a deliberately weak link: a metal element that melts when \(I^2 R\) heating exceeds what it can shed. It should sit as close to the battery as possible, so that it protects the wiring as well as the board. Size it above the normal peak current and below what the wires and connectors can carry (blade fuses from 2 A to 30 A are common on robots). Fuses respond to \(I^2t\): a fast-blow fuse opens quickly on a short; a slow-blow fuse tolerates brief motor inrush.</p>
+<p>A <b>polyfuse</b> (PTC resettable fuse) is a polymer loaded with carbon particles. When it heats up, the polymer expands, the carbon chains separate, and its resistance jumps from a fraction of an ohm to hundreds of ohms. It resets when it cools. Polyfuses are great for USB ports and sensor outputs. Know their quirks: they trip slowly (seconds at twice the hold current), have noticeable resistance even when not tripped, and their hold current drops when they're warm.</p>
+
+<h3>Reverse polarity</h3>
+<p>Use the P-MOSFET circuit from <a href="ch04-semis.html#diode-uses">Chapter 4</a>: drain to the battery, source to the board, gate to ground through a resistor. For packs above about 3S (12.6 V), add a Zener (10–12 V) from gate to source so \(V_{GS}\) stays within its rating. Keyed connectors (XT30, XT60, JST) prevent most mistakes in the first place.</p>
+
+<h3>Transients and TVS diodes</h3>
+<p>Long battery leads have inductance, about 1 µH per metre of wire pair, and motors are inductors. When a fuse blows, a connector bounces or a motor lead is unplugged under load, the current through that inductance stops abruptly, and the voltage spikes. A <b>TVS diode</b> across the battery input (standoff voltage just above the full pack voltage, for example SMBJ10A for 2S or SMBJ15A for 3S) clamps these spikes before they reach your regulators.</p>
+
+<h3>Inrush and hot-plugging</h3>
+<p>When you plug a battery into a board full of uncharged capacitors, the capacitors look like a short circuit. The current is limited only by the battery, wire and capacitor resistances, a few tens of milliohms in total, so tens of amps flow for a few microseconds. That's the spark you see on a connector. Worse, the wire inductance and the low-ESR ceramic capacitors form a lightly damped LC circuit (<a href="ch03-ac.html">Chapter 3</a>), and the voltage <b>rings up to nearly twice the battery voltage</b> before settling. A 3S pack at 12.6 V can briefly put over 20 V on a regulator rated for 17 V.</p>
+
+<figure class="widget wide">
+  <div id="w-hot"></div>
+  <div class="w-controls" id="w-hot-ctl"></div>
+  <figcaption><b>Figure 5.9</b> Hot-plugging a battery into a board's input capacitors (series RLC). Top: voltage on the board. Bottom: inrush current. Choose the pack and the cable length, then add an electrolytic capacitor: its higher ESR damps the ringing. Compare the peak voltage with the dashed absolute-maximum line of a typical small buck converter.</figcaption>
+</figure>
+
+<p>Fixes: add a bulk electrolytic capacitor (its ESR damps the ring), add a TVS, use an anti-spark connector (the XT90-S includes a pre-charge resistor), or add a <b>soft-start load switch</b>: a P-MOSFET whose gate is slowed by an RC so it turns on over a few milliseconds.</p>
+
+<div class="ex" data-id="protect-sort" data-kind="sort">
+  <div class="q">Match each protection part to the threat it addresses.</div>
+  <div class="bins">
+    <div data-bin="oc">Overcurrent / short circuit</div>
+    <div data-bin="rev">Reversed battery</div>
+    <div data-bin="spike">Voltage spikes / ESD</div>
+    <div data-bin="inr">Inrush when plugging in</div>
+  </div>
+  <ul class="items">
+    <li data-bin="oc">Blade fuse next to the battery</li>
+    <li data-bin="oc">Polyfuse on a USB port</li>
+    <li data-bin="rev">P-MOSFET with gate to ground</li>
+    <li data-bin="spike">TVS diode across the battery input</li>
+    <li data-bin="spike">ESD array on USB D+/D−</li>
+    <li data-bin="inr">Anti-spark XT90-S connector</li>
+    <li data-bin="inr">RC-slowed load-switch MOSFET</li>
+  </ul>
+  <div class="explain">Defence in depth: each part handles one failure mode, and a robust board has a fuse, reverse protection, a TVS and some inrush control between the battery connector and everything else.</div>
+</div>
+</section>
+
+<section>
+<h2 id="levels">Level shifting and USB power</h2>
+
+<p>Your ESP32 runs at 3.3 V. Plenty of modules (older sensors, Arduino shields, WS2812 LED strips, hobby servos' signal lines) live at 5 V. Two questions decide what you need:</p>
+<ol>
+  <li><b>Will a 3.3 V output be read as "high" by the 5 V input?</b> Check the receiver's \(V_{IH}\). A 5 V CMOS input typically needs \(0.7 \times V_{DD} = 3.5\) V, which 3.3 V doesn't reach. A TTL-compatible input (74HCT, 74AHCT, many 5 V MCUs' inputs) needs only 2.0 V. The ATmega328P needs \(0.6 \times V_{CC} = 3.0\) V, which works, with little margin.</li>
+  <li><b>Will a 5 V output damage the 3.3 V input?</b> For the ESP32: yes. Its pins are not 5 V tolerant (absolute maximum is about \(V_{DD} + 0.3\) V). Current flows through its input protection diodes into the 3.3 V rail.</li>
+</ol>
+
+<h3>Options</h3>
+<ul>
+  <li><b>Resistor divider</b> (5 V → 3.3 V, one direction only): for example 10 kΩ over 20 kΩ gives 3.33 V. Simple, but it slows edges (the divider's resistance with the input capacitance forms an RC low-pass), so it's fine for a UART at 115 200 baud and poor for fast SPI.</li>
+  <li><b>BSS138 bidirectional shifter</b> for open-drain buses (I²C): one small N-MOSFET per line, with pull-ups on both sides. It is the circuit inside the ubiquitous four-channel breakout boards, and the subject of NXP's application note AN10441.</li>
+  <li><b>74AHCT125 / 74HCT245 buffers</b> (3.3 V → 5 V, one direction, push-pull): powered from 5 V, they have TTL thresholds, so 3.3 V counts as high, and they output a clean 5 V. This is the standard fix for driving WS2812 strips (\(V_{IH} = 3.5\) V at 5 V) from an ESP32.</li>
+  <li><b>Dedicated translators</b>: the PCA9306 (I²C), or the TXB0108 (push-pull signals only; it does not work with I²C pull-ups).</li>
+</ul>
+
+<p>How does the BSS138 circuit work in both directions with no direction pin? Its gate is tied to 3.3 V, its source to the 3.3 V side and its drain to the 5 V side, and both sides have pull-up resistors.</p>
+<ul>
+  <li><b>Idle:</b> both sides are pulled high. The source is at 3.3 V, so \(V_{GS} = 0\) and the MOSFET is off. Each side sits at its own supply.</li>
+  <li><b>3.3 V side pulls low:</b> the source goes to 0 V, \(V_{GS} = 3.3\) V, the MOSFET turns on, and the 5 V side is pulled low through the channel.</li>
+  <li><b>5 V side pulls low:</b> the drain goes to 0 V. The MOSFET's body diode conducts and drags the source down to about 0.6 V; now \(V_{GS} \approx 2.7\) V, the channel turns on, and the 3.3 V side goes fully low.</li>
+</ul>
+
+<figure class="widget wide">
+  <div id="w-lvl"></div>
+  <div class="w-controls" id="w-lvl-ctl"></div>
+  <figcaption><b>Figure 5.10</b> The BSS138 bidirectional level shifter. Click the two open-drain switches, which represent the ESP32 (3.3 V side) and a 5 V sensor pulling the line low. Watch which way current flows through the MOSFET, and the voltages on each side.</figcaption>
+</figure>
+
+<div class="ex" data-id="level-mc" data-kind="mc">
+  <div class="q">A 5 V I²C sensor board has 4.7 kΩ pull-ups to 5 V on SDA and SCL. What should go between it and an ESP32?</div>
+  <ol class="opts">
+    <li>Nothing: I²C is open-drain, so it's safe</li>
+    <li>A 74AHCT125 buffer on each line</li>
+    <li data-correct>A BSS138-style bidirectional shifter (or PCA9306), with the 5 V pull-ups on the sensor side and 3.3 V pull-ups on the ESP32 side</li>
+    <li>A 1N4148 diode in series with each line</li>
+  </ol>
+  <div class="explain">The pull-ups to 5 V would hold the ESP32's pins at 5 V whenever the bus is idle. I²C is bidirectional and open-drain, which rules out a one-way buffer. (Often the simplest fix is to remove the sensor board's pull-ups and power them from 3.3 V, if the sensor chip itself accepts 3.3 V logic.)</div>
+</div>
+
+<h3>USB power basics</h3>
+<p>USB's VBUS supplies 5 V (4.75–5.25 V at the source; expect less at the end of a long cable). How much current you may draw depends on what the source advertises:</p>
+<ul>
+  <li><b>USB 2.0 port:</b> 500 mA once the device is configured (a laptop may enforce it with a polyfuse or a current-limit switch). USB 3.x: 900 mA.</li>
+  <li><b>USB-C:</b> the source advertises 0.5/0.9 A ("default"), 1.5 A or 3.0 A at 5 V through a pull-up resistor (Rp) on the CC pins. Your device, the sink, must put a <b>5.1 kΩ pull-down (Rd) on each CC pin separately</b>, or a USB-C charger will not turn VBUS on at all. Tying CC1 and CC2 together to one resistor is a classic design mistake that only shows up with C-to-C cables.</li>
+  <li><b>USB Power Delivery</b> negotiates higher voltages (9, 15, 20 V) over the CC wire, which needs a PD controller chip on your board.</li>
+</ul>
+<p>When a board can run from both USB and a battery, combine the sources with Schottky diodes or an "ideal diode" P-MOSFET circuit so neither back-feeds the other, and charge the battery from VBUS with a charger IC (TP4056, MCP73831, or a power-path charger such as the BQ24074 that runs the board while charging).</p>
+
+<div class="ex" data-id="cc-text" data-kind="text" data-answer="cc|cc1|cc2|cc pins|configuration channel|cc1 and cc2|cc1/cc2">
+  <div class="q">A USB-C device needs a 5.1 kΩ pull-down to ground on each of which two pins (one name covers both)?</div>
+  <div class="explain">The CC (configuration channel) pins, CC1 and CC2, each need their own 5.1 kΩ Rd. The source sees the pull-down through whichever CC wire the cable connects, which tells it a sink is attached and which way round the plug is.</div>
+</div>
+</section>
+
+<section>
+<h2 id="lab">Lab: a robot power board on perfboard</h2>
+
+<figure class="widget wide">
+  <div id="w-board"></div>
+  <figcaption><b>Figure 5.11</b> The lab's power board: 2S LiPo → fuse → reverse-polarity P-MOSFET → TVS and bulk capacitor → 5 V buck (servos) → 3.3 V LDO (ESP32), plus a divider so the ESP32 can measure the battery. The orange dots show the main power path; follow the current from the battery to each rail and back through ground.</figcaption>
+</figure>
+
+<aside class="callout lab"><span class="ct">🔧 Lab 5: 2S LiPo → 5 V buck → 3.3 V LDO</span>
+<p><b>Parts:</b> 2S LiPo with XT30/XT60 connector, matching connector, inline blade or 5×20 mm fuse holder with a 5 A fuse, P-MOSFET (for example AO3401A or a TO-220 IRF9540N-class part), 10 kΩ resistor, SMBJ10A TVS, 470 µF/16 V low-ESR electrolytic, 5 V buck module rated 3 A (MP1584 or a Pololu-style step-down), AP2112K-3.3 or AMS1117-3.3 (fed from 5 V!), 10 µF and 100 nF capacitors, 100 kΩ and 47 kΩ resistors, servo headers, perfboard, 18 AWG wire for the power path.</p>
+<ol>
+  <li><b>Plan the layout</b> on paper first: power flows left to right, with a thick ground bus along the bottom. Keep the buck's input capacitor and the TVS right at the input.</li>
+  <li><b>Build and test in stages</b> from a bench supply set to 8.4 V with a <b>200 mA current limit</b>. After each stage, check the voltages before adding the next one:
+    <ul>
+      <li>Fuse + P-MOSFET: measure the drop across the MOSFET at 1 A (load resistor). Then reverse the supply leads: the output must stay at 0 V.</li>
+      <li>Buck module: adjust to 5.00 V with no load, then load it with 1–2 A (servos, or a power resistor) and measure the output with a scope set to AC coupling. Find the ripple at the switching frequency.</li>
+      <li>LDO: confirm 3.3 V. Load it with 300 mA and feel the temperature. Compare the estimated \((5 - 3.3) \times 0.3 = 0.5\) W with a thermometer or thermal camera if you have one.</li>
+    </ul></li>
+  <li><b>Battery monitor:</b> the 100 kΩ / 47 kΩ divider maps 8.4 V to 2.69 V. Add a 100 nF capacitor from the ADC pin to ground (the divider's high impedance can't charge the ADC's sampling capacitor quickly). Read it with <code>analogReadMilliVolts()</code> on the ESP32 and scale by \(147/47\). The divider draws only 57 µA continuously.</li>
+  <li><b>Torture test:</b> connect the ESP32 running Wi-Fi, plus two servos. Command both servos to sweep simultaneously and log the battery voltage and any brown-out resets. Then pinch a servo horn to stall it and watch the 5 V rail on the scope. Add a 470 µF capacitor at the servo header and compare.</li>
+</ol>
+<p><b>Going further:</b> add a firmware low-voltage cut-off at 3.4 V per cell under load, a power switch that interrupts the gate drive of the P-MOSFET instead of the main current, and an INA219 (Chapter 4's current sensing) to log the robot's real power budget.</p>
+</aside>
+
+<div class="ex" data-id="bringup-order" data-kind="order">
+  <div class="q">Put the safe bring-up sequence for a new power board in order.</div>
+  <ol class="items">
+    <li>Check for shorts between each rail and ground with the multimeter (power off)</li>
+    <li>Power from a bench supply with a low current limit</li>
+    <li>Measure every rail with no load attached</li>
+    <li>Add loads one at a time while watching current and temperature</li>
+    <li>Connect the real battery, through the fuse</li>
+  </ol>
+  <div class="explain">Each step limits how much damage a mistake can do. The battery comes last because it has no current limit.</div>
+</div>
+
+<aside class="callout ref"><span class="ct">📚 Go deeper</span>
+<ul>
+  <li><b>Horowitz &amp; Hill, <i>The Art of Electronics</i> (3rd ed.)</b>, Ch. 9, "Voltage Regulation and Power Conversion": linear regulators, dropout and stability, and switching converters (buck, boost, inverting).</li>
+  <li><b>Scherz &amp; Monk, <i>Practical Electronics for Inventors</i> (4th ed.)</b>, Ch. 11, "Voltage Regulators and Power Supplies", and the battery material in Ch. 3.</li>
+  <li><b>Battery University</b> (batteryuniversity.com): BU-205 (types of lithium-ion), BU-409 (charging lithium-ion), BU-808 (how to prolong lithium-based batteries).</li>
+  <li><b>TI SLVA477</b>, "Basic Calculation of a Buck Converter's Power Stage", and <b>TI SLVA372</b>, "Basic Calculation of a Boost Converter's Power Stage": the formulas of Figure 5.5, with component selection.</li>
+  <li><b>TI SLVA079</b>, "Understanding the Terms and Definitions of LDO Voltage Regulators".</li>
+  <li><b>Linear Technology AN88</b>, "Ceramic Input Capacitors Can Cause Overvoltage Transients": the hot-plug ringing of Figure 5.9, measured.</li>
+  <li><b>NXP AN10441</b>, "Level shifting techniques in I²C-bus design": the BSS138 circuit of Figure 5.10.</li>
+  <li><b>Espressif, <i>ESP32 Hardware Design Guidelines</i></b>: the power-supply and decoupling recommendations for ESP32 modules.</li>
+  <li><b>Phil's Lab</b> (YouTube): the buck-converter design and PCB layout videos.</li>
+</ul>
+</aside>
+</section>
+
+</main>
+<script src="../assets/vendor/katex/katex.min.js"></script>
+<script src="../assets/vendor/katex/auto-render.min.js"></script>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/ch05-power.js"></script>
+</body>
+</html>

@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3 · Pushers & Squeezers — Sparky's Circuit Adventure</title>
+<meta name="description" content="Level 3 of Sparky's Circuit Adventure: batteries push, resistors squeeze, and a water-slide picture of voltage and resistance.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+/* kid level page styles (shared pattern, page-local copy) */
+.toy { background: var(--surface2); border: 2px solid var(--line); border-radius: 22px; padding: 12px 10px; margin: 16px 0; text-align: center; }
+.toy svg.art { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.toy .cap { font-size: 1rem; color: var(--muted); margin: 6px auto 0; }
+.toy-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0 4px; }
+.kbtn { font-family: inherit; font-size: 1.25rem; line-height: 1.2; min-width: 56px; min-height: 56px; padding: 6px 14px; border-radius: 18px; border: 3px solid var(--line); border-bottom-width: 6px; background: var(--surface); color: var(--ink); cursor: pointer; touch-action: manipulation; transition: transform .06s, border-color .15s, background .15s; }
+.kbtn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.kbtn:active { transform: translateY(3px); border-bottom-width: 3px; }
+.kbtn.on { border-color: var(--accent); background: var(--accent2); }
+.kbtn.go { background: var(--c3); border-color: color-mix(in srgb, var(--c3) 60%, #000); color: #fff; }
+.kbtn:disabled { opacity: .45; cursor: not-allowed; }
+.kbtn small { display: block; font-size: .8rem; color: var(--muted); }
+.kbtn.go small { color: inherit; opacity: .9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kbtn.go { color: #0b1a12; } }
+:root[data-theme="dark"] .kbtn.go { color: #0b1a12; }
+.ex .opts.emoji > li .lab, .ex .opts .lab { display: block; font-size: 1rem; line-height: 1.2; color: var(--muted); margin-top: 4px; }
+.ex .opts > li svg.mini { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto; }
+.toy .w-controls { justify-content: center; }
+.toy .w-slider { grid-template-columns: max-content 1fr max-content; font-size: 1.15rem; flex-basis: 260px; max-width: 460px; }
+.toy .w-slider input { height: 44px; }
+.toy .w-slider output { font-family: inherit; font-size: 1.05rem; min-width: 2.5em; }
+.toy .w-seg button { font-size: 1.1rem; min-height: 48px; padding: 6px 12px; }
+ol.steps { padding-left: 1.4em; } ol.steps li { margin: 6px 0; }
+.grownup { font-size: .82em; }
+.grownup > div { line-height: 1.5; }
+.card .big-emoji { letter-spacing: .05em; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  body.kid { font-size: 19px; }
+  main.cards > .card { padding: 18px 14px 20px; }
+  .speech { margin-left: 52px; padding: 12px 14px; }
+  .speech .who { left: -54px; font-size: 2.4rem; }
+  body.kid .ex { padding-left: 12px; padding-right: 50px; }
+  .big-emoji { font-size: clamp(2rem, 10.5vw, 3.2rem); }
+}
+main.cards > .card > h2 { padding-right: 48px; }
+
+</style>
+</head>
+<body data-book="kid" data-chapter="k03-push">
+<main class="chapter cards">
+<header class="chapter-head">
+  <p class="kicker">Level 3</p>
+  <h1>🔋 Pushers &amp; Squeezers</h1>
+  <p class="lede">Batteries push. Squeezy roads slow things down. Let's go down the water slide!</p>
+</header>
+
+<section class="card">
+  <h2>💪 The battery is a pusher</h2>
+  <div class="speech say"><span class="who">⚡</span>We Sparkies don't move all by ourselves. We need a push! A battery is a pusher. It gives us energy to zoom around the circle road.</div>
+  <div class="big-emoji">🔋💪⚡</div>
+  <div class="speech say"><span class="who">⚡</span>Think of a water slide. The battery carries us up to the top. Then, wheee, we slide down through the circuit!</div>
+</section>
+
+<section class="card">
+  <h2>🛝 The battery water slide</h2>
+  <div class="speech say"><span class="who">⚡</span>Stack batteries to make the slide taller. A taller slide means a bigger push, and we go faster!</div>
+  <div class="toy">
+    <div id="t-slide"></div>
+    <div id="t-slide-ctl" class="toy-row"></div>
+    <p class="cap">👆 Tap ➕ and ➖ to add or take away batteries.</p>
+  </div>
+  <div class="ex" data-id="tower" data-kind="task">
+    <div class="q">Build the tallest slide with 4 batteries!</div>
+    <div class="explain">Four batteries in a row push four times as hard as one. Each AA battery pushes with 1.5 volts, so four of them push with 6 volts.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🔢 The push number</h2>
+  <div class="speech say"><span class="who">⚡</span>Every battery has a push number. It's called volts. A bigger number means a bigger push!</div>
+  <div class="big-emoji">🔋 1.5 &nbsp; 🟦 9</div>
+  <div class="ex" data-id="harder" data-kind="mc">
+    <div class="q">Which battery pushes harder?</div>
+    <ol class="opts emoji grid2">
+      <li>🔋<span class="lab">1.5 volts</span></li>
+      <li data-correct>🟦<span class="lab">9 volts</span></li>
+    </ol>
+    <div class="explain">9 is a bigger number than 1.5, so the 9 volt battery pushes harder.</div>
+  </div>
+  <div class="ex" data-id="count" data-kind="num" data-answer="2" data-tol="0">
+    <div class="q">One AA battery pushes with 1.5 volts. How many AA batteries 🔋 do you need in a row to push with 3 volts?</div>
+    <div class="hint">1.5 and 1.5 more makes…?</div>
+    <div class="explain">Two! 1.5 + 1.5 = 3. That's why lots of toys take 2 batteries.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🤏 Squeezers</h2>
+  <div class="speech say"><span class="who">⚡</span>Some parts make the road narrow and squeezy. They are called resistors. A squeezy road makes it hard for us to get through, so fewer of us pass by each second.</div>
+  <div class="big-emoji">🛣️ ➡️ 🤏 ➡️ 🐌</div>
+  <div class="ex" data-id="narrow" data-kind="mc">
+    <div class="q">The road gets narrow and squeezy. What happens?</div>
+    <ol class="opts emoji grid2">
+      <li>🏎️<span class="lab">more Sparkies get through</span></li>
+      <li data-correct>🐌<span class="lab">fewer Sparkies get through</span></li>
+    </ol>
+    <div class="explain">A squeezy road (a resistor) lets fewer Sparkies through each second. So a bulb on that road gets dimmer.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🎛️ Bright or dim?</h2>
+  <div class="speech say"><span class="who">⚡</span>Now you are the boss! Pick how many batteries push, and how much the road squeezes.</div>
+  <div class="toy">
+    <div id="t-bright"></div>
+    <div id="t-bright-ctl"></div>
+    <p class="cap">🔋 Pick the batteries. 🤏 Slide to squeeze the road.</p>
+  </div>
+  <div class="ex" data-id="bright" data-kind="task">
+    <div class="q">Make the bulb SUPER bright! 🌟</div>
+    <div class="explain">Biggest push, and no squeeze at all. Lots of Sparkies rush through the bulb.</div>
+  </div>
+  <div class="ex" data-id="dim" data-kind="task">
+    <div class="q">Now make it glow just a tiny bit, like a night light. 🌙</div>
+    <div class="explain">A small push and a lot of squeezing means only a few Sparkies get through. The bulb glows softly.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🔥 Squeezing makes heat</h2>
+  <div class="speech say"><span class="who">⚡</span>When we squeeze through a narrow road, we rub and bump and make it warm. Some machines squeeze us on purpose to make heat!</div>
+  <div class="ex" data-id="toaster" data-kind="mc">
+    <div class="q">Which one uses squeezy wires to make heat?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>🍞<span class="lab">a toaster</span></li>
+      <li>🧊<span class="lab">an ice cube</span></li>
+      <li>🪁<span class="lab">a kite</span></li>
+    </ol>
+    <div class="explain">A toaster has thin wires that squeeze the electricity so much they glow red hot. Never touch them!</div>
+  </div>
+</section>
+
+<section class="card home">
+  <h2>🏠 Try it at home (with a grown-up)</h2>
+  <div class="speech say"><span class="who">⚡</span>Test the push and the squeeze!</div>
+  <p>You need: 🔋 one and two AA batteries in battery boxes, 💡 a small torch bulb (2.5 volts) in a holder, ✏️ a soft pencil, paper, and foil wires.</p>
+  <ol class="steps">
+    <li class="say">Light the bulb with one battery. Then with two in a row. Which is brighter?</li>
+    <li class="say">Draw a thick, dark pencil line on paper. Pencil lead lets a little electricity through. It's a squeezer!</li>
+    <li class="say">Put the pencil line in your circle road. Touch the wire near the start, then far along the line. Does the bulb get dimmer? If it won't glow at all, use a shorter line, or try an LED.</li>
+  </ol>
+  <aside class="callout warn"><span class="ct">⚠️ Careful</span><p>Use only small batteries. Batteries and bulbs can get warm, so let a grown-up help.</p></aside>
+  <aside class="callout tip grownup"><span class="ct">👨‍👩‍👧 For grown-ups</span><div>Voltage is energy per unit charge (the height of the slide); resistance sets how much current that voltage drives, <i>I = V/R</i>. Series cells add their voltages. The power turned into heat or light is <i>P = I²R</i>, which is why the bulb dims as you add series resistance. The pencil works because graphite is a modest conductor whose resistance grows with the length of the line. See <a href="../book/ch01-physics.html">Chapter 1</a> (voltage as energy) and <a href="../book/ch02-dc.html">Chapter 2</a> (Ohm's law, series circuits, power).</div></aside>
+</section>
+</main>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/kidkit.js"></script>
+<script src="js/k03-push.js"></script>
+</body>
+</html>

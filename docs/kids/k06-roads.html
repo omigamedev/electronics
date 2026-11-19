@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>6 · One Road or Two? — Sparky's Circuit Adventure</title>
+<meta name="description" content="Level 6 of Sparky's Circuit Adventure: series and parallel bulbs, and the mystery of the broken Christmas lights.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+/* kid level page styles (shared pattern, page-local copy) */
+.toy { background: var(--surface2); border: 2px solid var(--line); border-radius: 22px; padding: 12px 10px; margin: 16px 0; text-align: center; }
+.toy svg.art { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.toy .cap { font-size: 1rem; color: var(--muted); margin: 6px auto 0; }
+.toy-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0 4px; }
+.kbtn { font-family: inherit; font-size: 1.25rem; line-height: 1.2; min-width: 56px; min-height: 56px; padding: 6px 14px; border-radius: 18px; border: 3px solid var(--line); border-bottom-width: 6px; background: var(--surface); color: var(--ink); cursor: pointer; touch-action: manipulation; transition: transform .06s, border-color .15s, background .15s; }
+.kbtn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.kbtn:active { transform: translateY(3px); border-bottom-width: 3px; }
+.kbtn.on { border-color: var(--accent); background: var(--accent2); }
+.kbtn.go { background: var(--c3); border-color: color-mix(in srgb, var(--c3) 60%, #000); color: #fff; }
+.kbtn:disabled { opacity: .45; cursor: not-allowed; }
+.kbtn small { display: block; font-size: .8rem; color: var(--muted); }
+.kbtn.go small { color: inherit; opacity: .9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kbtn.go { color: #0b1a12; } }
+:root[data-theme="dark"] .kbtn.go { color: #0b1a12; }
+.ex .opts.emoji > li .lab, .ex .opts .lab { display: block; font-size: 1rem; line-height: 1.2; color: var(--muted); margin-top: 4px; }
+.ex .opts > li svg.mini { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto; }
+.toy .w-controls { justify-content: center; }
+.toy .w-slider { grid-template-columns: max-content 1fr max-content; font-size: 1.15rem; flex-basis: 260px; max-width: 460px; }
+.toy .w-slider input { height: 44px; }
+.toy .w-slider output { font-family: inherit; font-size: 1.05rem; min-width: 2.5em; }
+.toy .w-seg button { font-size: 1.1rem; min-height: 48px; padding: 6px 12px; }
+ol.steps { padding-left: 1.4em; } ol.steps li { margin: 6px 0; }
+.grownup { font-size: .82em; }
+.grownup > div { line-height: 1.5; }
+.card .big-emoji { letter-spacing: .05em; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  body.kid { font-size: 19px; }
+  main.cards > .card { padding: 18px 14px 20px; }
+  .speech { margin-left: 52px; padding: 12px 14px; }
+  .speech .who { left: -54px; font-size: 2.4rem; }
+  body.kid .ex { padding-left: 12px; padding-right: 50px; }
+  .big-emoji { font-size: clamp(2rem, 10.5vw, 3.2rem); }
+}
+main.cards > .card > h2 { padding-right: 48px; }
+
+</style>
+</head>
+<body data-book="kid" data-chapter="k06-roads">
+<main class="chapter cards">
+<header class="chapter-head">
+  <p class="kicker">Level 6</p>
+  <h1>🛣️ One Road or Two?</h1>
+  <p class="lede">Two bulbs, one battery. How should we join them?</p>
+</header>
+
+<section class="card">
+  <h2>🤔 Two bulbs, one battery</h2>
+  <div class="speech say"><span class="who">⚡</span>I have two bulbs and one battery. There are two ways to build the road!</div>
+  <div class="big-emoji">🔋 ➡️ 💡💡</div>
+  <div class="speech say"><span class="who">⚡</span>One way: put the bulbs in a line, one after the other, like train carriages. Then every Sparky goes through both bulbs. The other way: give each bulb its own road, side by side.</div>
+</section>
+
+<section class="card">
+  <h2>🚂 Line road or 🛣️ side-by-side?</h2>
+  <div class="toy">
+    <div id="t-roads-ctl" class="toy-row"></div>
+    <div id="t-roads"></div>
+    <p class="cap">👆 Pick a road. Then tap a bulb to take it out (tap again to put it back).</p>
+  </div>
+  <div class="ex" data-id="series-out" data-kind="task">
+    <div class="q">🚂 In the LINE road, take out one bulb. What happens to the other one?</div>
+    <div class="explain">Both go dark! In a line road, the gap from the missing bulb breaks the whole circle.</div>
+  </div>
+  <div class="ex" data-id="parallel-out" data-kind="task">
+    <div class="q">🛣️ In the SIDE-BY-SIDE road, take out one bulb. What happens now?</div>
+    <div class="explain">The other bulb keeps shining! It still has its own full circle road.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🔍 What did you see?</h2>
+  <div class="ex" data-id="dimmer" data-kind="mc">
+    <div class="q">Two bulbs in a LINE road. Are they brighter or dimmer than one bulb alone?</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>🕯️<span class="lab">dimmer</span></li>
+      <li>☀️<span class="lab">brighter</span></li>
+    </ol>
+    <div class="explain">Dimmer. The two bulbs have to share the battery's push, and the road is twice as squeezy.</div>
+  </div>
+  <div class="ex" data-id="goes-out" data-kind="mc">
+    <div class="q">In a LINE road, one bulb breaks. What does the other bulb do?</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>🌑<span class="lab">it goes dark too</span></li>
+      <li>💡<span class="lab">it stays on</span></li>
+    </ol>
+    <div class="explain">It goes dark. There's only one road, and now it has a gap.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🎄 The Christmas light mystery</h2>
+  <div class="speech say"><span class="who">⚡</span>Oh no! Grandpa's old Christmas lights won't shine! They are all in one long line road. If just one bulb is broken, the whole string goes dark. Can you find the broken bulb?</div>
+  <div class="toy">
+    <div id="t-xmas"></div>
+    <p class="cap">👆 Tap a bulb to swap it for a new one.</p>
+  </div>
+  <div class="ex" data-id="xmas" data-kind="task">
+    <div class="q">Find the broken bulb and fix the lights!</div>
+    <div class="explain">You found it! With the broken bulb swapped, the line road is a full circle again. Newer light strings are built so one broken bulb doesn't spoil the rest.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🏠 Roads in your house</h2>
+  <div class="speech say"><span class="who">⚡</span>In your house, every lamp and machine has its own side-by-side road. That's why the fridge keeps humming when you switch off your bedroom light!</div>
+  <div class="ex" data-id="house" data-kind="mc">
+    <div class="q">How are the lights in your house joined?</div>
+    <ol class="opts emoji grid2">
+      <li>🚂<span class="lab">in one line road</span></li>
+      <li data-correct>🛣️<span class="lab">side-by-side roads</span></li>
+    </ol>
+    <div class="explain">Side by side! Each light gets the full push, and you can switch each one on and off by itself.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🗂️ Road facts</h2>
+  <div class="ex" data-id="facts" data-kind="sort">
+    <div class="q">Which road is it? Tap a card, then tap a box.</div>
+    <div class="bins">
+      <div data-bin="s">🚂 Line road</div>
+      <div data-bin="p">🛣️ Side by side</div>
+    </div>
+    <ul class="items">
+      <li data-bin="s">🌑 One goes out, all go out</li>
+      <li data-bin="s">🔅 The bulbs share the push</li>
+      <li data-bin="p">💡 Each bulb is bright</li>
+      <li data-bin="p">🏠 Like the lights in a house</li>
+    </ul>
+    <div class="explain">Line road (grown-ups say "series"): one path, shared push. Side by side (grown-ups say "parallel"): each bulb has its own path and the full push.</div>
+  </div>
+</section>
+
+<section class="card home">
+  <h2>🏠 Try it at home (with a grown-up)</h2>
+  <div class="speech say"><span class="who">⚡</span>Build both roads!</div>
+  <p>You need: 🔋 two AA batteries in a battery box, 💡💡 two small torch bulbs in holders (the same kind), and 🥈 foil strips or wires with clips.</p>
+  <ol class="steps">
+    <li class="say">Light one bulb. Remember how bright it is.</li>
+    <li class="say">Now join two bulbs in a line. Are they dimmer?</li>
+    <li class="say">Unscrew one bulb. What happens to the other?</li>
+    <li class="say">Now give each bulb its own road, side by side. Unscrew one again!</li>
+  </ol>
+  <aside class="callout warn"><span class="ct">⚠️ Careful</span><p>Bulbs get hot. Let them cool down before you unscrew them.</p></aside>
+  <aside class="callout tip grownup"><span class="ct">👨‍👩‍👧 For grown-ups</span><div>In series the same current flows through both lamps and the supply voltage divides between them (Kirchhoff's voltage law), so with two equal lamps each gets half the voltage and, roughly, a quarter of the power. In parallel each lamp sees the full voltage, and the battery supplies the sum of the branch currents (so it runs down faster). Mains wiring in a house is parallel. See <a href="../book/ch02-dc.html">Chapter 2: DC Circuit Analysis</a>.</div></aside>
+</section>
+</main>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/kidkit.js"></script>
+<script src="js/k06-roads.js"></script>
+</body>
+</html>

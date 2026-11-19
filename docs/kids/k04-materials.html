@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4 · Who Lets Sparky Through? — Sparky's Circuit Adventure</title>
+<meta name="description" content="Level 4 of Sparky's Circuit Adventure: conductors and insulators, a bulb tester game, and why wires wear plastic coats.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+/* kid level page styles (shared pattern, page-local copy) */
+.toy { background: var(--surface2); border: 2px solid var(--line); border-radius: 22px; padding: 12px 10px; margin: 16px 0; text-align: center; }
+.toy svg.art { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.toy .cap { font-size: 1rem; color: var(--muted); margin: 6px auto 0; }
+.toy-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0 4px; }
+.kbtn { font-family: inherit; font-size: 1.25rem; line-height: 1.2; min-width: 56px; min-height: 56px; padding: 6px 14px; border-radius: 18px; border: 3px solid var(--line); border-bottom-width: 6px; background: var(--surface); color: var(--ink); cursor: pointer; touch-action: manipulation; transition: transform .06s, border-color .15s, background .15s; }
+.kbtn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.kbtn:active { transform: translateY(3px); border-bottom-width: 3px; }
+.kbtn.on { border-color: var(--accent); background: var(--accent2); }
+.kbtn.go { background: var(--c3); border-color: color-mix(in srgb, var(--c3) 60%, #000); color: #fff; }
+.kbtn:disabled { opacity: .45; cursor: not-allowed; }
+.kbtn small { display: block; font-size: .8rem; color: var(--muted); }
+.kbtn.go small { color: inherit; opacity: .9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kbtn.go { color: #0b1a12; } }
+:root[data-theme="dark"] .kbtn.go { color: #0b1a12; }
+.ex .opts.emoji > li .lab, .ex .opts .lab { display: block; font-size: 1rem; line-height: 1.2; color: var(--muted); margin-top: 4px; }
+.ex .opts > li svg.mini { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto; }
+.toy .w-controls { justify-content: center; }
+.toy .w-slider { grid-template-columns: max-content 1fr max-content; font-size: 1.15rem; flex-basis: 260px; max-width: 460px; }
+.toy .w-slider input { height: 44px; }
+.toy .w-slider output { font-family: inherit; font-size: 1.05rem; min-width: 2.5em; }
+.toy .w-seg button { font-size: 1.1rem; min-height: 48px; padding: 6px 12px; }
+ol.steps { padding-left: 1.4em; } ol.steps li { margin: 6px 0; }
+.grownup { font-size: .82em; }
+.grownup > div { line-height: 1.5; }
+.card .big-emoji { letter-spacing: .05em; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  body.kid { font-size: 19px; }
+  main.cards > .card { padding: 18px 14px 20px; }
+  .speech { margin-left: 52px; padding: 12px 14px; }
+  .speech .who { left: -54px; font-size: 2.4rem; }
+  body.kid .ex { padding-left: 12px; padding-right: 50px; }
+  .big-emoji { font-size: clamp(2rem, 10.5vw, 3.2rem); }
+}
+main.cards > .card > h2 { padding-right: 48px; }
+.tray { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 8px 0; }
+.tray .kbtn { font-size: 2rem; position: relative; min-width: 64px; min-height: 64px; padding: 4px 8px; touch-action: none; }
+.tray .kbtn .badge { position: absolute; right: -6px; top: -8px; font-size: 1.1rem; }
+.drag-ghost { position: fixed; z-index: 120; font-size: 2.6rem; pointer-events: none; transform: translate(-50%, -50%); }
+</style>
+</head>
+<body data-book="kid" data-chapter="k04-materials">
+<main class="chapter cards">
+<header class="chapter-head">
+  <p class="kicker">Level 4</p>
+  <h1>🥄 Who Lets Sparky Through?</h1>
+  <p class="lede">Some things are open roads. Some things are walls!</p>
+</header>
+
+<section class="card">
+  <h2>🚪 Open roads and walls</h2>
+  <div class="speech say"><span class="who">⚡</span>Some things let me zoom right through. They are called conductors. Metal things, like spoons and keys, are great conductors!</div>
+  <div class="big-emoji">🥄 🔑 📎 ✅</div>
+  <div class="speech say"><span class="who">⚡</span>Other things are like walls. They block me! They are called insulators. Plastic, wood, rubber and cloth are insulators.</div>
+  <div class="big-emoji">🧸 🪵 🧦 🛑</div>
+</section>
+
+<section class="card">
+  <h2>🧪 The Sparky tester</h2>
+  <div class="speech say"><span class="who">⚡</span>Let's be scientists! Put a thing in the gap. If the bulb lights up, it lets me through.</div>
+  <div class="toy">
+    <div id="t-tester"></div>
+    <div id="t-tray" class="tray"></div>
+    <p class="cap">👆 Tap a thing, or drag it into the gap.</p>
+  </div>
+  <div class="ex" data-id="test5" data-kind="task">
+    <div class="q">Test 5 different things!</div>
+    <div class="explain">The metal things (spoon, paper clip, key, ring) light the bulb. Teddy, wood, crayon, sock and plastic cup block Sparky.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🗂️ Sort them out</h2>
+  <div class="ex" data-id="sort" data-kind="sort">
+    <div class="q">Is it an open road or a wall? Tap a card, then tap a box.</div>
+    <div class="bins">
+      <div data-bin="c">✅ Lets Sparky through</div>
+      <div data-bin="i">🛑 Blocks Sparky</div>
+    </div>
+    <ul class="items">
+      <li data-bin="c">🪙 coin</li>
+      <li data-bin="c">🍴 metal fork</li>
+      <li data-bin="c">🥈 kitchen foil</li>
+      <li data-bin="i">🎈 balloon</li>
+      <li data-bin="i">📕 book</li>
+      <li data-bin="i">🥢 wooden chopsticks</li>
+    </ul>
+    <div class="hint">Is it made of metal? Metal lets Sparky through.</div>
+    <div class="explain">Coins, forks and foil are metal: conductors. Balloons (rubber), books (paper) and chopsticks (wood) are insulators.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🔩 The secret</h2>
+  <div class="ex" data-id="metal" data-kind="mc">
+    <div class="q">What is the same about all the things that let Sparky through?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>🔩<span class="lab">they are metal</span></li>
+      <li>🎨<span class="lab">they are red</span></li>
+      <li>📏<span class="lab">they are long</span></li>
+    </ol>
+    <div class="explain">Metals have lots of Sparkies that are free to move. That's why metals are great conductors!</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🧥 Wires wear coats</h2>
+  <div class="speech say"><span class="who">⚡</span>A wire has metal inside, so I can zoom along. But it wears a plastic coat on the outside! Let's peek inside.</div>
+  <div class="toy">
+    <div id="t-peel"></div>
+    <div id="t-peel-ctl" class="toy-row"></div>
+    <p class="cap">✂️ Tap the scissors to peel the coat.</p>
+  </div>
+  <div class="ex" data-id="peel" data-kind="task">
+    <div class="q">Peel the wire and look inside!</div>
+    <div class="explain">Inside is shiny copper metal. That's Sparky's road. The plastic coat outside keeps Sparky in the wire.</div>
+  </div>
+  <div class="ex" data-id="coat" data-kind="mc">
+    <div class="q">Why does a wire wear a plastic coat?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>🛡️<span class="lab">to keep Sparky inside and us safe</span></li>
+      <li>🎀<span class="lab">just to look pretty</span></li>
+      <li>🍬<span class="lab">so it tastes nice</span></li>
+    </ol>
+    <div class="explain">The coat is an insulator. It keeps the electricity inside the wire, so it can't jump into our fingers or into other wires.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>💧 Water and you</h2>
+  <div class="speech say"><span class="who">⚡</span>Tap water and salty water let some electricity through. And guess what? Your body is full of salty water! That's why water and wall electricity must never meet, and why we never touch sockets.</div>
+  <div class="big-emoji">💧 + 🔌 = 🚫</div>
+  <div class="ex" data-id="bath" data-kind="mc">
+    <div class="q">Can you use a hair dryer in the bath?</div>
+    <ol class="opts emoji grid2">
+      <li>👍<span class="lab">yes, it's fine</span></li>
+      <li data-correct>🚫<span class="lab">NO, never!</span></li>
+    </ol>
+    <div class="explain">Never! Water lets electricity through, so plugged-in things must stay far away from baths, sinks and puddles.</div>
+  </div>
+  <div class="ex" data-id="handle" data-kind="mc">
+    <div class="q">An electrician fixes wires. Which handle is safest for her screwdriver?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>🟥<span class="lab">thick rubbery plastic</span></li>
+      <li>🔩<span class="lab">bare metal</span></li>
+      <li>💦<span class="lab">wet wood</span></li>
+    </ol>
+    <div class="explain">Thick plastic and rubber are insulators, so they block electricity from reaching the electrician's hand. (She also switches the power off first!)</div>
+  </div>
+</section>
+
+<section class="card home">
+  <h2>🏠 Try it at home (with a grown-up)</h2>
+  <div class="speech say"><span class="who">⚡</span>Build your own Sparky tester!</div>
+  <p>You need: 🔋 two AA batteries in a battery box, 💡 a small torch bulb in a holder, and 🥈 three foil strips.</p>
+  <ol class="steps">
+    <li class="say">Make a circle road with the battery and the bulb, but leave two foil ends free. That's the gap.</li>
+    <li class="say">Touch both free ends to a spoon. Does the bulb light?</li>
+    <li class="say">Now try a coin, a crayon, a leaf, a sock, a pencil's lead, and a plastic toy.</li>
+    <li class="say">Make two piles: things that light the bulb, and things that don't.</li>
+  </ol>
+  <aside class="callout warn"><span class="ct">⚠️ Careful</span><p>Only test things with your battery tester. Never with a wall socket!</p></aside>
+  <aside class="callout tip grownup"><span class="ct">👨‍👩‍👧 For grown-ups</span><div>In metals the outer electrons are not tied to any one atom, so a tiny field moves a huge number of them; in insulators the electrons are bound and a band gap blocks conduction. Tap water conducts because of dissolved ions, and skin is a modest resistor, which is why mains voltage can drive a dangerous current. Pencil graphite is in between (it may glow the bulb dimly or not at all). See <a href="../book/ch01-physics.html">Chapter 1</a>, and <a href="../book/ch04-semis.html">Chapter 4</a> for semiconductors, the materials in between.</div></aside>
+</section>
+</main>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/kidkit.js"></script>
+<script src="js/k04-materials.js"></script>
+</body>
+</html>

@@ -1,0 +1,812 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>7 · Microcontrollers: Arduino, ESP32 & BLE — Sparks & Circuits</title>
+<meta name="description" content="What a microcontroller is, memory-mapped registers, interrupts, timers, watchdogs, the ESP32 and FreeRTOS, sleep modes, Bluetooth Low Energy, antennas and failsafe design for RC.">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+  .ch7-info { background: var(--surface2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 10px; font-size: .92rem; min-height: 4.5em; }
+  .ch7-info b { color: var(--accent); }
+  .ch7-regs { display: grid; gap: 8px; font: .9rem var(--mono); }
+  .ch7-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .ch7-row .nm { width: 4.2em; font-weight: 700; color: var(--ink); }
+  .ch7-row .val { margin-left: 8px; color: var(--muted); min-width: 7em; }
+  .ch7-bit { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 .85rem var(--mono); cursor: pointer; padding: 0; }
+  .ch7-bit.on { background: var(--c1); color: #fff; border-color: var(--c1); }
+  .ch7-bit.ro { cursor: default; opacity: .85; }
+  .ch7-bit.na { opacity: .35; cursor: not-allowed; }
+  .ch7-hdr { display: flex; gap: 4px; margin-left: 4.2em; color: var(--muted); font-size: .72rem; }
+  .ch7-hdr span { width: 30px; text-align: center; }
+  .ch7-led { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--line); background: var(--surface2); display: inline-block; box-sizing: border-box; }
+  .ch7-led.lit { background: #ff4d4d; border-color: #ff8787; box-shadow: 0 0 12px #ff4d4d; }
+  .ch7-code { font: .85rem var(--mono); background: var(--surface2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; min-height: 3.2em; color: var(--ink); }
+  .ch7-tree { font-size: .92rem; line-height: 1.5; }
+  .ch7-tree ul { list-style: none; margin: 0; padding-left: 18px; border-left: 1px dashed var(--line); }
+  .ch7-tree > ul { padding-left: 0; border-left: 0; }
+  .ch7-tree li { margin: 3px 0; }
+  .ch7-node { display: inline-flex; gap: 6px; align-items: center; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 3px 8px; cursor: pointer; font: inherit; text-align: left; }
+  .ch7-node:hover { border-color: var(--accent); }
+  .ch7-node.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent2); }
+  .ch7-node .k { font: 600 .7rem var(--font); text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 5px; color: #fff; }
+  .ch7-node .k.svc { background: var(--c5); } .ch7-node .k.chr { background: var(--c1); } .ch7-node .k.dsc { background: var(--c6); } .ch7-node .k.prf { background: var(--c2); }
+  .ch7-log { font: .8rem var(--mono); background: var(--surface2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; height: 8.5em; overflow-y: auto; white-space: pre-wrap; margin-top: 8px; color: var(--ink); }
+  .ch7-log .tx { color: var(--c1); } .ch7-log .rx { color: var(--c3); } .ch7-log .er { color: var(--bad); }
+</style>
+</head>
+<body data-book="adult" data-chapter="ch07-mcu">
+<main class="chapter">
+
+<header class="chapter-head">
+  <p class="kicker">Chapter 7</p>
+  <h1>Microcontrollers: Arduino, ESP32 & BLE</h1>
+  <p class="lede">A microcontroller is a whole computer on one chip, and its peripherals are hardware you control by writing numbers to memory addresses. This chapter goes underneath <code>digitalWrite()</code>: registers, interrupts, timers and watchdogs on the ATmega328P; then the ESP32 with FreeRTOS, sleep modes and its pin quirks; then Bluetooth Low Energy from the radio up to GATT. It ends with a BLE-controlled RC car that stops when the link drops.</p>
+</header>
+
+<section>
+<h2 id="what">What a microcontroller is</h2>
+<p>Your laptop's CPU is surrounded by separate chips: RAM sticks, an SSD, a chipset, a network card. A <b>microcontroller</b> (MCU) puts a modest CPU, its memories and a collection of special-purpose hardware blocks (<b>peripherals</b>) on a single piece of silicon, together with the clock generation and power management that keep them running. It costs from a few cents to a few dollars, starts in milliseconds and can run for years on a battery. The trade-off is scale: the ATmega328P in an Arduino Uno has 32 KB of flash and <b>2 KB</b> of RAM, and runs at 16 MHz. Even the comparatively huge ESP32 has around 520 KB of on-chip SRAM.</p>
+<p>The main parts, which you'll find on every MCU datasheet's block diagram:</p>
+<ul>
+  <li><b>CPU core.</b> AVR (8-bit) on the ATmega328P; Xtensa LX6 (32-bit, dual core) on the original ESP32; LX7 on the ESP32-S3; RISC-V on the ESP32-C3/C6; ARM Cortex-M on STM32 and nRF52.</li>
+  <li><b>Flash.</b> Non-volatile program memory. On the AVR it's on chip; on the ESP32 it's a separate SPI flash chip inside the module, executed through a cache.</li>
+  <li><b>SRAM.</b> Variables, the stack and the heap. Lost at power-off.</li>
+  <li><b>Peripherals.</b> GPIO ports, timers, UARTs, SPI and I²C controllers, ADCs, PWM generators, DMA, and on the ESP32 the radios. Each is a little state machine that runs in parallel with the CPU.</li>
+  <li><b>Buses.</b> The internal wiring that connects them. The CPU, DMA and memories sit on a fast bus; slower peripherals hang off a bridge to a slower one (ARM calls these AHB and APB, and Espressif uses the same terms). The bus clock is why ESP32 peripherals talk about the "80 MHz APB clock".</li>
+  <li><b>Clock tree.</b> A crystal or internal RC oscillator, often multiplied up by a <b>PLL</b> (phase-locked loop) and divided down for each domain. Every timer, baud rate and PWM frequency is ultimately a fraction of one of these clocks.</li>
+  <li><b>Interrupt controller</b>, <b>reset and power management</b> (brown-out detector, watchdog, sleep modes), and <b>debug</b> (JTAG/SWD, or the AVR's debugWIRE).</li>
+</ul>
+
+<figure class="widget" id="fig-block">
+  <div id="w-block"></div>
+  <div class="w-controls" id="c-block"></div>
+  <div class="ch7-info" id="block-info">Click any block.</div>
+  <figcaption><b>Figure 7.1</b> An MCU's block diagram. Switch between the ATmega328P and the ESP32 and click blocks to see what they do. The animated dots show the path from the CPU (or DMA) to the selected block over the internal buses, and the clock tree on the left shows where its clock comes from.</figcaption>
+</figure>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: an MCU is a single-process OS with memory-mapped devices</span>
+<p>There's no kernel between you and the hardware. Your firmware is the only process, it owns every address, and devices are memory-mapped: a peripheral's control registers appear at fixed addresses, just as <code>/dev/mem</code> exposes them on Linux. Interrupts are your signal handlers, timers are your <code>setInterval</code>, DMA is <code>sendfile()</code>, and the watchdog is a systemd watchdog that hard-reboots the machine if you stop petting it. The analogy breaks in one important place: nothing protects you from yourself. A stray pointer can corrupt the stack, rewrite a peripheral's configuration, or (on chips with writable flash) erase your program. Many MCUs do have an MPU (memory protection unit), but it's opt-in.</p>
+</aside>
+
+<div class="ex" data-id="mcu-mc" data-kind="mc">
+  <div class="q">Your ESP32 firmware sets a PWM frequency of 20 kHz and an I²C clock of 400 kHz. Where do both of those frequencies ultimately come from?</div>
+  <ol class="opts">
+    <li>Each peripheral contains its own independent crystal</li>
+    <li data-correct>A shared clock source (crystal or RC oscillator), multiplied by a PLL and divided down by each peripheral's prescalers</li>
+    <li>The CPU toggles the pins in software at those rates</li>
+    <li>The USB connection provides a timing reference</li>
+  </ol>
+  <div class="explain">The ESP32's 40 MHz crystal feeds a PLL; the CPU runs at up to 240 MHz and most peripherals at the 80 MHz APB clock (some can select other sources). Each peripheral divides its source down. That's why some frequencies are achievable exactly and others only approximately, as with the UART baud rates in Chapter 6.</div>
+</div>
+</section>
+
+<section>
+<h2 id="registers">Memory-mapped registers: the real API</h2>
+<p>Every peripheral is controlled through <b>registers</b>: small words of memory, at fixed addresses, wired directly to the hardware. Writing a bit doesn't store a value somewhere for later; it closes a switch in the silicon. On the ATmega328P each 8-pin port has three registers:</p>
+<table>
+  <tr><th>Register</th><th>Address (data space)</th><th>Meaning of bit \(n\)</th></tr>
+  <tr><td><code>DDRB</code></td><td>0x24</td><td><b>Data direction</b>: 1 = pin \(n\) is an output, 0 = input</td></tr>
+  <tr><td><code>PORTB</code></td><td>0x25</td><td>For an output: the level to drive. For an input: 1 enables the internal pull-up</td></tr>
+  <tr><td><code>PINB</code></td><td>0x23</td><td><b>Read</b> the actual pin level. Writing a 1 toggles the corresponding PORTB bit</td></tr>
+</table>
+<p>Arduino pin 13, the one with the on-board LED, is <b>PB5</b>: bit 5 of port B. So "turn the LED on" is: set bit 5 of DDRB (make it an output), then set bit 5 of PORTB (drive it high). In C you manipulate individual bits with masks and the bitwise operators you already know:</p>
+<pre><code class="raw">DDRB  |=  (1 << DDB5);       // set bit 5: PB5 is an output
+PORTB |=  (1 << PORTB5);     // set bit 5: drive high, LED on
+PORTB &= ~(1 << PORTB5);     // clear bit 5: drive low, LED off
+PORTB ^=  (1 << PORTB5);     // flip bit 5 (read-modify-write)
+PINB   =  (1 << PINB5);      // hardware toggle: one write, no read needed
+bool pressed = !(PIND & (1 << PIND2));   // read pin 2 (active low with pull-up)</code></pre>
+<p>Each of those set/clear lines compiles to a single 2-cycle <code>SBI</code> or <code>CBI</code> instruction: 125 ns at 16 MHz. By comparison, Arduino's <code>digitalWrite(13, HIGH)</code> takes a few microseconds, because it looks up the pin number in tables (pin → port, pin → bit mask, pin → timer), turns off any PWM on that pin, and disables interrupts briefly around the write. It's about 30–50 times slower, which almost never matters and occasionally matters a lot (bit-banging a protocol, toggling a pin in a fast ISR).</p>
+
+<figure class="widget" id="fig-regs">
+  <div id="w-regs"></div>
+  <figcaption><b>Figure 7.2</b> The ATmega328P's port B registers. Click bits to set them, or build a statement in the bottom row and press Apply. The LEDs show what each pin does: lit when it's an output driving high. The PINB row is read-only: it shows the pin's real level, including <code>?</code> for floating inputs (an input with its pull-up off). PB6 and PB7 are wired to the 16 MHz crystal on an Uno, so they're greyed out.</figcaption>
+</figure>
+
+<div class="ex" data-id="reg-task" data-kind="task">
+  <div class="q">In Figure 7.2, start from the reset state (everything 0), and make <b>PB5 (Arduino pin 13) an output driving high</b> while every other pin stays an <b>input</b>. Then make PB0 an input <b>with its pull-up enabled</b>.</div>
+  <div class="explain">You need DDRB = 0x20 (only bit 5 set) and PORTB with bits 5 and 0 set (0x21). Notice that PORTB bit 0 means something different on an input pin (pull-up enable) than on an output pin (drive level). The same bit, two meanings: always read the register description.</div>
+</div>
+
+<div class="ex" data-id="reg-hex" data-kind="text" data-answer="0x21|21|33|0b00100001|00100001|0x21u">
+  <div class="q">After <code>PORTB = 0; PORTB |= (1 &lt;&lt; 5) | (1 &lt;&lt; 0);</code> what is the value of PORTB? Answer in hex (like 0x3C) or decimal.</div>
+  <div class="hint">\(1 \ll 5 = 32\) and \(1 \ll 0 = 1\). OR them together.</div>
+  <div class="explain">\(32 + 1 = 33 = 0\text{x}21 = 0010\,0001_2\).</div>
+</div>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Read-modify-write is a race condition</span>
+<p><code>PORTB |= mask</code> is three steps: read PORTB, OR, write it back. If an interrupt fires between the read and the write and changes another bit of PORTB, your write-back silently undoes the ISR's change: a classic lost update. The AVR dodges this for single bits because the compiler emits atomic <code>SBI</code>/<code>CBI</code> instructions for constant masks, but not for multi-bit or variable masks. The ESP32 avoids it by design with paired <b>write-1-to-set</b> and <b>write-1-to-clear</b> registers (<code>GPIO_OUT_W1TS_REG</code>, <code>GPIO_OUT_W1TC_REG</code>): writing a 1 to bit \(n\) sets (or clears) only pin \(n\), and zeros mean "leave alone". No read, no race. It's the hardware equivalent of an atomic <code>fetch_or</code>.</p>
+</aside>
+
+<p>Datasheets also show how each pin can be taken over by a peripheral: the "alternate functions". PB3 is also MOSI and the output of Timer2's compare unit A (OC2A); PD0 and PD1 are the UART's RX and TX. Enabling a peripheral overrides the PORT/DDR settings for its pins. On the AVR, these assignments are fixed. On the ESP32 they're mostly flexible, as we'll see.</p>
+
+<figure class="widget" id="fig-avr">
+  <div id="w-avr"></div>
+  <div class="w-controls" id="c-avr"></div>
+  <figcaption><b>Figure 7.3</b> A minimal ATmega328P system: the 16 MHz crystal with its load capacitors, a decoupling capacitor, a reset pull-up, the LED on PB5 and a button on PD2 (INT0) using the internal pull-up. Press the button: the INT0 interrupt fires on the falling edge and its ISR toggles the LED. The counter shows how many times the ISR ran.</figcaption>
+</figure>
+
+<h3 id="arduino">The Arduino layer vs bare metal</h3>
+<p>The Arduino framework is a <b>hardware abstraction layer</b> plus a build system. <code>pinMode</code>, <code>digitalWrite</code>, <code>analogRead</code>, <code>Serial</code>, <code>Wire</code> and <code>SPI</code> wrap the registers in a portable API, <code>millis()</code> is driven by a Timer0 overflow interrupt, and <code>setup()</code>/<code>loop()</code> are called from a hidden <code>main()</code>. Arduino-ESP32 wraps ESP-IDF in the same way, which is why you can mix the two. It's an excellent starting point and a perfectly respectable production choice for small projects. Know what it costs:</p>
+<ul>
+  <li><b>Hidden resources.</b> Timer0 is taken (by <code>millis()</code>), <code>tone()</code> uses Timer2, and the Servo library takes Timer1, which disables <code>analogWrite()</code> on pins 9 and 10. If two libraries fight over a timer, the symptoms look random.</li>
+  <li><b>Hidden time.</b> <code>Serial.print</code> blocks when its 64-byte buffer is full; <code>delay()</code> burns the CPU; <code>analogRead()</code> takes about 110 µs on an Uno.</li>
+  <li><b>Hidden interrupts.</b> Timer0's overflow ISR runs every 1.024 ms and adds jitter to anything time-critical.</li>
+</ul>
+<p>Going bare-metal doesn't mean abandoning Arduino. It means knowing which register a function touches, so you can drop down a level for the one hot path that needs it.</p>
+</section>
+
+<section>
+<h2 id="interrupts">Interrupts</h2>
+<p>Your <code>loop()</code> can check a button a million times a second and still miss a 2 µs encoder pulse that happens while it's busy printing. <b>Interrupts</b> invert the control flow: the hardware notices the event, finishes the current instruction, saves a little state, and jumps to a function you registered, the <b>interrupt service routine</b> (ISR). When the ISR returns, the interrupted code resumes as if nothing happened. Sources include pin changes, timer matches, a byte arriving on a UART, an ADC conversion finishing, or a DMA transfer completing.</p>
+<p>The sequence, in more detail, is:</p>
+<ol>
+  <li>The peripheral sets an <b>interrupt flag</b> bit in one of its registers. This happens even if interrupts are disabled; the flag simply stays set (it's "pending").</li>
+  <li>If that interrupt is enabled (its enable bit and the global interrupt enable are both set), the CPU finishes its current instruction and saves the program counter.</li>
+  <li>It looks up the ISR's address in the <b>vector table</b> and jumps there. The compiler-generated prologue pushes any registers the ISR uses.</li>
+  <li>The ISR runs. On most peripherals, entering the ISR (or reading a data register) clears the flag; on some, your code must clear it explicitly. Forget, and the ISR re-triggers forever.</li>
+  <li>The epilogue restores registers and a return-from-interrupt instruction resumes the main code.</li>
+</ol>
+<p>The time from event to the first line of your ISR is the <b>interrupt latency</b>: a handful of cycles in hardware plus the prologue, so roughly 1–2 µs on a 16 MHz AVR, and on the order of a couple of microseconds through ESP-IDF's interrupt dispatcher on an ESP32. Latency grows whenever interrupts are disabled (inside another ISR on the AVR, or in a critical section) because the new interrupt has to wait.</p>
+
+<pre><code class="raw">// Arduino (AVR): count button presses on pin 2 (INT0)
+volatile uint16_t presses = 0;          // shared with the ISR: must be volatile
+
+void onPress() {                        // runs in interrupt context
+    presses++;                          // keep it short!
+}
+
+void setup() {
+    pinMode(2, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(2), onPress, FALLING);
+    Serial.begin(115200);
+}
+
+void loop() {
+    noInterrupts();                     // a 16-bit read takes two instructions on an 8-bit CPU:
+    uint16_t n = presses;               // without this, the ISR could change it halfway
+    interrupts();
+    Serial.println(n);
+    delay(200);
+}</code></pre>
+
+<h3 id="volatile">Why <code>volatile</code>, and why it isn't enough</h3>
+<p>The optimiser assumes that a variable only changes when the code it can see changes it. In <code>while (!flag) {}</code> it sees nothing inside the loop that writes <code>flag</code>, so it may load <code>flag</code> once into a register and spin forever. Declaring it <code>volatile</code> forces a real memory read every time. Any variable written in an ISR and read elsewhere (or vice versa) must be volatile. So must pointers to hardware registers, which is how the AVR headers define <code>PORTB</code>.</p>
+<p>But <code>volatile</code> does not make access <b>atomic</b>. On an 8-bit AVR, reading a 16- or 32-bit variable takes several instructions, and an interrupt can land between them and leave you with a torn value: half old bytes and half new. The fix is a short critical section (<code>noInterrupts()</code>/<code>interrupts()</code>, or <code>ATOMIC_BLOCK(ATOMIC_RESTORESTATE)</code> from <code>&lt;util/atomic.h&gt;</code>) around the copy. On the 32-bit ESP32 aligned 32-bit reads are atomic, but read-modify-write sequences such as <code>count++</code> are not, and with two cores you need real synchronisation: <code>portENTER_CRITICAL</code> with a spinlock, FreeRTOS primitives, or C11 atomics.</p>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "volatile makes it thread-safe"</span>
+<p><code>volatile</code> only means "don't cache this in a register, and don't remove or reorder accesses to it relative to other volatile accesses". It says nothing about atomicity, and nothing about ordering relative to non-volatile memory. It is the right tool for hardware registers and ISR flags on a single core. For anything more, use a critical section, an atomic type or an RTOS primitive. This is the same lesson as Java's or C#'s <code>volatile</code>, with sharper edges.</p>
+</aside>
+
+<h3 id="isr-rules">Keep ISRs short</h3>
+<p>While an ISR runs, the main code is frozen, and (on the AVR, and at the same or lower priority elsewhere) other interrupts wait. Long ISRs cause three kinds of trouble: they add latency to every other interrupt, they starve the main loop, and if the same event recurs before the ISR finishes, the hardware can only remember <em>one</em> pending occurrence. The rest are silently lost.</p>
+<p>The standard pattern is <b>do the minimum, defer the rest</b>: in the ISR, capture the timestamp or the data byte, set a flag or push to a queue, and return. Do the processing in the main loop or, with an RTOS, in a task that the ISR wakes. Things that don't belong in an ISR: <code>Serial.print</code>, <code>delay()</code>, floating-point maths on chips without an FPU, heap allocation, I²C transactions, and anything that waits for another interrupt (which can never arrive while you're blocking it).</p>
+
+<figure class="widget" id="fig-isr">
+  <div id="w-isr"></div>
+  <div class="w-controls" id="c-isr"></div>
+  <figcaption><b>Figure 7.4</b> Interrupt timing in slow motion. Events (say, encoder pulses) arrive at random at the chosen rate. Each one interrupts the main loop (blue) and runs the ISR (orange). An event that arrives while the ISR is busy sets the pending flag (yellow) and runs next; one that arrives while the flag is already set is <b>lost</b> (red ✕). Make the ISR longer, or raise the event rate, and watch the main loop starve and events go missing.</figcaption>
+</figure>
+
+<div class="ex" data-id="isr-multi" data-kind="multi">
+  <div class="q">Which of these are reasonable things to do inside an ISR? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>Increment a volatile counter</li>
+    <li>Print a debug message with <code>Serial.println()</code></li>
+    <li data-correct>Read a byte from the UART data register into a ring buffer</li>
+    <li>Wait in a loop for an I²C transaction to complete</li>
+    <li data-correct>Record the current timer value as a timestamp and set a flag</li>
+    <li data-correct>Send an item to a FreeRTOS queue with <code>xQueueSendFromISR()</code></li>
+  </ol>
+  <div class="explain">Capture, timestamp, flag, enqueue: all fast and non-blocking. Printing can block when the buffer is full and itself relies on interrupts; waiting on I²C may wait for an interrupt that can't run. In FreeRTOS, only API functions ending in <code>FromISR</code> may be called from an ISR.</div>
+</div>
+
+<h3 id="debounce">Debouncing</h3>
+<p>Mechanical contacts don't close cleanly. The metal bounces, making and breaking contact several times over a few hundred microseconds to a few milliseconds. To an interrupt on a falling edge, one press looks like five. There are two cures, and robust designs often use both:</p>
+<ul>
+  <li><b>Hardware:</b> an RC low-pass filter (for example 10 kΩ and 100 nF, \(\tau = 1\) ms) smooths the bounces into a single slow edge, and a <b>Schmitt-trigger</b> input (most MCU pins have some hysteresis; a 74HC14 has a lot) turns that slow edge back into one clean transition. Chapter 3 has the RC maths; Chapter 6 explained why slow edges need hysteresis.</li>
+  <li><b>Software:</b> after the first edge, ignore further edges for a lockout time (10–50 ms), or sample the pin periodically from a timer and only accept a new state after it has been stable for several samples.</li>
+</ul>
+
+<figure class="widget" id="fig-bounce">
+  <div id="w-bounce"></div>
+  <div class="w-controls" id="c-bounce"></div>
+  <figcaption><b>Figure 7.5</b> A bouncing button and an RC debouncer. The thin trace is the raw contact; the thick trace is the voltage after the RC filter; dashed lines are the Schmitt input's thresholds. The readouts count how many falling edges a plain input and a Schmitt input would see. Increase \(\tau\) until the Schmitt input sees exactly one press, then notice how much delay you've added.</figcaption>
+</figure>
+
+<pre><code class="raw">// Software debounce: accept a press only if 30 ms have passed since the last one
+volatile uint32_t lastEdgeMs = 0;
+volatile bool pressEvent = false;
+
+void IRAM_ATTR onButton() {             // IRAM_ATTR: ESP32 ISRs must live in RAM
+    uint32_t now = millis();
+    if (now - lastEdgeMs > 30) {        // unsigned subtraction handles millis() wrap-around
+        pressEvent = true;
+    }
+    lastEdgeMs = now;
+}</code></pre>
+</section>
+
+<section>
+<h2 id="timers">Timers, PWM and the watchdog</h2>
+<p>A hardware <b>timer</b> is a counter register that increments on every tick of a clock. That clock is the system clock divided by a <b>prescaler</b> (1, 8, 64, 256 or 1024 on the AVR). Comparators watch the counter: when it equals a <b>compare register</b> (OCR), the timer can raise an interrupt, toggle or set a pin, or reset the counter to zero. That last option is <b>CTC</b> mode ("clear timer on compare"), and it turns the timer into a precise periodic event generator:</p>
+<div class="formula">
+$$f_{\text{interrupt}} = \frac{f_{clk}}{N\,(1 + \text{OCR})} \qquad f_{\text{toggle pin}} = \frac{f_{clk}}{2N\,(1 + \text{OCR})}$$
+<p>CTC mode. \(N\) is the prescaler; the counter runs 0, 1, …, OCR, so one period is OCR + 1 ticks. A pin that toggles on each match completes one cycle every two matches.</p>
+</div>
+<p><b>Worked example.</b> You want a 1 kHz control-loop interrupt on a 16 MHz Uno. With \(N = 64\), one tick is 4 µs, and 1 ms is 250 ticks, so OCR = 249. With \(N = 8\) you'd need OCR = 1999, which doesn't fit an 8-bit timer (max 255) but fits the 16-bit Timer1. Always pick the smallest prescaler whose OCR still fits the timer's width: it gives the finest resolution.</p>
+
+<figure class="widget" id="fig-timer">
+  <div id="w-timer"></div>
+  <div class="w-controls" id="c-timer"></div>
+  <figcaption><b>Figure 7.6</b> A timer in CTC mode. The sawtooth is the counter climbing to OCR and resetting (each reset is an interrupt); the square wave is a pin that toggles on every match. Choose the timer width and prescaler, and adjust OCR. The readouts give the interrupt frequency and its error from a target.</figcaption>
+</figure>
+
+<div class="ex" data-id="timer-task" data-kind="task">
+  <div class="q">In Figure 7.6, using the <b>8-bit</b> timer at 16 MHz, produce an interrupt rate of <b>exactly 1000 Hz</b>.</div>
+  <div class="explain">Prescaler 64 and OCR = 249: \(16\,000\,000 / (64 \times 250) = 1000\) Hz exactly. With prescaler 256 you'd need OCR = 61.5, impossible; the nearest values give 1008 Hz or 992 Hz, an error of 0.8%.</div>
+</div>
+
+<div class="ex" data-id="timer-num" data-kind="num" data-answer="124" data-tol="0" data-unit="">
+  <div class="q">A 16 MHz AVR timer in CTC mode, prescaler 8, toggles a pin on each compare match. What OCR value makes the pin output an <b>8 kHz</b> square wave?</div>
+  <div class="hint">Use \(f_{toggle} = f_{clk}/(2N(1+\text{OCR}))\) and solve for OCR.</div>
+  <div class="explain">\(1 + \text{OCR} = 16\,000\,000/(2 \times 8 \times 8000) = 125\), so OCR = 124. The compare interrupt itself runs at 16 kHz; the pin needs two toggles per cycle.</div>
+</div>
+
+<pre><code class="raw">// AVR Timer2: 1 kHz interrupt in CTC mode
+volatile uint32_t ticks = 0;
+void setup() {
+    cli();
+    TCCR2A = (1 << WGM21);       // CTC: clear on compare match A
+    TCCR2B = (1 << CS22);        // Timer2 prescaler 64
+    OCR2A  = 249;                // 16 MHz / 64 / 250 = 1000 Hz
+    TIMSK2 = (1 << OCIE2A);      // enable the compare-match-A interrupt
+    sei();
+}
+ISR(TIMER2_COMPA_vect) { ticks++; }
+
+// ESP-IDF: the high-resolution esp_timer does the same job without touching hardware timers
+static void control_cb(void *arg) { /* runs every 1 ms in the esp_timer task */ }
+const esp_timer_create_args_t args = { .callback = control_cb, .name = "ctl" };
+esp_timer_handle_t t;
+esp_timer_create(&args, &t);
+esp_timer_start_periodic(t, 1000);   // period in microseconds</code></pre>
+
+<p>PWM (Chapter 6) is the same machinery with the counter running freely from 0 to TOP and a pin that is set at 0 and cleared when the counter passes the compare value. Timers also <b>capture</b>: on an input edge they copy the counter into a register, timestamping the edge with clock-cycle precision and no software latency. That's how you measure RC receiver pulse widths or an ultrasonic sensor's echo properly.</p>
+
+<h3 id="watchdog">The watchdog</h3>
+<p>Firmware hangs. An I²C bus locks up (Chapter 6), a loop waits for a flag that never comes, a stack overflow corrupts a return address. A <b>watchdog timer</b> (WDT) is an independent countdown, clocked from its own oscillator, that resets the chip if the firmware doesn't "kick" (reset) it in time. You kick it from one place in your main loop that's only reached when everything is healthy, never from a timer ISR (which would keep running while the main loop is stuck).</p>
+<pre><code class="raw">#include <avr/wdt.h>
+void setup() { wdt_enable(WDTO_250MS); }   // reset if not kicked within ~250 ms
+void loop()  { readSensors(); updateMotors(); wdt_reset(); }
+
+// ESP-IDF task watchdog: each subscribed task must check in
+esp_task_wdt_add(NULL);                     // subscribe the current task
+while (true) { do_work(); esp_task_wdt_reset(); vTaskDelay(pdMS_TO_TICKS(10)); }</code></pre>
+<p>For a robot, a watchdog reset is also a safety event: when the chip resets, its pins revert to inputs. Make sure that "all MCU pins floating" means "motors off" in hardware, with pull-downs on motor-driver enable and PWM inputs. That costs two resistors and is the cheapest failsafe you'll ever add.</p>
+
+<div class="ex" data-id="vol-mc" data-kind="mc">
+  <div class="q">A timer ISR sets <code>bool dataReady = true;</code> and <code>loop()</code> waits with <code>while (!dataReady) {}</code>. It works with optimisation off and hangs forever with <code>-O2</code>. What's the fix?</div>
+  <ol class="opts">
+    <li>Add <code>delay(1)</code> inside the while loop</li>
+    <li data-correct>Declare the flag <code>volatile bool dataReady;</code></li>
+    <li>Make the ISR longer so the flag is set for more time</li>
+    <li>Use an <code>int</code> instead of a <code>bool</code></li>
+  </ol>
+  <div class="explain">Without <code>volatile</code>, the compiler hoists the load out of the loop because nothing in the loop writes the flag. <code>delay(1)</code> might hide the bug by forcing a reload after a function call, which is exactly why this bug comes and goes.</div>
+</div>
+</section>
+
+<section>
+<h2 id="esp32">The ESP32</h2>
+<p>Espressif's ESP32 family is the default brain for hobby robots that need a radio. The original ESP32 has two 32-bit Xtensa LX6 cores at up to 240 MHz, about 520 KB of SRAM, Wi-Fi (802.11 b/g/n) and Bluetooth (Classic and BLE 4.2), and a long list of peripherals: three UARTs, two I²C, several SPI controllers, 16 PWM channels (LEDC) plus a motor-control PWM unit (MCPWM), a pulse counter for encoders, the RMT peripheral (originally for infrared remotes, now used for WS2812 LEDs and DShot), a CAN controller (TWAI), two ADCs and two DACs, capacitive touch and a low-power coprocessor. Newer members trade features: the <b>ESP32-S3</b> (dual LX7, BLE 5, native USB, vector instructions), the <b>ESP32-C3</b> (single RISC-V core, BLE 5, cheap) and the <b>ESP32-C6</b> (adds Wi-Fi 6 and 802.15.4 for Thread/Zigbee). Most of what follows applies to all of them, but pin numbers and quirks differ. Always check the datasheet for the exact chip.</p>
+<p>You rarely use the bare chip. A <b>module</b> (ESP32-WROOM-32E, ESP32-S3-WROOM-1, ...) adds the flash chip, the 40 MHz crystal, the RF matching network and the antenna under a metal shield, already certified for radio emissions. A <b>dev board</b> adds a USB-serial converter, a 3.3 V regulator, and BOOT and EN buttons. That extra hardware matters later when we talk about battery life.</p>
+
+<h3 id="cores">Two cores</h3>
+<p>On the dual-core parts, ESP-IDF runs a symmetric-multiprocessing build of FreeRTOS. By convention the Wi-Fi and Bluetooth stacks run on <b>core 0</b> ("PRO_CPU") and Arduino's <code>loop()</code> runs on <b>core 1</b> ("APP_CPU"). You can pin your own tasks to either. Putting time-critical motor control on core 1 keeps it away from radio activity, but remember the earlier warning: anything shared between cores needs real synchronisation, not just <code>volatile</code>.</p>
+
+<h3 id="strapping">Strapping pins and pins to avoid</h3>
+<p>At reset, before any of your code runs, the ESP32 samples a few <b>strapping pins</b> to decide how to boot. Hardware attached to those pins can therefore stop the board from booting at all, and it's the most common "it worked on the breadboard, not on my PCB" bug:</p>
+<table>
+  <tr><th>Pin (ESP32)</th><th>Sampled at reset for</th><th>Rule of thumb</th></tr>
+  <tr><td>GPIO0</td><td>Boot mode: low = serial download (flashing), high = run from flash</td><td>This is the BOOT button. Don't let external circuits pull it low at reset.</td></tr>
+  <tr><td>GPIO2</td><td>Must be low or floating for download mode</td><td>Often has the on-board LED. Avoid strong pull-ups.</td></tr>
+  <tr><td>GPIO12 (MTDI)</td><td>Flash supply voltage: high = 1.8 V</td><td>Pulled high at reset → 3.3 V flash gets 1.8 V → boot loop. Avoid, or burn the eFuse that fixes the flash voltage.</td></tr>
+  <tr><td>GPIO15 (MTDO)</td><td>Low silences the boot log on UART0</td><td>Mostly harmless, but don't fight it.</td></tr>
+  <tr><td>GPIO5</td><td>SDIO slave timing</td><td>Harmless for most uses; boots with an internal pull-up.</td></tr>
+</table>
+<p>Other pins to treat with care on the original ESP32:</p>
+<ul>
+  <li><b>GPIO6–11</b> are wired to the module's SPI flash. Touch them and the chip crashes.</li>
+  <li><b>GPIO16–17</b> drive the PSRAM on WROVER modules.</li>
+  <li><b>GPIO34–39</b> are <b>input only</b>, with no internal pull-ups or pull-downs. Great for ADC inputs and buttons with external resistors; useless as outputs.</li>
+  <li><b>GPIO1/3</b> are UART0 TX/RX, used for flashing and the boot log.</li>
+  <li>Some pins briefly output PWM or glitch high during boot (GPIO14 and GPIO15, for example, plus GPIO1/3 with UART traffic). Don't put a motor driver's enable on one of those without a pull-down and some thought about what a half-second "on" pulse would do.</li>
+</ul>
+<p>Safe general-purpose choices on a WROOM module: GPIO4, 13, 16–19, 21–23, 25–27 and 32–33.</p>
+
+<figure class="widget" id="fig-strap">
+  <div id="w-strap"></div>
+  <div class="w-controls" id="c-strap"></div>
+  <figcaption><b>Figure 7.7</b> The ESP32's reset and boot circuit. EN has a 10 kΩ pull-up and a 1 µF capacitor that holds the chip in reset until the supply is stable; GPIO0 has a pull-up and the BOOT button. Close the BOOT switch and press Reset to enter the bootloader. Then add the "sensor with pull-up on GPIO12" and press Reset again to reproduce a classic boot-loop bug.</figcaption>
+</figure>
+
+<div class="ex" data-id="pin-sort" data-kind="sort">
+  <div class="q">Sort these ESP32 (WROOM-32) pins.</div>
+  <div class="bins">
+    <div data-bin="strap">⚠️ Strapping pin</div>
+    <div data-bin="in">Input only</div>
+    <div data-bin="flash">🚫 Flash (never use)</div>
+    <div data-bin="ok">✅ Safe general purpose</div>
+  </div>
+  <ul class="items">
+    <li data-bin="strap">GPIO0</li>
+    <li data-bin="strap">GPIO12</li>
+    <li data-bin="in">GPIO34</li>
+    <li data-bin="in">GPIO36</li>
+    <li data-bin="flash">GPIO6</li>
+    <li data-bin="flash">GPIO11</li>
+    <li data-bin="ok">GPIO23</li>
+    <li data-bin="ok">GPIO32</li>
+  </ul>
+  <div class="explain">Strapping pins are sampled at reset (GPIO0, 2, 5, 12, 15); GPIO34–39 are input-only with no internal pulls; GPIO6–11 connect to the flash chip. GPIO32 is also an ADC1 channel, which makes it a good analog input even with Wi-Fi on.</div>
+</div>
+
+<h3 id="adc32">The ESP32's ADC: usable, with care</h3>
+<p>The original ESP32's ADCs are its weakest peripheral, and you should know their quirks before you design a battery monitor around one:</p>
+<ul>
+  <li><b>ADC2 is shared with the Wi-Fi driver.</b> While Wi-Fi is running, ADC2 reads fail (ESP-IDF returns a timeout error). Put analog inputs on <b>ADC1</b> channels: GPIO32–39.</li>
+  <li><b>Attenuation sets the range.</b> The ADC itself measures about 0–1 V. An input attenuator extends that: Espressif's documentation gives recommended ranges of roughly 100–950 mV at 0 dB, up to roughly 150–2450 mV at the highest setting (called 11 dB in older code, 12 dB in IDF 5). Outside those windows the response is nonlinear.</li>
+  <li><b>It's nonlinear and the reference varies from chip to chip.</b> Near 0 V the reading sticks at zero; near the top it saturates early and curves. The internal reference is around 1.1 V but varies by roughly ±10% between chips, so Espressif burns a per-chip calibration value into eFuse. Use the calibration API (<code>adc_cali_*</code> in IDF 5, or <code>analogReadMilliVolts()</code> in Arduino-ESP32), which applies it.</li>
+  <li><b>It's noisy.</b> Average several samples, add 100 nF at the pin (Chapter 6 explained why), and keep the signal in the linear window with a divider.</li>
+</ul>
+
+<figure class="widget" id="fig-adc">
+  <div id="w-adc"></div>
+  <div class="w-controls" id="c-adc"></div>
+  <figcaption><b>Figure 7.8</b> An ESP32 ADC transfer curve (an illustrative model of typical behaviour, not a datasheet curve). The dashed line is the ideal response; "raw" converts the code naively as code × full-scale / 4095; "calibrated" applies a per-chip correction. The shaded band is the recommended input range for the chosen attenuation. Notice the dead zone near 0 V and the compression near the top.</figcaption>
+</figure>
+
+<div class="ex" data-id="adc2-mc" data-kind="mc">
+  <div class="q">Your ESP32 robot reads its battery voltage on GPIO25. It works in a test sketch, but as soon as you enable Wi-Fi, the readings fail. Why?</div>
+  <ol class="opts">
+    <li>Wi-Fi transmissions add too much noise to the battery line</li>
+    <li data-correct>GPIO25 is on ADC2, which the Wi-Fi driver uses; move the divider to an ADC1 pin (GPIO32–39)</li>
+    <li>GPIO25 is a strapping pin</li>
+    <li>Wi-Fi changes the ADC attenuation</li>
+  </ol>
+  <div class="explain">ADC2 channels (GPIO0, 2, 4, 12–15, 25–27) are unusable while Wi-Fi is active. GPIO34–39 are ideal for analog inputs: input-only pins on ADC1.</div>
+</div>
+
+<h3 id="matrix">The GPIO matrix</h3>
+<p>On the AVR, the UART's TX is PD1, full stop. On the ESP32 most peripheral signals pass through a <b>GPIO matrix</b>, a big crossbar that can route almost any peripheral input or output to almost any GPIO. That's why <code>Wire.begin(sda, scl)</code> and <code>uart_set_pin()</code> take pin numbers. The routing adds a few nanoseconds of delay, so the fastest signals (the flash's SPI bus, high-speed SPI at 80 MHz) use dedicated <b>IO_MUX</b> pins instead. For a robot it means a lot of freedom in PCB layout: route the board for clean wiring, then tell the firmware where everything ended up.</p>
+
+<h3 id="idf">ESP-IDF vs Arduino-ESP32</h3>
+<p><b>ESP-IDF</b> is Espressif's official framework: CMake builds, <code>menuconfig</code> for configuration, FreeRTOS, and C APIs for every peripheral and protocol (Wi-Fi, BLE through NimBLE or Bluedroid, HTTP, MQTT, OTA, flash encryption, secure boot). <b>Arduino-ESP32</b> is a layer on top of it. You get the Arduino API and libraries, and you can still call IDF functions directly. A good path: start in Arduino (fast results, huge library ecosystem), use IDF APIs where Arduino hides something you need (RMT, MCPWM, sleep, power management), and move to pure IDF (or <b>PlatformIO</b> with the IDF framework) when the project needs reproducible builds, fine-grained configuration or production features like secure boot.</p>
+</section>
+
+<section>
+<h2 id="rtos">FreeRTOS: tasks, queues and priorities</h2>
+<p>A super-loop (<code>loop()</code> calling everything in turn) works until one part needs to wait. The BLE stack waits for packets, the IMU driver waits for I²C, the logger waits for the SD card, and the motor controller must run every 10 ms regardless. A <b>real-time operating system</b> lets you write each of those as an independent <b>task</b> with its own stack, as if it had the CPU to itself, and a <b>scheduler</b> switches between them.</p>
+<p>FreeRTOS's scheduler is simple and predictable, which is what "real-time" really means:</p>
+<ul>
+  <li>Every task has a <b>priority</b>. The scheduler always runs the highest-priority task that is <b>ready</b>. Equal priorities share time slices of one tick (1 ms by default on ESP-IDF).</li>
+  <li>A task that calls <code>vTaskDelay()</code>, waits on a queue, a semaphore or an event, is <b>blocked</b> and uses no CPU until the event happens or its timeout expires.</li>
+  <li>Scheduling is <b>preemptive</b>: when a higher-priority task becomes ready (because an ISR gave it a semaphore, say), it runs immediately, interrupting whatever lower-priority task was running.</li>
+  <li>When nothing is ready, the <b>idle task</b> runs (and can put the CPU into light sleep).</li>
+</ul>
+<p>The consequence: a high-priority task that never blocks starves everything below it. In FreeRTOS, "busy-waiting" isn't just wasteful, it's a correctness bug.</p>
+
+<figure class="widget wide" id="fig-rtos">
+  <div id="w-rtos"></div>
+  <div class="w-controls" id="c-rtos"></div>
+  <figcaption><b>Figure 7.9</b> A FreeRTOS schedule on one core, 100 ms. The motor task needs 2 ms every 10 ms; the comms task 4 ms every 20 ms; a button ISR at 37 ms wakes the comms task early. Red marks are motor deadlines missed. Now misbehave: give the logger a <b>higher priority</b>, then make it <b>busy-wait</b> instead of blocking, and see who starves.</figcaption>
+</figure>
+
+<pre><code class="raw">// ESP-IDF: an ISR feeds a queue; a task does the work
+static QueueHandle_t cmd_q;
+
+typedef struct { int16_t throttle, steering; } cmd_t;
+
+static void motor_task(void *arg) {
+    cmd_t cmd = {0};
+    TickType_t last = xTaskGetTickCount();
+    for (;;) {
+        cmd_t c;
+        while (xQueueReceive(cmd_q, &c, 0) == pdTRUE) cmd = c;   // drain: keep the newest
+        apply_motors(cmd.throttle, cmd.steering);
+        vTaskDelayUntil(&last, pdMS_TO_TICKS(10));              // exact 100 Hz, no drift
+    }
+}
+
+void app_main(void) {
+    cmd_q = xQueueCreate(8, sizeof(cmd_t));
+    // name, stack bytes, arg, priority, handle, core
+    xTaskCreatePinnedToCore(motor_task, "motor", 4096, NULL, 10, NULL, 1);
+}
+
+// Elsewhere (a BLE callback, a UART task...):  xQueueSend(cmd_q, &c, 0);</code></pre>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: tasks are threads, queues are channels</span>
+<p>A FreeRTOS task is a thread with a fixed-size stack you choose up front (too small and it overflows silently, unless you enable stack checking). A queue is a bounded, thread-safe channel that copies items by value, just like a Go channel or a <code>BlockingQueue</code>. Semaphores, mutexes (with priority inheritance) and event groups are what you'd expect. Two differences from desktop threads: priorities are strict (there's no fairness; a ready high-priority task always wins), and there's no virtual memory, so every stack is real RAM you pay for. <code>uxTaskGetStackHighWaterMark()</code> tells you how close each task came to overflowing.</p>
+</aside>
+</section>
+
+<section>
+<h2 id="power">Power modes, battery life and OTA</h2>
+<p>An ESP32 that's awake with Wi-Fi transmitting can draw 200–300 mA in bursts. One that's in <b>deep sleep</b> draws around 10 µA. That's a ratio of more than 10,000, and battery-powered design is the art of spending as much time as possible in the low state. The main modes, roughly:</p>
+<table>
+  <tr><th>Mode</th><th>What runs</th><th>Typical current (chip)</th><th>Wake-up</th></tr>
+  <tr><td>Active, radio TX</td><td>Everything</td><td>~100–250 mA (bursts higher)</td><td>—</td></tr>
+  <tr><td>Modem sleep</td><td>CPU on, radio off between beacons</td><td>~20–30 mA at 80 MHz, more at 240 MHz</td><td>—</td></tr>
+  <tr><td>Light sleep</td><td>CPU paused, RAM and state kept</td><td>~0.8 mA</td><td>~1 ms; resumes where it stopped</td></tr>
+  <tr><td>Deep sleep</td><td>Only the RTC domain (timer, RTC memory, ULP)</td><td>~10 µA</td><td>Reboots into <code>app_main()</code>; only RTC memory survives</td></tr>
+  <tr><td>Hibernation</td><td>RTC timer only</td><td>~5 µA</td><td>Like deep sleep, fewer sources</td></tr>
+</table>
+<p>The average current decides battery life. If the device is active at \(I_a\) for \(t_a\) seconds every \(T\) seconds and sleeps at \(I_s\) the rest of the time:</p>
+<div class="formula">
+$$\bar I = \frac{I_a t_a + I_s (T - t_a)}{T} \qquad \text{life} \approx \frac{\text{capacity}}{\bar I}$$
+<p>Duty-cycled average current. In practice derate the capacity by 20–30% for temperature, ageing and the cut-off voltage.</p>
+</div>
+<p><b>Worked example.</b> A weather node wakes every 10 minutes, spends 2 s at 80 mA connecting to Wi-Fi and sending a reading, and sleeps at 10 µA. \(\bar I = (80 \times 2 + 0.01 \times 598)/600 = 0.277\) mA. A 1000 mAh cell lasts \(1000/0.277 \approx 3600\) hours, about five months. Note where the charge goes: the sleep current contributes 0.01 mA, the wake-ups 0.267 mA. Halving the time spent connected helps far more than a better sleep current. That's why low-power designs cache the Wi-Fi channel and use static IPs, or use ESP-NOW or BLE, which connect in milliseconds instead of seconds.</p>
+
+<aside class="callout warn"><span class="ct">⚠️ The dev board, not the chip, sets your sleep current</span>
+<p>Measure a typical ESP32 dev board in deep sleep and you'll see milliamps, not microamps: the USB-serial chip, the power LED, and a regulator like the AMS1117 (several mA of quiescent current) are all still powered. For battery work use a board designed for it, or your own PCB with a low-I<sub>Q</sub> LDO (Chapter 5) and the USB bridge powered only from USB. Also check every pull-up: a 10 kΩ pull-up on a line held low during sleep costs 330 µA, thirty times the chip's own sleep current.</p>
+</aside>
+
+<figure class="widget" id="fig-batt">
+  <div id="w-batt"></div>
+  <div class="w-controls" id="c-batt"></div>
+  <figcaption><b>Figure 7.10</b> Battery life calculator. The curve shows life against the wake-up interval; the dot is your current setting. Notice the knee: at short intervals the wake-ups dominate, and at long intervals the curve flattens at capacity ÷ sleep current. Try the sleep current of a bare module (10 µA) and of a typical dev board (~5 mA).</figcaption>
+</figure>
+
+<div class="ex" data-id="batt-task" data-kind="task">
+  <div class="q">In Figure 7.10, keeping a <b>1000 mAh</b> battery and wake-ups of <b>80 mA for 2 s</b>, find settings that reach <b>one year</b> (365 days) of battery life.</div>
+  <div class="explain">You need \(\bar I \le 1000\,\text{mAh}/8760\,\text{h} = 0.114\) mA. With a 10 µA sleep current, the wake-ups may use at most about 0.104 mA, so \(160\,\text{mA·s}/T \le 0.104\) mA, giving \(T \ge 1540\) s: one wake-up every 26 minutes or so. With a 5 mA dev-board sleep current it's impossible at any interval.</div>
+</div>
+
+<div class="ex" data-id="batt-num" data-kind="num" data-answer="3614" data-tol="2%" data-unit="h">
+  <div class="q">A sensor node draws 80 mA for 2 s every 600 s and 10 µA the rest of the time. Ignoring derating, how many hours does a 1000 mAh battery last?</div>
+  <div class="hint">Average current \(= (80 \times 2 + 0.010 \times 598)/600\) mA.</div>
+  <div class="explain">\(\bar I = (160 + 5.98)/600 = 0.2766\) mA, so life \(= 1000/0.2766 \approx 3614\) h ≈ 150 days. With a realistic 25% derating, plan on about 110 days.</div>
+</div>
+
+<pre><code class="raw">// ESP-IDF deep sleep: wake every 10 minutes; RTC memory survives
+RTC_DATA_ATTR static uint32_t boot_count;     // kept in RTC slow memory
+
+void app_main(void) {
+    boot_count++;
+    take_measurement_and_send();
+    esp_sleep_enable_timer_wakeup(10ULL * 60 * 1000000);   // microseconds
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_33, 0);          // ...or a button pulling GPIO33 low
+    esp_deep_sleep_start();                                // does not return
+}</code></pre>
+
+<h3 id="ota">Over-the-air updates</h3>
+<p>Once the robot is assembled, the USB port is buried. <b>OTA</b> (over-the-air) updates let the firmware download and install a new version of itself. The ESP32's partition table reserves two application slots, <code>ota_0</code> and <code>ota_1</code>, plus a small <code>otadata</code> partition recording which one to boot. The running firmware writes the new image into the <em>other</em> slot, verifies it, flips <code>otadata</code> and reboots. With <b>rollback</b> enabled, the new image must call <code>esp_ota_mark_app_valid_cancel_rollback()</code> after it has proved itself (connected to Wi-Fi, passed a self-test); if it crashes before that, the bootloader reverts to the old slot. It's the same blue/green deployment pattern you'd use for a web service.</p>
+<pre><code class="raw">// ESP-IDF: download and install firmware over HTTPS
+esp_http_client_config_t http = { .url = "https://example.com/rc-car.bin", .cert_pem = server_cert };
+esp_https_ota_config_t ota = { .http_config = &http };
+if (esp_https_ota(&ota) == ESP_OK) esp_restart();
+
+// Arduino-ESP32: OTA from the Arduino IDE / PlatformIO over the local network
+ArduinoOTA.setPassword("change-me");
+ArduinoOTA.begin();          // in setup()
+ArduinoOTA.handle();         // call regularly in loop()</code></pre>
+<aside class="callout warn"><span class="ct">⚠️ OTA on a robot</span>
+<p>An update reboots the MCU, and during the download the CPU and radio are busy. Never allow an OTA while the motors are armed: require the vehicle to be disarmed and stationary, and stop the motors before the download starts. Protect the update channel too (a password at minimum; signed images with secure boot for anything serious), or anyone on the network can replace your firmware.</p>
+</aside>
+</section>
+
+<section>
+<h2 id="ble">Bluetooth Low Energy from the radio up</h2>
+<p><b>Bluetooth Low Energy</b> (BLE, marketed as Bluetooth Smart for a while) shares a name with "Classic" Bluetooth (headphones, serial-port profiles) but is a different protocol, designed from scratch for devices that send small amounts of data and sleep most of the time. It's what your phone uses to talk to fitness bands, and it's the easiest way to control a robot from a phone, because every phone has it and no pairing app is needed beyond a generic one. The standard reference for this section is Townsend, Cufí, Akiba and Davidson's <i>Getting Started with Bluetooth Low Energy</i>.</p>
+
+<h3 id="radio">The radio: 40 channels at 2.4 GHz</h3>
+<p>BLE uses the 2.4 GHz ISM band (2400–2483.5 MHz), shared with Wi-Fi, microwave ovens and many RC links. It divides the band into <b>40 channels</b>, 2 MHz apart. Three of them, channels <b>37, 38 and 39</b> (at 2402, 2426 and 2480 MHz), are <b>advertising channels</b>, deliberately placed in the gaps between the most common Wi-Fi channels 1, 6 and 11. The other 37 are <b>data channels</b>, used once two devices are connected, with <b>frequency hopping</b>: each connection event happens on a different channel, following a pattern both sides know, and channels that keep failing can be removed from the map ("adaptive frequency hopping"). The basic PHY sends 1 Mbit/s; Bluetooth 5 added a 2 Mbit/s PHY (faster, slightly shorter range) and a <b>Coded PHY</b> at 125 or 500 kbit/s that adds forward error correction for roughly four times the range. The ESP32-S3 and C3 support both; the original ESP32 only has the 1 Mbit/s PHY.</p>
+
+<h3 id="adv">Advertising and scanning</h3>
+<p>Before any connection, a device makes itself known by <b>advertising</b>: every advertising interval (20 ms to 10.24 s) it wakes, transmits a short packet on channel 37, then 38, then 39, and goes back to sleep. A random delay of 0–10 ms is added to each interval so that two advertisers that happen to collide don't keep colliding forever. A legacy advertising packet carries up to 31 bytes of payload: flags, the device name, service UUIDs, manufacturer data, transmit power.</p>
+<p>A <b>scanner</b> listens on one advertising channel for a <b>scan window</b>, every <b>scan interval</b>, cycling through the three channels. Discovery happens when an advertising packet lands inside a scan window on the channel being listened to. The <em>scanner</em>'s duty cycle (window ÷ interval) and the <em>advertiser</em>'s interval together set how quickly devices find each other, and both cost power: the advertiser per packet, the scanner for every millisecond its receiver is on.</p>
+
+<figure class="widget wide" id="fig-adv">
+  <div id="w-adv"></div>
+  <div class="w-controls" id="c-adv"></div>
+  <figcaption><b>Figure 7.11</b> Advertising and scanning, slowed down. Each advertising event (orange ticks) sends one packet on channels 37, 38 and 39; the shaded bars are the scanner's listening windows, which rotate through the three channels. A packet that lands inside a window is heard (green flash). Shorten the advertising interval or widen the scan window and watch discovery speed up, then look at what each costs.</figcaption>
+</figure>
+
+<h3 id="gap">GAP: who does what</h3>
+<p>The <b>Generic Access Profile</b> (GAP) defines roles and procedures. There are four roles:</p>
+<ul>
+  <li><b>Broadcaster</b>: advertises, never connects (a beacon). <b>Observer</b>: only scans.</li>
+  <li><b>Peripheral</b>: advertises and accepts a connection. Your robot, a sensor or a heart-rate band.</li>
+  <li><b>Central</b>: scans and initiates connections. A phone, a laptop, or an ESP32 acting as the remote control.</li>
+</ul>
+<p>A device can play several roles at once (an ESP32 can be a central to a sensor and a peripheral to a phone). Note that GAP roles say who <em>connects</em>, not who serves data. That's GATT's business, below.</p>
+
+<h3 id="conn">Connections: interval, latency and supervision timeout</h3>
+<p>Once connected, the two devices meet at regular <b>connection events</b>. At each event the central transmits first, the peripheral answers, and they can exchange several packets back and forth before both go back to sleep until the next event. Three parameters, set by the central (the peripheral can request changes), control everything:</p>
+<ul>
+  <li><b>Connection interval</b>: 7.5 ms to 4 s, in steps of 1.25 ms. Short intervals mean low latency and high throughput; long ones mean low power.</li>
+  <li><b>Peripheral latency</b> (formerly "slave latency"): the number of consecutive events the peripheral may skip when it has nothing to send. It saves the peripheral's power without slowing the peripheral's own uplink, but data <em>to</em> the peripheral can now wait up to \((1 + \text{latency})\) intervals.</li>
+  <li><b>Supervision timeout</b>: 100 ms to 32 s. If no valid packet is received for this long, the link is declared lost. The specification requires</li>
+</ul>
+<div class="formula">
+$$t_{\text{supervision}} \gt 2\,(1 + \text{latency}) \times t_{\text{interval}}$$
+<p>The supervision timeout must exceed two "effective" intervals, so that a couple of missed events can't kill a healthy link.</p>
+</div>
+<p>For an RC vehicle the supervision timeout is a safety parameter: it is how long the robot keeps executing its last command after the phone walks out of range, unless you add an application-level failsafe (and you will, later in this chapter).</p>
+
+<figure class="widget" id="fig-conn">
+  <div id="w-conn"></div>
+  <div class="w-controls" id="c-conn"></div>
+  <figcaption><b>Figure 7.12</b> Connection parameters and their trade-offs. The timeline shows connection events (central, top) and the events at which the peripheral actually wakes (bottom); with latency > 0 it skips events while idle. The model of throughput and current is for a typical nRF52-class BLE chip; an ESP32's own consumption is much higher because its CPU stays awake. Watch the supervision-timeout readout turn red when it violates the rule above.</figcaption>
+</figure>
+
+<div class="ex" data-id="conn-task" data-kind="task">
+  <div class="q">In Figure 7.12, configure a link for an RC car: worst-case command latency to the car <b>at most 20 ms</b>, and a <b>valid</b> supervision timeout of <b>250 ms or less</b>.</div>
+  <div class="explain">For example interval 15 ms, latency 0, timeout 100–250 ms. Peripheral latency must be 0 (or the interval tiny) because commands flow <em>to</em> the peripheral. Phones decide the final parameters: iOS and Android typically accept 15 ms or 30 ms intervals when the peripheral requests them, and the supervision timeout you request may be adjusted.</div>
+</div>
+
+<div class="ex" data-id="sup-num" data-kind="num" data-answer="0.3" data-tol="1%" data-unit="s">
+  <div class="q">A connection uses a 30 ms interval and a peripheral latency of 4. What's the smallest supervision timeout the rule allows? (The actual value must be strictly greater.)</div>
+  <div class="hint">\(2 \times (1 + \text{latency}) \times \text{interval}\).</div>
+  <div class="explain">\(2 \times 5 \times 30\) ms \(= 300\) ms, so the timeout must be above 300 ms (it's set in 10 ms units, so 310 ms is the smallest legal value). With that latency the peripheral may legitimately stay silent for 150 ms, so a failsafe on the car that triggers after 100 ms of silence would fire constantly.</div>
+</div>
+
+<h3 id="gatt">GATT: services, characteristics and descriptors</h3>
+<p>Once connected, data is organised by the <b>Generic Attribute Profile</b> (GATT), which sits on top of the Attribute Protocol (ATT). The device holding the data is the <b>GATT server</b> (usually the peripheral; your robot); the one accessing it is the <b>client</b> (the phone). The server's data is a flat table of <b>attributes</b>, each with a 16-bit <b>handle</b>, a type (a UUID) and a value, organised into a hierarchy:</p>
+<ul>
+  <li>A <b>profile</b> is just a specification of which services a kind of device has (the Heart Rate Profile, for instance). It doesn't appear on the wire.</li>
+  <li>A <b>service</b> groups related data: Battery Service (UUID 0x180F), Device Information (0x180A), or your own "RC Control" service.</li>
+  <li>A <b>characteristic</b> is one value with <b>properties</b> that say what a client may do with it: <b>read</b>, <b>write</b> (acknowledged), <b>write without response</b> (unacknowledged, faster), <b>notify</b> (server pushes updates, unacknowledged) and <b>indicate</b> (server pushes updates, acknowledged).</li>
+  <li>A <b>descriptor</b> adds metadata to a characteristic. The important one is the <b>Client Characteristic Configuration Descriptor</b> (CCCD, UUID 0x2902): the client writes 0x0001 to it to enable notifications (0x0002 for indications). Until a client does that, the server isn't allowed to notify.</li>
+</ul>
+<p><b>UUIDs</b> come in two sizes. The Bluetooth SIG assigns 16-bit UUIDs to standard services and characteristics (Battery Level is 0x2A19); these are shorthand for a 128-bit UUID built on the Bluetooth base UUID <code>0000xxxx-0000-1000-8000-00805F9B34FB</code>. For your own services, generate random 128-bit UUIDs (for example with <code>uuidgen</code>). Never invent 16-bit ones.</p>
+
+<figure class="widget" id="fig-gatt">
+  <div id="w-gatt"></div>
+  <figcaption><b>Figure 7.13</b> The GATT table of the RC car built later in this chapter, as nRF Connect would show it. Click any node for its handle, UUID and properties, then use the buttons as a client would. The log shows the ATT operations on the air. Try reading the battery level, writing a drive command, and enabling notifications on the telemetry characteristic.</figcaption>
+</figure>
+
+<div class="ex" data-id="gatt-task" data-kind="task">
+  <div class="q">In Figure 7.13, subscribe to the <b>Telemetry</b> characteristic's notifications, the way nRF Connect does when you tap its triple-arrow icon.</div>
+  <div class="explain">Subscribing is just an ATT Write Request of <code>01 00</code> to the characteristic's CCCD (UUID 0x2902). From then on the server pushes Handle Value Notifications without being asked. If notifications "don't work" in your own app, check first that it wrote the CCCD.</div>
+</div>
+
+<h3 id="mtu">MTU and throughput</h3>
+<p>ATT packets are limited by the <b>ATT MTU</b>. The default is 23 bytes, of which 3 are the opcode and handle, leaving <b>20 bytes</b> of value per notification or write. Both sides can negotiate a larger MTU (up to 517; 247 is a common choice because, with the Data Length Extension of Bluetooth 4.2, one 251-byte link-layer packet then carries a whole ATT packet). An RC command (throttle and steering as two 16-bit values) fits easily in 20 bytes, so MTU matters for telemetry and OTA, not for control. Real-world throughput depends on the connection interval, how many packets each side's stack allows per connection event, and the PHY: tens of kbit/s with defaults, up to about 1.3 Mbit/s with the 2M PHY and everything tuned.</p>
+
+<div class="ex" data-id="mtu-num" data-kind="num" data-answer="244" data-tol="0" data-unit="bytes">
+  <div class="q">After the client and server negotiate an ATT MTU of 247, what is the largest value a single notification can carry?</div>
+  <div class="hint">A notification spends 1 byte on the opcode and 2 on the handle.</div>
+  <div class="explain">\(247 - 3 = 244\) bytes. With the default MTU of 23 it's 20 bytes, the "20-byte BLE limit" you'll see in old forum posts.</div>
+</div>
+
+<h3 id="nimble">An RC control service with NimBLE</h3>
+<p>On the ESP32 you have two BLE host stacks: Bluedroid (the default in older Arduino-ESP32 versions, large) and <b>NimBLE</b> (from Apache Mynewt; much smaller in flash and RAM). The <b>NimBLE-Arduino</b> library wraps NimBLE in a friendly C++ API. Here is the core of an RC car's GATT server: a write-without-response characteristic for drive commands, a notify characteristic for telemetry, and callbacks that stop the motors on disconnect. The code targets NimBLE-Arduino 2.x; version 1.x has slightly different callback signatures.</p>
+<pre><code class="raw">#include <NimBLEDevice.h>
+
+static const char* SVC_UUID   = "c0de0001-7a1e-4d1b-9b6b-5c0ffee00001";
+static const char* DRIVE_UUID = "c0de0002-7a1e-4d1b-9b6b-5c0ffee00001";
+static const char* TELEM_UUID = "c0de0003-7a1e-4d1b-9b6b-5c0ffee00001";
+
+struct __attribute__((packed)) DriveCmd { int16_t throttle; int16_t steering; };  // -1000..1000
+
+volatile uint32_t lastCmdMs = 0;
+volatile DriveCmd cmd = {0, 0};
+NimBLECharacteristic* telem;
+
+class DriveCallbacks : public NimBLECharacteristicCallbacks {
+    void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& info) override {
+        NimBLEAttValue v = c->getValue();
+        if (v.size() != sizeof(DriveCmd)) return;          // validate everything from the air
+        DriveCmd d; memcpy(&d, v.data(), sizeof d);
+        cmd.throttle = constrain(d.throttle, -1000, 1000);
+        cmd.steering = constrain(d.steering, -1000, 1000);
+        lastCmdMs = millis();
+    }
+};
+
+class ServerCallbacks : public NimBLEServerCallbacks {
+    void onConnect(NimBLEServer* s, NimBLEConnInfo& info) override {
+        // ask for 15 ms interval, no latency, 250 ms supervision timeout
+        // (units: 1.25 ms, 1.25 ms, events, 10 ms)
+        s->updateConnParams(info.getConnHandle(), 12, 12, 0, 25);
+    }
+    void onDisconnect(NimBLEServer* s, NimBLEConnInfo& info, int reason) override {
+        cmd.throttle = 0; cmd.steering = 0;                 // failsafe on link loss
+        NimBLEDevice::startAdvertising();                   // let the phone reconnect
+    }
+};
+
+void setup() {
+    NimBLEDevice::init("RC-Car");
+    NimBLEServer* server = NimBLEDevice::createServer();
+    server->setCallbacks(new ServerCallbacks());
+    NimBLEService* svc = server->createService(SVC_UUID);
+    svc->createCharacteristic(DRIVE_UUID, NIMBLE_PROPERTY::WRITE_NR)
+       ->setCallbacks(new DriveCallbacks());
+    telem = svc->createCharacteristic(TELEM_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+    svc->start();
+    NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
+    adv->addServiceUUID(SVC_UUID);
+    adv->setName("RC-Car");
+    adv->start();
+}</code></pre>
+<p>Write-without-response is the right property for control: a lost command is better replaced by the next one 20 ms later than retried, and unacknowledged writes can be sent several per connection event. Telemetry uses notify for the same reason.</p>
+
+<h3 id="security">Security, briefly</h3>
+<p>By default the service above is open: anyone in range with nRF Connect can drive your robot. BLE <b>pairing</b> creates encryption keys; <b>bonding</b> stores them so the devices reconnect securely later. The pairing method decides whether it resists eavesdroppers and man-in-the-middle attacks. "Just Works" pairing encrypts the link but authenticates nothing; <b>LE Secure Connections</b> with passkey entry or numeric comparison does both, but needs a display or keypad on at least one side. A robot without a screen can show a fixed passkey on a sticker (weak but better than nothing), or require a physical button press to accept new bonds. Then mark the drive characteristic as requiring an encrypted (or authenticated) link, so unpaired clients can't write to it.</p>
+
+<h3 id="nrfconnect">Testing with nRF Connect</h3>
+<p>Nordic's free <b>nRF Connect for Mobile</b> app (Android and iOS) is the BLE equivalent of <code>curl</code>. It scans and shows advertising data and RSSI, connects, lists every service, characteristic and descriptor with their handles and properties, reads and writes raw values, and subscribes to notifications. Test your peripheral with it before writing any phone app: if nRF Connect can drive the car by writing <code>E8 03 00 00</code> (throttle 1000, steering 0, little-endian) to the drive characteristic, the firmware is right and any remaining bugs are in the app. On a desktop, the nRF Connect apps or the Python <code>bleak</code> library do the same job.</p>
+
+<div class="ex" data-id="ble-order" data-kind="order">
+  <div class="q">Put the steps of a phone controlling the RC car over BLE in order.</div>
+  <ol class="items">
+    <li>The car advertises on channels 37, 38 and 39</li>
+    <li>The phone scans and receives an advertising packet</li>
+    <li>The phone sends a connection request</li>
+    <li>The phone discovers services and characteristics</li>
+    <li>The phone writes 01 00 to the telemetry CCCD</li>
+    <li>The phone writes drive commands; the car notifies telemetry</li>
+  </ol>
+  <div class="explain">Advertise → scan → connect → discover → subscribe → exchange data. Service discovery results are often cached; subscriptions on a bonded device can persist too, which is a frequent source of "it works only the second time" bugs.</div>
+</div>
+</section>
+
+<section>
+<h2 id="rf">Choosing a radio, and keeping its range</h2>
+<p>An ESP32 gives you three ways to drive a robot wirelessly. They solve different problems:</p>
+<table>
+  <tr><th></th><th>BLE</th><th>Wi-Fi (UDP/WebSocket)</th><th>ESP-NOW</th></tr>
+  <tr><td>Controller</td><td>Any phone, nRF Connect, a second ESP32</td><td>Phone browser or app on the same network (or the ESP32 as an access point)</td><td>Another ESP32 (a custom remote)</td></tr>
+  <tr><td>Connection setup</td><td>Advertise + connect, well under a second</td><td>Association, DHCP: one to several seconds</td><td>None: send to a MAC address</td></tr>
+  <tr><td>Latency</td><td>One connection interval (7.5–30 ms typical)</td><td>A few ms on a quiet network, unpredictable on a busy one</td><td>A few ms</td></tr>
+  <tr><td>Throughput</td><td>Tens to hundreds of kbit/s</td><td>Megabits: video, OTA</td><td>Up to 250 bytes per packet (more on ESP-NOW v2)</td></tr>
+  <tr><td>Power</td><td>Lowest</td><td>Highest</td><td>Wi-Fi radio, but short bursts</td></tr>
+  <tr><td>Range (typical, line of sight)</td><td>Tens of metres (more with Coded PHY)</td><td>Tens of metres to an AP</td><td>Can exceed 100 m (long-range mode further)</td></tr>
+</table>
+<p>For a phone-controlled toy, BLE. For video streaming or a web UI, Wi-Fi. For a dedicated handheld remote with low, predictable latency and no phone involved, ESP-NOW is excellent. For serious range (hundreds of metres to kilometres), use a purpose-built RC link such as ExpressLRS and read its CRSF output, as described in Chapter 6.</p>
+
+<div class="ex" data-id="radio-sort" data-kind="sort">
+  <div class="q">Which radio fits each requirement best?</div>
+  <div class="bins">
+    <div data-bin="ble">BLE</div>
+    <div data-bin="wifi">Wi-Fi</div>
+    <div data-bin="now">ESP-NOW</div>
+  </div>
+  <ul class="items">
+    <li data-bin="ble">Drive the robot from any phone with no special app installed</li>
+    <li data-bin="wifi">Stream camera video to a laptop</li>
+    <li data-bin="now">A custom two-ESP32 remote with no pairing and no router</li>
+    <li data-bin="ble">A coin-cell sensor that reports once a minute</li>
+    <li data-bin="wifi">Serve a configuration web page</li>
+    <li data-bin="now">Broadcast the same command to five robots at once</li>
+  </ul>
+  <div class="explain">BLE wins on ubiquity and power; Wi-Fi on bandwidth and IP-based tooling; ESP-NOW on simplicity and latency between ESP32s (it supports broadcast to all listeners, too). "Any phone with no app" needs a web page that uses Web Bluetooth (Chrome on Android and desktop) or nRF Connect.</div>
+</div>
+
+<h3 id="antenna">Antennas, keep-out zones and why your hand matters</h3>
+<p>The antenna on an ESP32 module is usually a <b>PCB trace antenna</b>: the meandering copper at the end of the module, outside the metal shield. It works by letting the high-frequency current in the trace radiate its fields into space (Chapter 1's fields, now at 2.4 GHz with a wavelength of 12.5 cm). Anything conductive nearby changes how it radiates: a ground plane under it, a battery, a motor, a metal chassis, your hand. Hence the module datasheets' <b>keep-out zone</b>: no copper on any layer under or around the antenna, and ideally the antenna sticking out past the edge of your PCB. Violate it and you can easily lose 10 dB, two-thirds of your range, without anything looking wrong.</p>
+<p>Received signal strength falls quickly with distance. In free space the power spreads over a sphere, so it drops with the square of the distance; indoors, reflections and absorption make it fall faster. Engineers describe that in decibels (see <a href="appA-math.html">Appendix A</a>) with the log-distance model:</p>
+<div class="formula">
+$$P_{rx} = P_{tx} + G_{tx} + G_{rx} - \underbrace{\left(PL_0 + 10\,n\log_{10}\frac{d}{d_0}\right)}_{\text{path loss}} - L_{\text{extra}}$$
+<p>Received power in dBm. \(PL_0 \approx 40\) dB at \(d_0 = 1\) m for 2.4 GHz; the exponent \(n\) is 2 in free space and roughly 2.5–4 indoors; \(L_{\text{extra}}\) collects bodies, walls and enclosures.</p>
+</div>
+<p>With \(n = 2\), doubling the distance costs \(20\log_{10} 2 = 6\) dB. So every 6 dB you lose to a bad enclosure halves your range in open air. A <b>metal enclosure</b> is a Faraday cage: it can cost 20–40 dB or more, turning a 50 m link into a 1 m one. A human body (mostly salt water, which absorbs 2.4 GHz strongly) between the antennas costs 10–20 dB, and a hand wrapped around a phone's antenna costs several more. Plastic enclosures are nearly transparent; carbon fibre is a conductor and behaves like metal.</p>
+
+<figure class="widget" id="fig-rssi">
+  <div id="w-rssi"></div>
+  <div class="w-controls" id="c-rssi"></div>
+  <figcaption><b>Figure 7.14</b> Received signal strength against distance (log axis). The horizontal lines are the receiver's sensitivity and a 10 dB fade margin above it; the readout is the distance where the curve crosses the margin. Toggle the losses one at a time: a hand on the antenna, a body in the path, a metal enclosure. Loss values are typical magnitudes for illustration; measure your own with nRF Connect's RSSI readout.</figcaption>
+</figure>
+
+<div class="ex" data-id="fspl-num" data-kind="num" data-answer="6" data-tol="0.15" data-unit="dB">
+  <div class="q">In free space (path-loss exponent \(n = 2\)), by how many dB does the received signal drop when you double the distance?</div>
+  <div class="hint">\(10\,n\log_{10}(2)\) with \(n = 2\).</div>
+  <div class="explain">\(20 \log_{10} 2 = 6.02\) dB. Indoors, with \(n \approx 3\), it's about 9 dB per doubling, which is why indoor range is so much shorter than the datasheet's open-field figure.</div>
+</div>
+</section>
+
+<section>
+<h2 id="failsafe">Failsafe design: what happens when the link dies</h2>
+<p>Every wireless link fails eventually: the phone goes out of range, its screen locks and the app suspends, the battery sags and the radio browns out, a Wi-Fi router starts a big download on the same channel. The only question is what your robot does in the next half second. A car that keeps executing "full throttle" until it hits a wall is not a bug you want to discover in testing. The rule from hobby RC, enforced by every commercial receiver, is: <b>on loss of signal, go to a safe state within a bounded time</b>. For a car or a ground robot that's "motors stopped, steering centred"; for a plane it may be "throttle low, controls neutral" or a programmed return; for a multirotor it's a controlled descent or disarm.</p>
+<p>A good failsafe has layers, each catching what the previous one misses:</p>
+<ol>
+  <li><b>Command timeout (application layer).</b> Timestamp every valid command. A periodic control task checks the age of the last one and, if it exceeds a timeout, stops the motors. This catches everything above the radio: a frozen phone app, a crashed BLE task, a full queue. The controller must send commands continuously (say every 20 ms), even when the sticks don't move, so silence always means trouble.</li>
+  <li><b>Link-layer events.</b> Handle <code>onDisconnect</code> by stopping the motors too. It reacts within the supervision timeout.</li>
+  <li><b>Watchdog.</b> If the firmware itself hangs, the watchdog resets the MCU, and…</li>
+  <li><b>…hardware defaults.</b> Pull-down resistors on motor-driver enable and PWM inputs make "MCU in reset or not yet booted" equal "motors off". Avoid strapping pins and pins that glitch at boot for these signals (see the ESP32 section).</li>
+  <li><b>Validation.</b> Reject malformed packets (wrong length, out-of-range values, bad checksum) instead of acting on them. Ramp-limit sudden changes so a single corrupted value can't slam the motors.</li>
+</ol>
+<p>The timeout is a design trade-off you can compute. Too short, and ordinary packet loss trips it. Too long, and the robot travels too far blind. If commands arrive every \(T\) seconds and each is lost independently with probability \(p\), the timeout trips falsely when about \(m = \lfloor t_{out}/T \rfloor\) consecutive packets are lost, which starts with probability about \((1-p)\,p^m\) per packet. Meanwhile a vehicle at speed \(v\) covers \(v \cdot t_{out}\) after the link dies before it starts braking.</p>
+
+<figure class="widget wide" id="fig-fs">
+  <div id="w-fs"></div>
+  <div class="w-controls" id="c-fs"></div>
+  <figcaption><b>Figure 7.15</b> A command-timeout failsafe. Packets arrive every 20 ms (green) or are lost (red). The middle trace is the age of the last good command; when it crosses the timeout (dashed), the motors are cut. Press <b>Kill link</b> to simulate the phone dying and see how far the car (at 2 m/s) travels before it stops. Then tune the timeout against packet loss using the false-trip readout.</figcaption>
+</figure>
+
+<div class="ex" data-id="fs-task" data-kind="task">
+  <div class="q">In Figure 7.15, with packet loss at <b>20%</b>, choose a timeout that gives <b>fewer than 0.1 false trips per hour</b> while still stopping the car within <b>0.5 m</b> of losing the link.</div>
+  <div class="explain">At 20% loss and 50 packets per second, you need about nine consecutive losses before a false trip is rare enough: \(180\,000 \times 0.8 \times 0.2^9 \approx 0.07\) per hour at 180 ms. The 0.5 m limit at 2 m/s caps the timeout at 250 ms. Anything from 180 to 250 ms works. If you can't find a window (say at 40% loss), the right fix is the link, not the timeout: send commands more often, move the antenna, or change radio.</div>
+</div>
+
+<pre><code class="raw">// Control task: 100 Hz, independent of the radio
+const uint32_t FAILSAFE_MS = 200;
+
+void controlTask(void*) {
+    TickType_t last = xTaskGetTickCount();
+    for (;;) {
+        uint32_t age = millis() - lastCmdMs;         // lastCmdMs written by the BLE callback
+        int16_t thr = cmd.throttle, steer = cmd.steering;
+        if (age > FAILSAFE_MS) { thr = 0; steer = 0; }   // safe state
+        setMotor(rampLimit(thr));                     // limit acceleration even when healthy
+        setServo(1500 + steer / 2);                   // µs: 1000..2000
+        esp_task_wdt_reset();                         // only reached if this loop is alive
+        vTaskDelayUntil(&last, pdMS_TO_TICKS(10));
+    }
+}</code></pre>
+
+<div class="ex" data-id="fs-multi" data-kind="multi">
+  <div class="q">Which of these belong in a robust RC failsafe? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>The controller sends commands periodically even when the sticks don't move</li>
+    <li data-correct>The robot stops the motors if no valid command has arrived for a set time</li>
+    <li>The robot keeps the last command until the user reconnects, to avoid jerky motion</li>
+    <li data-correct>Pull-down resistors keep the motor driver disabled while the MCU is in reset</li>
+    <li data-correct>Malformed or out-of-range packets are discarded</li>
+    <li>The failsafe relies only on the BLE disconnect callback</li>
+  </ol>
+  <div class="explain">Holding the last command is exactly the runaway you're trying to prevent. The disconnect callback alone fires only after the supervision timeout, and never if the phone stays connected while its app has frozen. Layers: periodic commands, a timeout, link events, a watchdog and hardware defaults.</div>
+</div>
+
+<aside class="callout tip"><span class="ct">🦀 Optional: Rust and Zephyr</span>
+<p>Two alternatives may appeal to you as a developer. <b>Rust on the ESP32</b> (the esp-rs project) comes in two flavours: <code>esp-idf-hal</code>/<code>esp-idf-svc</code>, which run on top of ESP-IDF with the standard library, threads and Wi-Fi; and the bare-metal <code>esp-hal</code> (<code>no_std</code>), often paired with the <b>Embassy</b> async framework, where tasks are <code>async fn</code>s and waiting for a pin edge or a timer is an <code>.await</code>. The borrow checker turns many of this chapter's hazards (shared mutable state between an ISR and the main loop, peripherals configured twice) into compile errors. <b>Zephyr</b> is a Linux Foundation RTOS with a devicetree-based hardware description, a Kconfig build system, and an excellent, certified BLE stack; it's Nordic's official SDK for the nRF52/53/54 chips and also supports the ESP32. Both have steeper learning curves than Arduino and smaller ecosystems than ESP-IDF, but they reward the investment on larger projects.</p>
+</aside>
+
+<aside class="callout lab"><span class="ct">🔧 Lab: an ESP32 BLE RC car with a failsafe</span>
+<p>Parts: an ESP32 dev board (or ESP32-S3/C3), a DRV8833 or TB6612FNG dual motor driver, two small DC gear motors (or one motor plus a steering servo), a 2S LiPo with a 5 V buck converter for the servo and the board, and the battery-monitor divider from Chapter 6 on GPIO34.</p>
+<ol>
+  <li>Wire it as in Figure 7.16. Add 10 kΩ pull-downs on the motor driver's inputs. Power from a current-limited bench supply first.</li>
+  <li>Flash the NimBLE server above, plus the control task. Use <b>nRF Connect</b> to find the service, write <code>E8 03 00 00</code> to the drive characteristic, and confirm the wheels turn. Write <code>00 00 00 00</code> and confirm they stop.</li>
+  <li>Measure the failsafe: drive with nRF Connect, then force-close the app (or walk away). With a phone stopwatch or, better, a logic analyser on a motor input and a GPIO you toggle in the BLE callback, measure the time from the last command to motors off. Compare with your timeout and with the supervision timeout.</li>
+  <li>Write a controller: a web page using Web Bluetooth, a phone app, or a second ESP32 with a joystick acting as a BLE central. Send commands every 20 ms.</li>
+  <li>Add telemetry: notify the battery voltage (from the ADC1 pin, calibrated) and the RSSI once a second.</li>
+  <li>Range test: note the RSSI at 1, 2, 5, 10 and 20 m in line of sight, then with your body between phone and car, then with the ESP32 inside a metal tin. Plot RSSI against log distance and estimate the path-loss exponent.</li>
+  <li>Robustness: unplug the battery mid-drive, pull the reset pin, and let the watchdog fire (add a deliberate infinite loop on a hidden command). Every case must end with the motors stopped.</li>
+</ol>
+</aside>
+
+<figure class="widget" id="fig-lab">
+  <div id="w-lab"></div>
+  <figcaption><b>Figure 7.16</b> Lab wiring for the BLE RC car. The buck converter feeds 5 V to the servo and the dev board's 5 V input; the DRV8833 runs its motors straight from the battery; pull-downs keep the driver inputs low while the ESP32 boots; and a 100k/100k divider (with 100 nF) lets ADC1 on GPIO34 watch the battery.</figcaption>
+</figure>
+
+<aside class="callout ref"><span class="ct">📚 Go deeper</span>
+<ul>
+  <li><b>Microchip (Atmel), <i>ATmega328P datasheet</i></b>: the chapters on I/O ports (13 in the 2015 edition), interrupts, the three timer/counters, and the watchdog. Read one chapter a week alongside your code.</li>
+  <li><b>Elecia White, <i>Making Embedded Systems</i></b>, 2nd ed. (O'Reilly, 2024). The chapters on interrupts, timers, "doing more with less" (power) and on design patterns for embedded software are written for exactly the reader of this book.</li>
+  <li><b>Jonathan Valvano and Ramesh Yerraballi, <i>Embedded Systems – Shape the World</i></b> (UT Austin, free online, with the companion textbook <i>Embedded Systems: Introduction to ARM Cortex-M Microcontrollers</i>): bare-metal I/O, interrupts, SysTick timers and finite state machines.</li>
+  <li><b>Espressif, <i>ESP-IDF Programming Guide</i></b> (docs.espressif.com): API Guides → FreeRTOS (IDF), Sleep Modes, Over The Air Updates, and the Bluetooth LE / NimBLE sections; plus the <i>ESP32 Datasheet</i> and <i>ESP32 Hardware Design Guidelines</i> (strapping pins, antenna keep-out, power).</li>
+  <li><b>Richard Barry, <i>Mastering the FreeRTOS Real Time Kernel</i></b> (free PDF from freertos.org): tasks, queues, interrupts and resource management, with diagrams of exactly the schedules in Figure 7.9.</li>
+  <li><b>Kevin Townsend, Carles Cufí, Akiba and Robert Davidson, <i>Getting Started with Bluetooth Low Energy</i></b> (O'Reilly, 2014): chapters on GAP, GATT and the protocol basics. Short and clear.</li>
+  <li><b>Nordic Semiconductor DevAcademy</b>: the free "Bluetooth Low Energy Fundamentals" course (advertising, connection parameters, GATT, security), and the <b>Novel Bits</b> blog (novelbits.io) for deeper BLE topics.</li>
+  <li><b>NimBLE-Arduino</b> (h2zero, on GitHub): examples and API docs for the code in this chapter.</li>
+  <li><b>The Rust on ESP Book</b> (docs.esp-rs.org) and the <b>Zephyr Project documentation</b> (docs.zephyrproject.org), if you take the optional paths.</li>
+</ul>
+</aside>
+</section>
+
+</main>
+<script src="../assets/vendor/katex/katex.min.js"></script>
+<script src="../assets/vendor/katex/auto-render.min.js"></script>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/ch07-mcu.js"></script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2 · The Circle Road — Sparky's Circuit Adventure</title>
+<meta name="description" content="Level 2 of Sparky's Circuit Adventure: electricity needs a closed loop, and switches open and close the road.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+/* kid level page styles (shared pattern, page-local copy) */
+.toy { background: var(--surface2); border: 2px solid var(--line); border-radius: 22px; padding: 12px 10px; margin: 16px 0; text-align: center; }
+.toy svg.art { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.toy .cap { font-size: 1rem; color: var(--muted); margin: 6px auto 0; }
+.toy-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0 4px; }
+.kbtn { font-family: inherit; font-size: 1.25rem; line-height: 1.2; min-width: 56px; min-height: 56px; padding: 6px 14px; border-radius: 18px; border: 3px solid var(--line); border-bottom-width: 6px; background: var(--surface); color: var(--ink); cursor: pointer; touch-action: manipulation; transition: transform .06s, border-color .15s, background .15s; }
+.kbtn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.kbtn:active { transform: translateY(3px); border-bottom-width: 3px; }
+.kbtn.on { border-color: var(--accent); background: var(--accent2); }
+.kbtn.go { background: var(--c3); border-color: color-mix(in srgb, var(--c3) 60%, #000); color: #fff; }
+.kbtn:disabled { opacity: .45; cursor: not-allowed; }
+.kbtn small { display: block; font-size: .8rem; color: var(--muted); }
+.kbtn.go small { color: inherit; opacity: .9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kbtn.go { color: #0b1a12; } }
+:root[data-theme="dark"] .kbtn.go { color: #0b1a12; }
+.ex .opts.emoji > li .lab, .ex .opts .lab { display: block; font-size: 1rem; line-height: 1.2; color: var(--muted); margin-top: 4px; }
+.ex .opts > li svg.mini { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto; }
+.toy .w-controls { justify-content: center; }
+.toy .w-slider { grid-template-columns: max-content 1fr max-content; font-size: 1.15rem; flex-basis: 260px; max-width: 460px; }
+.toy .w-slider input { height: 44px; }
+.toy .w-slider output { font-family: inherit; font-size: 1.05rem; min-width: 2.5em; }
+.toy .w-seg button { font-size: 1.1rem; min-height: 48px; padding: 6px 12px; }
+ol.steps { padding-left: 1.4em; } ol.steps li { margin: 6px 0; }
+.grownup { font-size: .82em; }
+.grownup > div { line-height: 1.5; }
+.card .big-emoji { letter-spacing: .05em; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  body.kid { font-size: 19px; }
+  main.cards > .card { padding: 18px 14px 20px; }
+  .speech { margin-left: 52px; padding: 12px 14px; }
+  .speech .who { left: -54px; font-size: 2.4rem; }
+  body.kid .ex { padding-left: 12px; padding-right: 50px; }
+  .big-emoji { font-size: clamp(2rem, 10.5vw, 3.2rem); }
+}
+main.cards > .card > h2 { padding-right: 48px; }
+
+</style>
+</head>
+<body data-book="kid" data-chapter="k02-circle">
+<main class="chapter cards">
+<header class="chapter-head">
+  <p class="kicker">Level 2</p>
+  <h1>🔁 The Circle Road</h1>
+  <p class="lede">Sparky needs a road that goes all the way around.</p>
+</header>
+
+<section class="card">
+  <h2>💡 Sparky wants to light a bulb</h2>
+  <div class="speech say"><span class="who">⚡</span>To light a bulb, my friends and I must travel out of the battery, through the bulb, and back into the battery. The road must make a full circle. We call it a circuit!</div>
+  <div class="big-emoji">🔋 ➡️ 💡 ➡️ 🔋</div>
+  <div class="speech say"><span class="who">⚡</span>Circuit sounds like circle. That's how you remember it!</div>
+</section>
+
+<section class="card">
+  <h2>🚧 Fix the road!</h2>
+  <div class="speech say"><span class="who">⚡</span>Oh no! The road has holes in it. We can't get through! Can you fix it?</div>
+  <div class="toy">
+    <div id="t-road"></div>
+    <p class="cap">👆 Tap each ❓ hole to put in a piece of wire.</p>
+  </div>
+  <div class="ex" data-id="road" data-kind="task">
+    <div class="q">Fill every hole and light the bulb!</div>
+    <div class="explain">With no holes, the road is a full circle. Sparky and friends can go all the way around, and the bulb lights up!</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🔍 Spot the circle</h2>
+  <div class="speech say"><span class="who">⚡</span>Look carefully. Follow the road with your finger, from one end of the battery to the other end.</div>
+  <div class="ex" data-id="which" data-kind="mc">
+    <div class="q">Which bulb will light up?</div>
+    <ol class="opts grid3">
+      <li><span class="mini" data-mini="gap"></span><span class="lab">A</span></li>
+      <li data-correct><span class="mini" data-mini="ok"></span><span class="lab">B</span></li>
+      <li><span class="mini" data-mini="one"></span><span class="lab">C</span></li>
+    </ol>
+    <div class="hint">The road must leave one end of the battery and come back to the OTHER end, with no holes.</div>
+    <div class="explain">Only B is a full circle. A has a hole. In C, both wires go to the same end of the battery, so Sparky can't get back to the other end.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🌉 The switch is a drawbridge</h2>
+  <div class="speech say"><span class="who">⚡</span>A switch is like a drawbridge. When it's open, there's a gap in the road. When it's closed, the road is joined up again. The light switch on your wall works just like this!</div>
+  <div class="toy">
+    <div id="t-switch"></div>
+    <p class="cap">👆 Tap the switch to open and close it.</p>
+  </div>
+  <div class="ex" data-id="switch" data-kind="task">
+    <div class="q">Turn the light on and off 3 times!</div>
+    <div class="explain">Closed switch: the road is a full circle, so the light is on. Open switch: there's a gap, so the light is off.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🤔 Open or closed?</h2>
+  <div class="ex" data-id="open" data-kind="mc">
+    <div class="q">The switch is open. What does the road look like?</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>🚧<span class="lab">it has a gap</span></li>
+      <li>🛣️<span class="lab">it's all joined up</span></li>
+    </ol>
+    <div class="explain">An open switch makes a gap. No full circle means no light.</div>
+  </div>
+  <div class="ex" data-id="closed" data-kind="mc">
+    <div class="q">The switch is closed. What does the bulb do?</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>💡<span class="lab">it lights up</span></li>
+      <li>🌑<span class="lab">it stays dark</span></li>
+    </ol>
+    <div class="explain">Closed switch means a full circle road, so the bulb shines.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🗺️ Sparky's trip</h2>
+  <div class="ex" data-id="trip" data-kind="order">
+    <div class="q">Put Sparky's trip in order. Tap the pieces one by one.</div>
+    <ol class="items">
+      <li>🔋 Leave the battery</li>
+      <li>➰ Zoom along the wire</li>
+      <li>💡 Go through the bulb</li>
+      <li>🔁 Back into the battery</li>
+    </ol>
+    <div class="explain">Out of the battery, along the wire, through the bulb and back home. Then round again and again!</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🚂 All at once!</h2>
+  <div class="speech say"><span class="who">⚡</span>Here's something cool. The wire is already full of Sparkies, like a train with no gaps. When the switch closes, we ALL start moving at the same time, everywhere in the road!</div>
+  <div class="big-emoji">⚡⚡⚡⚡⚡⚡</div>
+  <div class="ex" data-id="fast" data-kind="mc">
+    <div class="q">You flip the switch. When does the light come on?</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>⚡<span class="lab">right away!</span></li>
+      <li>🐢<span class="lab">after an hour</span></li>
+    </ol>
+    <div class="explain">The light comes on right away, because Sparkies everywhere in the wire start moving together. Each Sparky actually moves quite slowly, but the whole train starts at once.</div>
+  </div>
+</section>
+
+<section class="card home">
+  <h2>🏠 Try it at home (with a grown-up)</h2>
+  <div class="speech say"><span class="who">⚡</span>Build a real circle road!</div>
+  <p>You need: 🔋 two AA batteries in a battery box, 💡 a small torch bulb (2.5 volts or 3 volts) in a holder, 🥈 kitchen foil, and sticky tape.</p>
+  <ol class="steps">
+    <li class="say">Fold foil into long, thin strips. These are your wires.</li>
+    <li class="say">Tape one strip from the plus end of the battery box to one side of the bulb holder.</li>
+    <li class="say">Tape another strip from the other side of the bulb holder back to the minus end.</li>
+    <li class="say">Does it light? Now make a gap in one strip. What happens?</li>
+    <li class="say">Make a switch: two paper fasteners in cardboard, and a paper clip you can swing to touch both.</li>
+  </ol>
+  <aside class="callout warn"><span class="ct">⚠️ Careful</span><p>Never join plus and minus with only foil and no bulb. That's a shortcut! The foil gets hot and the battery runs out.</p></aside>
+  <aside class="callout tip grownup"><span class="ct">👨‍👩‍👧 For grown-ups</span><div>Current only flows around a closed loop: charge can't pile up anywhere, which is Kirchhoff's current law. An open switch is effectively an infinite resistance. The light comes on "instantly" because the wire is already full of electrons and the push travels close to light speed, even though each electron drifts at well under a millimetre per second. See <a href="../book/ch01-physics.html">Chapter 1</a> (drift vs. signal speed) and <a href="../book/ch02-dc.html">Chapter 2: DC Circuit Analysis</a>.</div></aside>
+</section>
+</main>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/kidkit.js"></script>
+<script src="js/k02-circle.js"></script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>1 · Meet Sparky! — Sparky's Circuit Adventure</title>
+<meta name="description" content="Level 1 of Sparky's Circuit Adventure: what electricity is, tiny electrons everywhere, static electricity with a balloon, and Sparky's safety rules.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+/* kid level page styles (shared pattern, page-local copy) */
+.toy { background: var(--surface2); border: 2px solid var(--line); border-radius: 22px; padding: 12px 10px; margin: 16px 0; text-align: center; }
+.toy svg.art { width: 100%; max-width: 440px; height: auto; display: block; margin: 0 auto; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.toy .cap { font-size: 1rem; color: var(--muted); margin: 6px auto 0; }
+.toy-row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; margin: 10px 0 4px; }
+.kbtn { font-family: inherit; font-size: 1.25rem; line-height: 1.2; min-width: 56px; min-height: 56px; padding: 6px 14px; border-radius: 18px; border: 3px solid var(--line); border-bottom-width: 6px; background: var(--surface); color: var(--ink); cursor: pointer; touch-action: manipulation; transition: transform .06s, border-color .15s, background .15s; }
+.kbtn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.kbtn:active { transform: translateY(3px); border-bottom-width: 3px; }
+.kbtn.on { border-color: var(--accent); background: var(--accent2); }
+.kbtn.go { background: var(--c3); border-color: color-mix(in srgb, var(--c3) 60%, #000); color: #fff; }
+.kbtn:disabled { opacity: .45; cursor: not-allowed; }
+.kbtn small { display: block; font-size: .8rem; color: var(--muted); }
+.kbtn.go small { color: inherit; opacity: .9; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kbtn.go { color: #0b1a12; } }
+:root[data-theme="dark"] .kbtn.go { color: #0b1a12; }
+.ex .opts.emoji > li .lab, .ex .opts .lab { display: block; font-size: 1rem; line-height: 1.2; color: var(--muted); margin-top: 4px; }
+.ex .opts > li svg.mini { width: 100%; max-width: 150px; height: auto; display: block; margin: 0 auto; }
+.toy .w-controls { justify-content: center; }
+.toy .w-slider { grid-template-columns: max-content 1fr max-content; font-size: 1.15rem; flex-basis: 260px; max-width: 460px; }
+.toy .w-slider input { height: 44px; }
+.toy .w-slider output { font-family: inherit; font-size: 1.05rem; min-width: 2.5em; }
+.toy .w-seg button { font-size: 1.1rem; min-height: 48px; padding: 6px 12px; }
+ol.steps { padding-left: 1.4em; } ol.steps li { margin: 6px 0; }
+.grownup { font-size: .82em; }
+.grownup > div { line-height: 1.5; }
+.card .big-emoji { letter-spacing: .05em; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  body.kid { font-size: 19px; }
+  main.cards > .card { padding: 18px 14px 20px; }
+  .speech { margin-left: 52px; padding: 12px 14px; }
+  .speech .who { left: -54px; font-size: 2.4rem; }
+  body.kid .ex { padding-left: 12px; padding-right: 50px; }
+  .big-emoji { font-size: clamp(2rem, 10.5vw, 3.2rem); }
+}
+main.cards > .card > h2 { padding-right: 48px; }
+
+</style>
+</head>
+<body data-book="kid" data-chapter="k01-sparky">
+<main class="chapter cards">
+<header class="chapter-head">
+  <p class="kicker">Level 1</p>
+  <h1>⚡ Meet Sparky!</h1>
+  <p class="lede">A tiny friend, a magic balloon, and Sparky's safety rules.</p>
+</header>
+
+<section class="card">
+  <h2>👋 Hello, explorer!</h2>
+  <div class="speech say"><span class="who">⚡</span>Hi! I'm Sparky. I am an electron. That's a super tiny bit of electricity!</div>
+  <div class="toy">
+    <div id="t-hello"></div>
+    <p class="cap">👆 Tap Sparky to say hi!</p>
+  </div>
+  <div class="ex" data-id="size" data-kind="mc">
+    <div class="q">How big is Sparky, really?</div>
+    <ol class="opts emoji grid3">
+      <li>🐘<span class="lab">big as an elephant</span></li>
+      <li>🐜<span class="lab">small as an ant</span></li>
+      <li data-correct>✨<span class="lab">too tiny to see!</span></li>
+    </ol>
+    <div class="hint">Sparky is smaller than an ant. Much, much smaller!</div>
+    <div class="explain">Electrons are so tiny that nobody can see one, not even with a microscope!</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🔍 Sparkies are everywhere</h2>
+  <div class="speech say"><span class="who">⚡</span>Everything is made of tiny, tiny balls called atoms. Every atom has little Sparkies like me buzzing around its middle!</div>
+  <div class="toy">
+    <div id="t-zoom"></div>
+    <p class="cap">🔍 Tap the magnifying glass to zoom into a spoon!</p>
+  </div>
+  <div class="ex" data-id="zoom" data-kind="task">
+    <div class="q">Zoom all the way in and find the Sparkies!</div>
+    <div class="explain">A spoon, your toy, your hand and even the air are full of atoms. And every atom has electrons buzzing around it.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>⚡ So what is electricity?</h2>
+  <div class="big-emoji">⚡⚡⚡ ➰ 💡</div>
+  <div class="speech say"><span class="who">⚡</span>In a wire, lots of Sparkies can move along together. When we all get pushed along the wire, that's electricity! It makes lights shine and toys go.</div>
+  <div class="ex" data-id="what" data-kind="mc">
+    <div class="q">What is electricity?</div>
+    <ol class="opts emoji grid3">
+      <li>🍦<span class="lab">melted ice cream</span></li>
+      <li data-correct>⚡<span class="lab">tiny Sparkies moving</span></li>
+      <li>💨<span class="lab">wind</span></li>
+    </ol>
+    <div class="explain">Electricity is lots and lots of tiny electrons moving together.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🎈 The magic balloon</h2>
+  <div class="speech say"><span class="who">⚡</span>Watch this trick! When you rub a balloon on hair, some Sparkies hop from the hair onto the balloon.</div>
+  <div class="toy">
+    <div id="t-balloon"></div>
+    <div id="t-balloon-ctl" class="toy-row"></div>
+    <p class="cap">👆 Tap the rub button again and again. What does the hair do?</p>
+  </div>
+  <div class="ex" data-id="balloon" data-kind="task">
+    <div class="q">Rub the balloon until the hair stands up!</div>
+    <div class="explain">The balloon got extra Sparkies. The hair lost some. Now they pull on each other, so the hair lifts up toward the balloon! This is called static electricity.</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>🤗 Pull or push?</h2>
+  <div class="speech say"><span class="who">⚡</span>Here's a secret. Things with extra Sparkies and things with missing Sparkies pull together. Two things that both have extra Sparkies push apart!</div>
+  <div class="ex" data-id="pull" data-kind="mc">
+    <div class="q">The balloon has extra Sparkies. The hair is missing some. What happens?</div>
+    <ol class="opts emoji grid2">
+      <li data-correct>🤗<span class="lab">they pull together</span></li>
+      <li>🙅<span class="lab">they push apart</span></li>
+    </ol>
+    <div class="explain">Opposites pull together, like best friends giving a hug.</div>
+  </div>
+  <div class="ex" data-id="push" data-kind="mc">
+    <div class="q">Two balloons. Both have extra Sparkies. What happens when they come close?</div>
+    <ol class="opts emoji grid2">
+      <li>🤗<span class="lab">they pull together</span></li>
+      <li data-correct>🙅<span class="lab">they push apart</span></li>
+    </ol>
+    <div class="hint">Both balloons are the same kind. Same kinds push away.</div>
+    <div class="explain">Same kinds push apart. Hang two rubbed balloons on strings and watch them move away from each other!</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>⚠️ Sparky's rules</h2>
+  <div class="speech say"><span class="who">⚡</span>A balloon has just a little electricity. But the holes in the wall, called sockets, have a giant push! It can hurt you very badly. So I have some rules.</div>
+  <div class="big-emoji">🔌🚫✋</div>
+  <div class="ex" data-id="rules" data-kind="sort">
+    <div class="q">Help Sparky! Tap a card, then tap the right box.</div>
+    <div class="bins">
+      <div data-bin="ok">✅ Safe</div>
+      <div data-bin="no">🚫 Never!</div>
+    </div>
+    <ul class="items">
+      <li data-bin="ok">🎈 Rub a balloon</li>
+      <li data-bin="ok">🔋 Play with an AA battery with a grown-up</li>
+      <li data-bin="ok">🗣️ Tell a grown-up about a broken wire</li>
+      <li data-bin="no">🔌 Poke things in a wall socket</li>
+      <li data-bin="no">💧 Touch plugs with wet hands</li>
+      <li data-bin="no">🪁 Fly a kite near power lines</li>
+      <li data-bin="no">✂️ Cut or chew a cable</li>
+    </ul>
+    <div class="hint">Wall sockets, plugs and big power lines are only for grown-ups. Water and electricity never mix!</div>
+    <div class="explain">Small batteries and balloons are fun. Wall sockets, power lines and broken cables have a huge push. Only grown-ups touch those!</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>⛈️ The biggest spark</h2>
+  <div class="speech say"><span class="who">⚡</span>Lightning is a giant spark! Lots and lots of Sparkies jump from a cloud to the ground. It is super strong.</div>
+  <div class="big-emoji">☁️⚡🌳</div>
+  <div class="ex" data-id="storm" data-kind="mc">
+    <div class="q">Thunder and lightning! Where should you go?</div>
+    <ol class="opts emoji grid3">
+      <li data-correct>🏠<span class="lab">inside a house</span></li>
+      <li>🌳<span class="lab">under a tall tree</span></li>
+      <li>⛳<span class="lab">in an open field</span></li>
+    </ol>
+    <div class="hint">Lightning likes tall things and open spaces.</div>
+    <div class="explain">Go inside a building (or a car) and wait for the storm to pass. "When thunder roars, go indoors!"</div>
+  </div>
+</section>
+
+<section class="card home">
+  <h2>🏠 Try it at home (with a grown-up)</h2>
+  <div class="speech say"><span class="who">⚡</span>Let's do real static magic!</div>
+  <p>You need: 🎈 a balloon and ✂️ tiny bits of paper.</p>
+  <ol class="steps">
+    <li class="say">Rub the balloon on your hair or a wool sweater.</li>
+    <li class="say">Hold it over the paper bits. Do they jump up?</li>
+    <li class="say">Rub it again and hold it near your hair. Look in a mirror!</li>
+    <li class="say">Turn on a tap to make a very thin stream of water. Bring the rubbed balloon close. The water bends!</li>
+  </ol>
+  <aside class="callout warn"><span class="ct">⚠️ Sparky's rule</span><p>Only play with balloons and small batteries. Never touch wall sockets.</p></aside>
+  <aside class="callout tip grownup"><span class="ct">👨‍👩‍👧 For grown-ups</span><div>Rubbing transfers electrons between materials (the triboelectric effect): the rubber balloon ends up negative and the hair positive. Neutral paper and water are attracted because the balloon's field polarises them. Mains is dangerous because its high voltage drives a harmful current through the body's resistance. The physics is in <a href="../book/ch01-physics.html">Chapter 1: How Current Really Flows</a>, and safety in <a href="../book/ch00-lab.html">Chapter 0</a>.</div></aside>
+</section>
+</main>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/kidkit.js"></script>
+<script src="js/k01-sparky.js"></script>
+</body>
+</html>

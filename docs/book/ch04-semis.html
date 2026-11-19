@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4 · Diodes, Transistors & Op-Amps — Sparks & Circuits</title>
+<meta name="description" content="Semiconductor physics, diodes, flyback protection, BJTs and MOSFETs as switches, H-bridges, op-amps and how to read a datasheet.">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+  /* chapter-local styles */
+  .ds-sheet { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 12px 14px; font-size: .9rem; }
+  .ds-sheet h4 { margin: .6em 0 .3em; font-size: .95rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .ds-sheet table { margin: .3em 0 .8em; font-size: .86rem; }
+  .ds-sheet td, .ds-sheet th { padding: 5px 8px; }
+  .ds-mark { display: inline-flex; align-items: center; justify-content: center; min-width: 1.45em; height: 1.45em; border-radius: 999px; background: var(--accent); color: var(--accent-ink); font: 700 .78rem var(--font); cursor: pointer; border: 0; margin-left: 4px; vertical-align: middle; }
+  .ds-mark.on { background: var(--c5); }
+  .ds-note { margin-top: 10px; background: var(--surface2); border-radius: 10px; padding: 10px 14px; min-height: 4.2em; font-size: .93rem; }
+  .ds-title { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; border-bottom: 2px solid var(--ink); padding-bottom: 6px; margin-bottom: 6px; }
+  .ds-title b { font-size: 1.15rem; }
+  .w-status { font: .9rem var(--mono); padding: 4px 10px; border-radius: 8px; background: var(--surface2); display: inline-block; }
+  .w-status.bad { background: var(--bad-bg); color: var(--bad); }
+  .w-status.good { background: var(--good-bg); color: var(--good); }
+  .sub-sch[hidden] { display: none; }
+  figure .w-seg { flex-wrap: wrap; max-width: 100%; }
+</style>
+</head>
+<body data-book="adult" data-chapter="ch04-semis">
+<main class="chapter">
+
+<header class="chapter-head">
+  <p class="kicker">Chapter 4</p>
+  <h1>Diodes, Transistors &amp; Op-Amps</h1>
+  <p class="lede">Resistors, capacitors and inductors are linear and passive: they can only resist, store or release. Semiconductors are where circuits start making decisions. A diode lets current through in one direction only, a transistor lets a tiny signal switch amps into a motor, and an op-amp turns feedback into precision. In this chapter you go from silicon atoms to the motor driver on your robot.</p>
+</header>
+
+<section>
+<h2 id="silicon">Why silicon? Bonds, holes and doping</h2>
+
+<p>In <a href="ch01-physics.html">Chapter 1</a> you met the two extremes. In a metal, every atom donates roughly one electron to a shared "sea", so a cubic centimetre of copper holds about \(8.5\times10^{22}\) free electrons. In an insulator such as glass, every electron is locked into a chemical bond and none can wander. A <b>semiconductor</b> sits in between, and the interesting part is that we get to <em>choose</em> where in between it sits.</p>
+
+<p>Silicon has four outer (valence) electrons. In a crystal, each silicon atom shares one electron with each of its four neighbours, forming four covalent bonds. Every valence electron is busy holding the lattice together, so a perfect silicon crystal at absolute zero is an insulator. At room temperature, though, the atoms jiggle. Every so often a jiggle is violent enough to shake an electron out of its bond. That electron is now free to drift through the crystal, and it leaves behind a broken bond: a gap where an electron should be.</p>
+
+<p>That gap is called a <b>hole</b>, and it is the single most useful fiction in electronics. A neighbouring bonded electron can hop into the gap, which moves the gap one place over. When an electric field pushes the bonded electrons to the left one hop at a time, the hole moves to the right, just as a positive charge would. So we treat holes as real positive carriers, with their own mobility (about a third of an electron's in silicon).</p>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: the hole as a free slot</span>
+<p>Picture an array that is full except for one empty slot, and a loop that shifts each element left whenever the slot is to its left. Many elements each move one step left, but you can describe the whole process far more simply by saying the empty slot travelled to the right. A hole is that empty slot. It is not a particle, but bookkeeping it as one gives the right answers, and the semiconductor equations are written that way.</p>
+</aside>
+
+<h3>How many carriers?</h3>
+<p>Breaking a bond in silicon costs about <b>1.12 eV</b>, the <b>band gap</b> \(E_g\). The typical thermal energy of a vibration at room temperature is only \(kT \approx 0.026\) eV, about 43 times smaller. The chance of a fluctuation reaching \(E_g\) goes like the Boltzmann factor \(e^{-E_g/2kT}\), which is tiny. Pure (intrinsic) silicon at 300 K has about \(n_i \approx 10^{10}\) free electrons per cm³ (and as many holes), against \(5\times10^{22}\) atoms. That is one free carrier per few trillion atoms: a poor conductor.</p>
+
+<aside class="callout physics"><span class="ct">⚛️ The band picture in one paragraph</span>
+<p>Physicists draw this as two energy bands. The <em>valence band</em> holds the bonded electrons and is completely full; the <em>conduction band</em> above it is where free electrons live. The forbidden gap between them is \(E_g\). Metals have no gap (their highest band is half full), insulators have a large one (glass: about 9 eV), and semiconductors have a modest one (Si 1.12 eV, GaAs 1.42 eV, GaN 3.4 eV). Because the number of carriers depends exponentially on \(E_g/kT\), <b>everything about semiconductors is temperature-sensitive</b>. Keep that in mind; it shows up in diode voltages, leakage currents and transistor gain.</p>
+</aside>
+
+<h3>Doping: choosing the carriers</h3>
+<p>Now the trick that makes the whole industry possible. Replace one silicon atom in ten million with a <b>phosphorus</b> atom, which has <em>five</em> valence electrons. Four of them form bonds with the neighbours; the fifth has no bond to join and is so loosely held (about 0.045 eV) that at room temperature it is essentially always free. Phosphorus is a <b>donor</b>, and silicon doped this way is <b>n-type</b>: its majority carriers are negative electrons. Doping at \(10^{16}\) per cm³ multiplies the free-electron concentration by a million.</p>
+
+<p>Replace silicon with <b>boron</b> (three valence electrons) instead, and each boron atom has one bond missing an electron. A neighbour's electron easily drops into it, creating a mobile hole. Boron is an <b>acceptor</b>, and the material is <b>p-type</b>: its majority carriers are holes.</p>
+
+<p>Doping does not destroy the thermal pairs. It shifts the balance. In equilibrium the product of the two concentrations stays fixed, \(n\,p = n_i^2\), so adding lots of electrons suppresses the holes (they find an electron and recombine). In n-type silicon with \(n = 10^{16}\), the holes number only \(p = 10^{20}/10^{16} = 10^4\) per cm³. These rare carriers are called <b>minority carriers</b>, and they will turn out to be the whole story of diodes and bipolar transistors.</p>
+
+<figure class="widget wide">
+  <div id="w-lattice"></div>
+  <figcaption><b>Figure 4.1</b> A 2-D cartoon of the silicon lattice (each atom bonds to four neighbours). Switch between intrinsic, n-type and p-type. Raise the temperature and watch thermal electron–hole pairs appear and recombine. Turn on the field and notice that electrons (blue) drift left while holes (orange) drift right, which is the same direction as conventional current.</figcaption>
+</figure>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "n-type silicon is negatively charged"</span>
+<p>It isn't. Each phosphorus atom brings one extra electron <em>and</em> one extra proton in its nucleus. When the electron wanders off, it leaves behind a fixed positive ion, and the crystal as a whole stays neutral. The "n" describes which carrier is mobile, not the net charge. That distinction matters in the next section, where the fixed ions are what create the junction's electric field.</p>
+</aside>
+
+<div class="ex" data-id="dope-mc" data-kind="mc">
+  <div class="q">You dope silicon with arsenic, which (like phosphorus) has five valence electrons. What do you get?</div>
+  <ol class="opts">
+    <li>p-type silicon, because arsenic creates holes</li>
+    <li data-correct>n-type silicon, whose majority carriers are free electrons</li>
+    <li>A negatively charged crystal</li>
+    <li>An insulator, because the extra electrons fill all the holes</li>
+  </ol>
+  <div class="hint">Count bonds: silicon needs four. What happens to the fifth electron?</div>
+  <div class="explain">Arsenic is a donor (group V), so the material is n-type. It stays electrically neutral: every free electron is balanced by a fixed positive arsenic ion.</div>
+</div>
+
+</section>
+
+<section>
+<h2 id="pn">The PN junction: a valve made of diffusion</h2>
+
+<p>Grow a crystal that is p-type on one side and n-type on the other. The boundary is a <b>PN junction</b>, and it is the heart of every diode, LED, solar cell and bipolar transistor.</p>
+
+<p>At the instant you imagine the two sides touching, the n side is crowded with free electrons and the p side with holes. Particles that are crowded on one side and scarce on the other spread out by <b>diffusion</b>, the same random-walk process that spreads a drop of ink in water. Electrons diffuse into the p side and holes into the n side. When an electron meets a hole, they <b>recombine</b>: the electron falls into the broken bond, and both carriers disappear.</p>
+
+<p>Diffusion leaves something behind. The electrons that left the n side abandoned their positive donor ions, which are locked into the lattice. The holes that left the p side abandoned negative acceptor ions. So a thin layer on each side of the boundary now holds fixed, uncovered charge: positive on the n side, negative on the p side. This layer has been swept clean of mobile carriers, which is why it is called the <b>depletion region</b>. It is typically 0.1 to 1 µm thick.</p>
+
+<p>Two layers of opposite charge make an electric field (Chapter 1's parallel plates again), pointing from the n side to the p side. That field pushes electrons back toward the n side and holes back toward the p side, opposing the diffusion that created it. The process stops when the two balance. The field corresponds to a voltage step across the junction, the <b>built-in potential</b> \(V_{bi}\), about 0.6–0.8 V for silicon. Carriers now face an energy hill: only the few electrons with enough thermal energy can climb over it.</p>
+
+<aside class="callout physics"><span class="ct">⚛️ Why you can't measure the built-in potential with a voltmeter</span>
+<p>If the junction has 0.7 V across it, why doesn't an unpowered diode read 0.7 V on your meter? Because the metal contacts at each end form their own junctions with their own contact potentials, and around the complete loop they cancel exactly. If they didn't, you could draw power from a diode sitting in a drawer, which would violate the second law of thermodynamics. The built-in potential is real; it just isn't available to an external circuit in equilibrium.</p>
+</aside>
+
+<h3>Biasing the junction</h3>
+<p>Now connect a battery.</p>
+<ul>
+  <li><b>Forward bias</b> (p side positive): the external voltage opposes the built-in field. The hill gets lower by \(V\), the depletion region narrows, and the number of carriers with enough energy to cross grows <em>exponentially</em> (each 26 mV of extra bias multiplies it by \(e\)). Electrons pour into the p side, holes into the n side, they recombine there, and the battery replaces them. A large current flows.</li>
+  <li><b>Reverse bias</b> (n side positive): the external voltage adds to the hill. The depletion region widens and diffusion stops. All that flows is the trickle of <em>minority</em> carriers that happen to wander into the field and get swept across. This leakage current \(I_S\) is tiny (nanoamps or less in a small silicon diode) and almost independent of voltage.</li>
+  <li><b>Breakdown</b>: push the reverse voltage high enough and the field becomes so strong that carriers crossing it gain enough energy to knock new electrons out of bonds (avalanche), or electrons tunnel straight through a very thin junction (Zener effect). Current then rises steeply. In an ordinary diode that destroys it; in a Zener or TVS diode it is the intended mode of operation.</li>
+</ul>
+
+<figure class="widget wide">
+  <div id="w-pn"></div>
+  <figcaption><b>Figure 4.2</b> A PN junction. Drag the bias from reverse to forward. The fixed ions (⊕ and ⊖ squares) mark the depletion region, and the curve along the bottom is the energy hill an electron must climb to cross from n to p. Under forward bias the hill shrinks and carriers stream across (the arrows show the current); under reverse bias it grows and only rare minority carriers leak through.</figcaption>
+</figure>
+
+<p>The depletion region also behaves like a capacitor. Its two layers of fixed charge are plates, and the depleted silicon between them is the dielectric. More reverse bias pushes the plates apart and lowers the capacitance (roughly as \(1/\sqrt{V_{bi}+V_R}\)). Varactor diodes exploit this to tune radio circuits with a voltage. For us it matters because every diode and transistor has junction capacitance that must be charged and discharged when it switches, which is part of why switching takes time.</p>
+</section>
+
+<section>
+<h2 id="iv">The diode I–V curve</h2>
+
+<p>A <b>diode</b> is a PN junction with two leads. The p side is the <b>anode</b>, the n side the <b>cathode</b> (marked by the stripe on the package and the bar in the symbol). Conventional current flows from anode to cathode, in the direction the triangle points.</p>
+
+<p>The exponential behaviour from the last section leads to one of the most important equations in electronics, the <b>Shockley diode equation</b>:</p>
+<div class="formula">
+$$I = I_S\left(e^{V/(n V_T)} - 1\right), \qquad V_T = \frac{kT}{q} \approx 25.9\ \text{mV at } 300\ \text{K}$$
+<p>\(I_S\): saturation (leakage) current, femtoamps to microamps. \(n\): ideality factor, 1 to 2. \(V_T\): the thermal voltage.</p>
+</div>
+
+<p>Read it like this. For reverse voltages, the exponential vanishes and \(I \approx -I_S\), the tiny leakage. For forward voltages above about 0.1 V the "−1" is negligible and the current is a pure exponential. Every additional \(n V_T \ln 10\) volts multiplies the current by ten. For \(n = 1\) that is 59.6 mV per decade at room temperature. A useful rule: <b>60 mV more forward voltage gives ten times the current</b> (for an ideal junction; real small-signal diodes with \(n \approx 1.8\) need about 105 mV per decade).</p>
+
+<aside class="callout math"><span class="ct">∑ Exponentials and logs, quickly</span>
+<p>If \(I = I_S e^{V/nV_T}\), then taking the natural log gives \(V = nV_T \ln(I/I_S)\). The voltage grows only with the <em>logarithm</em> of current, which is why a diode's voltage barely moves while its current changes by orders of magnitude. To go from \(I_1\) to \(I_2\): \(\Delta V = nV_T\ln(I_2/I_1)\). For a factor of 10 that is \(nV_T \times 2.303\). <a href="appA-math.html">Appendix A</a> covers exponentials and logs from scratch.</p>
+</aside>
+
+<p>Real diodes add a small <b>series resistance</b> \(R_S\) (the bulk silicon and leads), which straightens the curve at high current. So the full model is \(V = nV_T\ln(I/I_S) + I R_S\).</p>
+
+<figure class="widget wide">
+  <div id="w-iv"></div>
+  <figcaption><b>Figure 4.3</b> The diode I–V curve from the Shockley model plus series resistance. Pick a diode type, then drag the temperature. Switch to the log current axis: the exponential becomes a straight line whose slope is the "mV per decade", and the leakage current at the left becomes visible. Hover to read values.</figcaption>
+</figure>
+
+<h3>Temperature</h3>
+<p>\(I_S\) contains the number of thermally generated minority carriers, so it rises steeply with temperature, roughly doubling every 5–10 °C. The net effect is that, at a constant current, <b>the forward voltage of a silicon junction falls by about 2 mV per °C</b>. A diode at 10 mA that reads 0.69 V at 25 °C reads about 0.59 V at 75 °C. That is a handy thermometer (many chips measure their die temperature with exactly this), and also a hazard: in a hot transistor, the same drive produces more current, which makes more heat, which makes more current. We will meet this "thermal runaway" again in parallel transistors.</p>
+
+<div class="ex" data-id="iv-temp" data-kind="task">
+  <div class="q">In Figure 4.3, select the <b>1N4148 silicon</b> diode and find a temperature at which its forward voltage at 10 mA (shown in the readout) falls <b>below 0.60 V</b>.</div>
+  <div class="explain">With a temperature coefficient of about −1.9 mV/°C, dropping from 0.69 V to 0.60 V takes roughly 45–50 °C of heating, so somewhere around 70–75 °C. That's an ordinary temperature for a part next to a motor driver.</div>
+</div>
+
+<div class="ex" data-id="decade-num" data-kind="num" data-answer="0.0596" data-tol="3%" data-unit="V">
+  <div class="q">An ideal junction (\(n = 1\)) at 300 K carries 1 mA. How much more forward voltage does it need to carry 10 mA? Give the answer in volts (\(V_T = 25.9\) mV).</div>
+  <div class="hint">\(\Delta V = nV_T \ln(I_2/I_1)\), with \(\ln 10 \approx 2.303\).</div>
+  <div class="explain">\(\Delta V = 0.0259 \times 2.303 \approx 0.0596\) V, the famous "60 mV per decade". It is why the "0.7 V drop" is a good approximation over such a wide range of currents.</div>
+</div>
+
+<h3>Forward voltages you will meet</h3>
+<p>The voltage at which a diode "turns on" depends on its barrier: the band gap for a PN junction, or the metal–semiconductor barrier for a Schottky diode. Here is a practical table, at typical operating currents:</p>
+<table>
+  <tr><th>Part</th><th>Type</th><th>\(V_F\) (typical)</th><th>Notes</th></tr>
+  <tr><td>1N4148</td><td>Small-signal Si</td><td>0.6–0.75 V at 1–10 mA</td><td>Fast, 100 V, 200–300 mA. The default small diode.</td></tr>
+  <tr><td>1N4001…1N4007</td><td>Rectifier Si</td><td>0.8–1.0 V at 1 A</td><td>Slow (µs recovery), 50–1000 V, 1 A.</td></tr>
+  <tr><td>1N5819, SS34</td><td>Schottky</td><td>0.3–0.5 V at 1 A</td><td>Fast, low drop, but higher leakage (and it grows with temperature). Low reverse voltage (40 V).</td></tr>
+  <tr><td>Infrared LED</td><td>GaAs / AlGaAs</td><td>1.2–1.5 V</td><td>Remote controls, optocouplers.</td></tr>
+  <tr><td>Red / orange LED</td><td>AlGaInP</td><td>1.8–2.2 V</td><td>Low enough to drive from 3.3 V comfortably.</td></tr>
+  <tr><td>Green / blue / white LED</td><td>InGaN</td><td>2.8–3.4 V</td><td>Barely possible from 3.3 V. White is a blue LED plus a yellow phosphor.</td></tr>
+</table>
+
+<aside class="callout physics"><span class="ct">⚛️ An LED's voltage is its photon energy</span>
+<p>In an LED, each electron that crosses the junction and recombines releases its energy as one photon. A photon's energy is \(E = hc/\lambda\), which works out to \(E[\text{eV}] \approx 1240/\lambda[\text{nm}]\). A red photon at 630 nm carries 1.97 eV; a blue one at 465 nm carries 2.67 eV. An electron falling through \(V\) volts gains \(V\) electron-volts, so the LED cannot emit until the forward voltage approaches the photon energy. That's why the colour sets \(V_F\), and why blue LEDs need more voltage than red ones. (Blue LEDs need a bit extra on top, because of losses in the InGaN material.)</p>
+</aside>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "a diode always drops 0.7 V"</span>
+<p>The 0.7 V figure is a model, not a law. A 1N4148 drops about 0.45 V at 10 µA, 0.69 V at 10 mA and over 1 V at 300 mA; it drops 0.1 V less when it is hot. The "constant-drop" model is fine for quick design, but when a datasheet says "\(V_F = 1.0\) V max at 50 mA", design to that number.</p>
+</aside>
+</section>
+
+<section>
+<h2 id="diode-uses">Diodes at work: rectifiers, protection and clamps</h2>
+
+<h3>Rectifiers and OR-ing</h3>
+<p>The classic use of a one-way valve is turning AC into DC. A <b>half-wave rectifier</b> is a single diode feeding a capacitor: the diode conducts only near the positive peaks and the capacitor holds the voltage between them. A <b>bridge rectifier</b> (four diodes) uses both halves of the cycle at the cost of two diode drops. Between peaks the capacitor supplies the load and sags by \(\Delta V \approx I/(fC)\) (where \(f\) is the ripple frequency); see the RC discussion in <a href="ch03-ac.html">Chapter 3</a>. Every USB charger and bench supply starts this way, but you will rarely build one on a robot.</p>
+
+<p>On robots you are more likely to use diodes to <b>OR power sources</b> together. Connect USB 5 V and a battery each through a Schottky diode to the same rail, and whichever source is higher supplies the board while the diodes stop one source from back-feeding the other. The price is the diode drop and the heat \(P = V_F I\).</p>
+
+<h3>Reverse-polarity protection</h3>
+<p>Sooner or later someone plugs a battery in backwards. Without protection, current flows backwards through every chip's internal ESD diodes and through the motor driver's body diodes, and things die within milliseconds. There are three standard defences:</p>
+<ol>
+  <li><b>Series diode.</b> Simple and foolproof: reversed, the diode blocks. But all the load current flows through it all the time. A silicon rectifier at 2 A drops 0.9 V and burns 1.8 W; a Schottky drops 0.45 V (0.9 W). On a 7.4 V pack that's 6–12 % of your power, gone as heat.</li>
+  <li><b>Shunt diode plus fuse.</b> A diode across the supply that is normally reverse-biased. Plug the battery in backwards and it conducts a huge current, blowing the fuse. No loss in normal operation, but you need a new fuse every time.</li>
+  <li><b>P-channel MOSFET "ideal diode".</b> Put a P-MOSFET in the positive line with its drain toward the battery and its source toward the load, and tie its gate to ground. Connected correctly, the MOSFET's body diode conducts first, the source rises to near the battery voltage, \(V_{GS} \approx -V_{bat}\), and the channel switches fully on. The loss is only \(I^2 R_{DS(on)}\): with 20 mΩ at 2 A, that's 80 mW and a 40 mV drop. Connected backwards, the body diode is reverse-biased and \(V_{GS} \approx 0\), so the MOSFET stays off and nothing flows. (For packs above about 12 V, add a Zener and resistor to keep \(V_{GS}\) inside its ±20 V or ±12 V rating.)</li>
+</ol>
+
+<figure class="widget wide">
+  <div id="w-revpol"></div>
+  <div class="w-controls" id="w-revpol-ctl"></div>
+  <figcaption><b>Figure 4.4</b> Reverse-polarity protection, solved live. Choose a protection scheme, set the load current, then click <b>Flip battery</b>. Compare the voltage the load gets and the heat wasted in the protection part. With no protection, a reversed battery drives a large current backwards through the board's internal diodes.</figcaption>
+</figure>
+
+<div class="ex" data-id="revpol-num" data-kind="num" data-answer="0.9" data-tol="3%" data-unit="W">
+  <div class="q">A robot draws 2 A through a series Schottky diode with \(V_F = 0.45\) V. How much power does the diode dissipate?</div>
+  <div class="hint">\(P = V_F \times I\).</div>
+  <div class="explain">\(P = 0.45 \times 2 = 0.9\) W, enough to make a small SMD diode very hot. A 20 mΩ P-MOSFET in the same spot dissipates \(I^2R = 4 \times 0.02 = 0.08\) W.</div>
+</div>
+
+<h3>Flyback diodes: taming the inductive kick</h3>
+<p>Recall from <a href="ch01-physics.html">Chapter 1</a> and <a href="ch03-ac.html">Chapter 3</a> that an inductor resists changes in current. Its voltage is</p>
+<div class="formula">
+$$V_L = L\,\frac{dI}{dt}$$
+<p>An inductor will produce <em>whatever voltage it takes</em> to keep its current flowing for a moment.</p>
+</div>
+<p>Relay coils, solenoids and motors are inductors. While a transistor holds a relay on, 70 mA flows through the coil, and the coil's magnetic field stores energy \(E = \tfrac12 L I^2\). Now the transistor turns off in, say, 50 ns. To stop 70 mA in 50 ns, a 100 mH coil would need \(V = 0.1 \times 0.07/50\times10^{-9} = 140{,}000\) V. Of course it never gets there: the voltage at the transistor rises until <em>something</em> conducts. Usually that something is the transistor itself, breaking down. This is the <b>inductive kick</b>, and it is the number-one killer of hobby transistors (and the reason microcontrollers mysteriously reset when a relay clicks).</p>
+
+<p>The cure is a <b>flyback diode</b> (also called a freewheeling, snubber or catch diode) across the coil, cathode to the positive supply. While the transistor is on, the diode is reverse-biased and does nothing. When the transistor turns off, the coil's current simply continues around the small loop through the diode, and the transistor only sees the supply voltage plus one diode drop. The stored energy is dissipated slowly in the coil's own resistance.</p>
+
+<p>There is a trade-off. The current now decays with the coil's \(L/R\) time constant, so a relay releases noticeably slower (milliseconds) and a solenoid lets go sluggishly. If that matters, put a Zener diode in series with the flyback diode: the coil current then has to fight an extra \(V_Z\), so it decays much faster, while the transistor sees \(V_{supply} + V_Z + 0.7\), still within its rating.</p>
+
+<figure class="widget wide">
+  <div id="w-fly"></div>
+  <div class="w-controls" id="w-fly-ctl"></div>
+  <figcaption><b>Figure 4.5</b> Turning off a 5 V relay coil (70 Ω, 100 mH). Pick a clamp, then press <b>Switch off</b>. The top trace is the voltage at the transistor's collector/drain; the bottom trace is the coil current. Without a clamp, the voltage shoots up to the transistor's breakdown voltage and the coil's energy is dumped into the transistor. With a plain diode, the current freewheels slowly. With diode + Zener, the voltage is clamped higher, so the current dies faster.</figcaption>
+</figure>
+
+<div class="ex" data-id="fly-task" data-kind="task">
+  <div class="q">In Figure 4.5, find a clamp setting that makes the coil current fall to zero in <b>less than 0.6 ms</b> while keeping the peak switch voltage <b>below 40 V</b> (so a 40 V transistor survives with margin).</div>
+  <div class="explain">A Zener clamp of around 12–33 V does it: the coil voltage during release is about \(V_Z + 0.7\) plus its own \(IR\) drop, so the current ramps down in roughly \(L I/(V_Z + 0.7)\). The plain diode takes several milliseconds; no clamp at all hits the transistor's breakdown voltage.</div>
+</div>
+
+<aside class="callout warn"><span class="ct">⚠️ Every coil gets a diode</span>
+<p>Relays, solenoids, valves, brushed motors driven by a single transistor, the coil of a buzzer: all need a flyback path. Use a fast diode rated for at least the coil current (1N4148 for small relays, a Schottky such as SS34 or 1N5819 for motors). Place it physically close to the coil or the switch, so the loop carrying the fast current is small. Motor driver ICs and H-bridges have this built in (the MOSFET body diodes or dedicated diodes), which is one reason to use them.</p>
+</aside>
+
+<h3>Zener diodes as references</h3>
+<p>A <b>Zener diode</b> is doped heavily so that it breaks down at a precise, low reverse voltage (2.4 V to about 50 V) without damage. Above breakdown its voltage stays nearly constant over a wide range of current, so a resistor and a Zener make a crude voltage regulator. The resistor drops the difference between the input and \(V_Z\); the Zener soaks up whatever current the load doesn't take.</p>
+<div class="formula">
+$$R = \frac{V_{in,\min} - V_Z}{I_{load,\max} + I_{Z,\min}}, \qquad P_Z = V_Z\, I_Z$$
+<p>Design so the Zener still has a few mA at the worst case (lowest input, highest load), then check its dissipation at the other extreme (highest input, no load).</p>
+</div>
+<p>It works, but it wastes current continuously, and its output moves with both input and load. Today a Zener's main jobs are clamping (protecting a MOSFET gate, a sensor input, or an ADC pin) and providing a rough reference. For a supply rail, use a regulator (<a href="ch05-power.html">Chapter 5</a>). For a precise reference, use a bandgap reference or a TL431 shunt regulator, which behaves like a programmable, much sharper Zener.</p>
+
+<figure class="widget">
+  <div id="w-zener"></div>
+  <div class="w-controls" id="w-zener-ctl"></div>
+  <figcaption><b>Figure 4.6</b> A 5.1 V Zener shunt regulator, solved live. Change the input voltage and the load resistance. As long as the Zener current stays above a few mA, the output barely moves. Lower the load resistance (more load current) until the Zener starves and the output collapses.</figcaption>
+</figure>
+
+<div class="ex" data-id="zener-num" data-kind="num" data-answer="156" data-tol="3%" data-unit="Ω">
+  <div class="q">You need 5.1 V for a 20 mA load from a 9 V battery, using a Zener. You want at least 5 mA in the Zener at full load. What series resistor do you need?</div>
+  <div class="hint">\(R = (V_{in} - V_Z)/(I_{load} + I_{Z,min})\).</div>
+  <div class="explain">\(R = (9 - 5.1)/(0.020 + 0.005) = 3.9/0.025 = 156\,\Omega\). Pick 150 Ω. Now check the no-load case: all 26 mA flows into the Zener, which dissipates \(5.1 \times 0.026 \approx 0.13\) W. And notice that as the battery sags to 7 V, the Zener current at full load falls to \((7-5.1)/150 - 0.020 = -7\) mA, which is negative, so regulation is lost. Zener regulators hate varying inputs.</div>
+</div>
+
+<h3>TVS and ESD diodes</h3>
+<p>A <b>TVS (transient-voltage-suppression) diode</b> is an avalanche diode with a large junction, built to absorb short, high-energy pulses: the load-dump spike when a motor lead disconnects, a hot-plug overshoot, a static zap. Three numbers matter on its datasheet:</p>
+<ul>
+  <li><b>Standoff voltage</b> \(V_{RWM}\): it is guaranteed to leak only microamps below this. Choose it at or above your normal maximum (for example 15 V standoff for a 3S LiPo at 12.6 V).</li>
+  <li><b>Breakdown voltage</b> \(V_{BR}\): where it starts to conduct significantly, roughly 10 % above standoff.</li>
+  <li><b>Clamping voltage</b> \(V_C\) at the rated peak pulse current: what your circuit actually sees during the surge. It is typically 1.4–1.6 times the standoff. Your protected parts must survive it.</li>
+</ul>
+<p><b>ESD protection arrays</b> (for example a USBLC6-2) are small, low-capacitance TVS diodes for data lines. Every connector that a human touches (USB, buttons on a cable, sensor headers) is a door for 8 kV static discharges. Microcontroller pins have internal ESD diodes, but those are designed to survive handling in a factory, not repeated zaps in the field.</p>
+
+<div class="ex" data-id="tvs-sort" data-kind="sort">
+  <div class="q">Which diode would you reach for? Sort each job.</div>
+  <div class="bins">
+    <div data-bin="sig">1N4148 / Schottky</div>
+    <div data-bin="z">Zener</div>
+    <div data-bin="tvs">TVS / ESD array</div>
+  </div>
+  <ul class="items">
+    <li data-bin="sig">Catch the inductive kick of a small relay coil</li>
+    <li data-bin="z">Keep a P-MOSFET's gate–source voltage below 12 V on a 4S pack</li>
+    <li data-bin="tvs">Protect USB D+/D− against static discharge</li>
+    <li data-bin="tvs">Absorb a voltage spike on the battery input when a motor cable is yanked</li>
+    <li data-bin="sig">OR together USB power and battery power</li>
+    <li data-bin="z">A rough 3.3 V reference for a comparator</li>
+  </ul>
+  <div class="explain">Signal and Schottky diodes conduct in the forward direction (flyback, OR-ing). Zeners give a defined reverse voltage at small currents (clamps, references). TVS diodes are Zener-like but built to absorb large energy pulses, and ESD arrays are their low-capacitance cousins for data lines.</div>
+</div>
+</section>
+
+<section>
+<h2 id="bjt">The bipolar transistor: a current-controlled valve</h2>
+
+<p>Put two junctions back to back with a very thin middle layer and you get a <b>bipolar junction transistor</b> (BJT). An <b>NPN</b> transistor is an n-type <b>emitter</b>, a thin p-type <b>base</b> and an n-type <b>collector</b>. A <b>PNP</b> transistor is the mirror image, with everything reversed.</p>
+
+<h3>What really happens inside</h3>
+<p>Forward-bias the base–emitter junction (base about 0.6–0.7 V above emitter) and it behaves like a diode: the emitter, which is very heavily doped, injects a flood of electrons into the base. In a plain diode those electrons would recombine with holes in the p region. But the base is made extremely thin (around a micrometre or less) and only lightly doped, so most electrons diffuse straight across it before they find a hole. On the far side they meet the reverse-biased base–collector junction, whose field sweeps them into the collector. A small fraction, say one in a hundred, does recombine in the base, and that is the <b>base current</b>.</p>
+
+<p>So the collector current is set by how many electrons the emitter injects, which depends exponentially on \(V_{BE}\), exactly like a diode: \(I_C \approx I_S e^{V_{BE}/V_T}\). The base current is a small, roughly fixed fraction of it. Their ratio is the <b>current gain</b>:</p>
+<div class="formula">
+$$I_C = \beta\, I_B, \qquad I_E = I_C + I_B, \qquad \beta \;(\text{also } h_{FE}) \approx 50\text{–}400$$
+<p>Valid in the <em>active</em> region. β varies with current, temperature and from part to part, often by a factor of three within one type.</p>
+</div>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: β is not an API contract</span>
+<p>Treat β like an undocumented performance characteristic: "usually around 200". Good designs never depend on its exact value. Amplifiers use negative feedback so the gain is set by resistors. Switches use a <em>forced</em> β of 10–20, so that any real transistor (with β from 50 to 400) is driven hard into saturation. It's the same mindset as never relying on a timing race in code that happens to work on your machine.</p>
+</aside>
+
+<h3>Three regions</h3>
+<ul>
+  <li><b>Cut-off</b>: \(V_{BE}\) below about 0.5 V. No base current, no collector current. The switch is open.</li>
+  <li><b>Active</b>: \(I_C = \beta I_B\), and the collector voltage is whatever the load allows. This is the amplifier region. As a switch it is bad news, because the transistor drops a lot of voltage while carrying current, so it gets hot.</li>
+  <li><b>Saturation</b>: you supply more base current than \(I_C/\beta\) requires. The load limits the current, the collector falls to within \(V_{CE(sat)} \approx 0.05\text{–}0.3\) V of the emitter, and both junctions are forward-biased. The switch is closed, and dissipation is only \(V_{CE(sat)} I_C\).</li>
+</ul>
+
+<h3>Worked example: an ESP32 switches a 5 V relay</h3>
+<p>A 5 V relay coil measures 70 Ω. We drive it with a 2N2222 (or 2N3904) NPN on the low side, from a 3.3 V ESP32 GPIO.</p>
+<ol>
+  <li><b>Collector current.</b> In saturation the transistor drops about 0.2 V, so \(I_C = (5 - 0.2)/70 \approx 69\) mA. Check that this is well under the transistor's rating (2N2222: 600 mA; 2N3904: 200 mA).</li>
+  <li><b>Base current with a forced β.</b> The datasheet guarantees \(h_{FE} \ge 50\)–100 at these currents. Ignore that and design for a forced β of 20: \(I_B = 69/20 \approx 3.4\) mA. A GPIO can easily source that.</li>
+  <li><b>Base resistor.</b> The resistor drops the pin voltage minus \(V_{BE}\) (about 0.75 V at this current): \(R_B = (3.3 - 0.75)/3.4\text{ mA} \approx 750\,\Omega\). Pick the next lower standard value, 680 Ω, which gives \(I_B \approx 3.75\) mA (more drive is the safe direction).</li>
+  <li><b>Extras.</b> Add the flyback diode across the coil. Add a 10–100 kΩ resistor from base to emitter, so the transistor stays off while the GPIO floats during boot. Check the power: \(P \approx V_{CE(sat)} I_C = 0.2 \times 0.069 \approx 14\) mW. Cool.</li>
+</ol>
+
+<figure class="widget wide">
+  <div id="w-bjt"></div>
+  <div class="w-controls" id="w-bjt-ctl"></div>
+  <figcaption><b>Figure 4.7</b> An NPN low-side switch driven from a 3.3 V GPIO. The model uses the transistor's β and a saturation voltage. Increase the base resistor or decrease β and watch the transistor fall out of saturation into the active region: \(V_{CE}\) rises, the relay gets less than it needs, and the transistor's dissipation jumps.</figcaption>
+</figure>
+
+<div class="ex" data-id="bjt-task" data-kind="task">
+  <div class="q">In Figure 4.7, with the worst-case <b>β = 50</b>, choose a base resistor that keeps the transistor <b>saturated</b> while the GPIO supplies <b>less than 5 mA</b>.</div>
+  <div class="explain">Saturation needs \(I_B \ge I_C/\beta = 69/50 \approx 1.4\) mA, so roughly \(R_B \le 1.8\) kΩ; the 5 mA limit needs \(R_B \ge 510\,\Omega\). Anything from about 560 Ω to 1.5 kΩ works, and the low end gives margin.</div>
+</div>
+
+<div class="ex" data-id="rb-num" data-kind="num" data-answer="867" data-tol="3%" data-unit="Ω">
+  <div class="q">A 3.3 V GPIO drives an NPN that must switch 60 mA. Using a forced β of 20 and \(V_{BE} = 0.7\) V, what base resistor do you calculate (before rounding to a standard value)?</div>
+  <div class="hint">\(I_B = I_C/20\); then \(R_B = (3.3 - V_{BE})/I_B\).</div>
+  <div class="explain">\(I_B = 60/20 = 3\) mA, \(R_B = 2.6/0.003 \approx 867\,\Omega\). Round <em>down</em> to 820 Ω so the transistor is driven slightly harder, not softer.</div>
+</div>
+
+<h3>PNP, Darlingtons and when to stop using BJTs</h3>
+<p>A <b>PNP</b> works the same way with all polarities reversed: its emitter goes to the positive supply, and you pull the base <em>down</em> to turn it on. That makes it a natural <b>high-side</b> switch, but driving its base from a 3.3 V pin is awkward when the emitter sits at 5 V or 12 V: the pin can never pull the base high enough to turn it off. We will solve the same problem for MOSFETs below.</p>
+
+<p>A <b>Darlington</b> pair is two transistors where the first one's emitter feeds the second one's base, so the gains multiply (β of 1000 or more). The TIP120 and the ULN2003 (seven Darlingtons in one chip, with built-in flyback diodes) are hobby classics. The catch: the output transistor can never saturate, because its collector has to stay above its base by the first transistor's \(V_{CE}\). A Darlington drops about 0.9–2 V when on. At 2 A that is up to 4 W of heat, enough to need a heatsink.</p>
+
+<p>For switching anything bigger than about 100 mA from a microcontroller, the modern answer is almost always a <b>MOSFET</b>. BJTs remain great for small signals, for cheap low-current switching, and inside nearly every analog IC.</p>
+
+</section>
+
+<section>
+<h2 id="mosfet">The MOSFET: a switch controlled by a capacitor</h2>
+
+<p>The <b>metal–oxide–semiconductor field-effect transistor</b> works on a completely different principle. Take a p-type body with two n-type islands, the <b>source</b> and the <b>drain</b>. Between them, the p-type body blocks current, because one of the two PN junctions is always reverse-biased. Above the gap, separated by a very thin layer of glass (silicon dioxide, a few nanometres to tens of nanometres thick), sits a conducting plate: the <b>gate</b>.</p>
+
+<p>The gate and the body form a capacitor. Put positive voltage on the gate and positive charge collects on it; negative charge must collect on the silicon side. First the holes are pushed away, then, above the <b>threshold voltage</b> \(V_{GS(th)}\), electrons are pulled in from the source and drain, forming a thin n-type <b>inversion channel</b> right under the oxide. The channel connects source to drain and the switch is on. The more gate voltage, the more electrons and the lower the resistance.</p>
+
+<p>Three consequences matter enormously in practice:</p>
+<ul>
+  <li><b>No DC gate current.</b> The gate is insulated, so once it is charged, holding the MOSFET on costs nothing. (Compare a BJT, which needs base current continuously.)</li>
+  <li><b>It is a resistor when on.</b> A fully enhanced MOSFET acts like a small resistor, \(R_{DS(on)}\), in milliohms. Dissipation is \(P = I^2 R_{DS(on)}\), with no fixed 0.2 V drop. That's why MOSFETs beat BJTs for power switching.</li>
+  <li><b>Switching means charging a capacitor.</b> To turn on, you must deliver the <b>gate charge</b> \(Q_g\) (typically 2–100 nC); to turn off, you must remove it. How fast you can do that sets the switching speed.</li>
+</ul>
+<p>Every power MOSFET also contains a <b>body diode</b>, an unavoidable PN junction from source to drain (for N-channel). It conducts whenever the drain is pulled below the source. We used it in the reverse-polarity circuit, and H-bridges rely on it for freewheeling.</p>
+
+<h3>Threshold is not "on"</h3>
+<p>The single most misunderstood MOSFET spec is \(V_{GS(th)}\). The datasheet defines it as the gate voltage at which the drain current reaches a tiny value, usually <b>250 µA</b>. At threshold, the MOSFET is barely starting to conduct. To carry amps with a low resistance, the gate must be driven well beyond it, and the datasheet tells you how far: \(R_{DS(on)}\) is specified only at certain gate voltages, such as 10 V, 4.5 V or 2.5 V. <b>A MOSFET is only "fully on" at the gate voltages where its \(R_{DS(on)}\) is specified.</b></p>
+
+<p>This is why a classic like the IRFZ44N, specified at \(V_{GS} = 10\) V with a threshold of 2–4 V, is a poor choice for a 3.3 V microcontroller: some parts barely conduct at 3.3 V, others not at all. A <b>logic-level</b> MOSFET is specified at 4.5 V or lower. For 3.3 V drive, look for \(R_{DS(on)}\) specified at \(V_{GS} = 2.5\) V (examples: AO3400A, IRLML6344, Si2302). The IRLZ44N is specified at 4 V and 5 V, so it is a good match for a 5 V Arduino and only "works, mostly" at 3.3 V.</p>
+
+<figure class="widget wide">
+  <div id="w-fet"></div>
+  <div class="w-controls" id="w-fet-ctl"></div>
+  <figcaption><b>Figure 4.8</b> On-resistance vs gate voltage for three MOSFET types (simplified models, typical parts). The dashed lines mark 3.3 V and 5 V gate drive. Set the gate voltage and the load current (12 V supply) and read the operating point. Try the standard-level part at 3.3 V with a 3 A load: it can't pass the current, falls out of the "resistor" region, and dissipates watts.</figcaption>
+</figure>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "\(V_{GS(th)} = 2\) V, so 3.3 V turns it on"</span>
+<p>At \(V_{GS(th)}\) the part conducts 250 µA. Your motor wants 2 A, ten thousand times more. Look at the \(R_{DS(on)}\) table and the "typical output characteristics" graph, and find the curve for <em>your</em> gate voltage. If the datasheet has no curve at your gate voltage, the manufacturer is telling you not to use it there.</p>
+</aside>
+
+<h3>Heat: \(I^2R\) and thermal resistance</h3>
+<p>When the MOSFET is fully on, its loss is conduction loss, \(P = I^2 R_{DS(on)}\). Two corrections make that number honest. First, \(R_{DS(on)}\) rises with temperature, typically by a factor of 1.4–1.8 at 125 °C compared with 25 °C (the datasheet has a "normalised on-resistance vs junction temperature" graph). Second, the heat has to go somewhere. Each package has a thermal resistance from junction to ambient air, \(\theta_{JA}\) in °C/W, so the junction temperature is</p>
+<div class="formula">
+$$T_J = T_A + P\,\theta_{JA}$$
+<p>A SOT-23 on a small pad might have \(\theta_{JA} \approx 100\)–250 °C/W; a TO-220 in free air about 60 °C/W; a DPAK on a generous copper area about 40–50 °C/W.</p>
+</div>
+<p>Example: an AO3400 (SOT-23) with \(R_{DS(on)} \approx 30\) mΩ carries 3 A: \(P = 9 \times 0.03 = 0.27\) W. With \(\theta_{JA} = 150\) °C/W, it runs \(0.27 \times 150 = 40\) °C above ambient. Fine. At 5 A it would be 0.75 W and 112 °C above ambient, and with the resistance rise at temperature it heads for trouble. Chapter 5 works through thermal design in more detail.</p>
+
+
+<h3>Gate resistor and pull-down</h3>
+<p>Two resistors appear around almost every MOSFET:</p>
+<ul>
+  <li><b>Gate resistor</b>, 10–100 Ω in series with the gate. The gate is a capacitor of a nanofarad or more, and the trace to it is an inductor, so a fast edge from a GPIO can ring. The resistor damps that ringing, limits the peak current drawn from the pin, and slows the edges slightly (which also reduces electromagnetic noise).</li>
+  <li><b>Gate pull-down</b>, 10–100 kΩ from gate to source. During reset and boot, a microcontroller pin is a high-impedance input. A floating gate holds whatever charge it last had, or picks up charge from the drain through the gate–drain capacitance, and the MOSFET can turn half on and cook. The pull-down defines "off" whenever nothing drives the gate.</li>
+</ul>
+
+<h3>Gate charge and switching losses</h3>
+<p>When you drive a MOSFET with PWM (<a href="ch03-ac.html">Chapter 3</a>), it spends a little time in transition at every edge. During that time it carries current <em>and</em> has voltage across it, so it dissipates heavily. Look at how the gate actually charges, and you meet the <b>Miller plateau</b>:</p>
+<ol>
+  <li>The gate voltage rises from 0 to \(V_{GS(th)}\) as the driver charges the gate–source capacitance. Nothing happens at the drain.</li>
+  <li>From threshold to the plateau voltage, the drain current ramps up from zero to the load current. With an inductive load (a motor with its freewheeling diode) the drain voltage stays at the supply during this phase.</li>
+  <li><b>The plateau.</b> Now the drain voltage falls. The gate–drain capacitance \(C_{GD}\) has to be discharged from the full supply voltage, and it soaks up all the gate current. The gate voltage stays flat until the drain has fallen, and the charge needed is \(Q_{GD}\).</li>
+  <li>The gate then rises to the full drive voltage, lowering \(R_{DS(on)}\) to its final value.</li>
+</ol>
+<p>The energy lost per transition is roughly a triangle: \(\tfrac12 V I t_{sw}\). With one turn-on and one turn-off per PWM period:</p>
+<div class="formula">
+$$P_{sw} \approx \tfrac12\, V_{DS}\, I_D\,(t_r + t_f)\, f_{PWM}, \qquad t \approx \frac{Q}{I_{gate}}$$
+<p>Switching loss grows with voltage, current, transition time and PWM frequency. A stronger gate drive (more current) means shorter transitions.</p>
+</div>
+
+<figure class="widget wide">
+  <div id="w-gate"></div>
+  <div class="w-controls" id="w-gate-ctl"></div>
+  <figcaption><b>Figure 4.9</b> Turn-on of a logic-level MOSFET switching 5 A from 12 V into an inductive load. Top: the gate voltage with its Miller plateau. Bottom: drain voltage and drain current, with the shaded area showing the instantaneous power. Increase the gate resistance (a weak driver, like a GPIO pin) and watch the plateau stretch out and the switching losses grow. Then try a 3.3 V drive: with less voltage above the plateau, the gate current is small and everything is slow.</figcaption>
+</figure>
+
+<div class="ex" data-id="sw-num" data-kind="num" data-answer="0.24" data-tol="4%" data-unit="W">
+  <div class="q">A MOSFET switches 5 A at 12 V with 20 kHz PWM. Each rise and each fall takes 200 ns. Estimate the switching loss.</div>
+  <div class="hint">\(P = \tfrac12 V I (t_r + t_f) f\).</div>
+  <div class="explain">\(P = 0.5 \times 12 \times 5 \times (400\times10^{-9}) \times 20\,000 = 0.24\) W. At 200 kHz (a buck converter) it would be 2.4 W, which is why converters use dedicated gate drivers that switch in nanoseconds.</div>
+</div>
+
+<p>A microcontroller pin can source and sink perhaps 20–40 mA. Charging 20 nC at 30 mA takes about 700 ns, which is fine at a few kHz but wasteful at 50 kHz. A <b>gate driver</b> IC (for example a UCC27517 or TC4427) takes a logic input and drives the gate with amps of peak current from a 10–12 V supply, giving both fast edges and full enhancement. Motor driver ICs and buck controllers have them built in.</p>
+
+<h3>Low side or high side?</h3>
+<p>There are two places to put a switch in series with a load:</p>
+<ul>
+  <li><b>Low side</b> (between the load and ground) with an <b>N-channel</b> MOSFET. Its source sits at ground, so \(V_{GS}\) is simply the GPIO voltage. This is the easy, cheap, efficient default for motors, LED strips, solenoids and heaters. The downside: the load's negative terminal is no longer ground, which matters if the load has another connection to ground (a sensor with its own ground wire, for example).</li>
+  <li><b>High side</b> (between the supply and the load). The load stays grounded, which is safer and sometimes necessary. With an <b>N-channel</b> part, the source rises to nearly the supply voltage when on, so the gate must go <em>above</em> the supply; that needs a bootstrap circuit or charge pump, which is what H-bridge driver ICs do internally. With a <b>P-channel</b> part, the source is at the supply, and you turn it on by pulling the gate <em>below</em> the supply by several volts. The catch: to turn it <em>off</em>, the gate must go all the way up to the supply. A 3.3 V pin can't do that when the supply is 12 V, so you add a small NPN or N-MOSFET as a level shifter.</li>
+</ul>
+
+<figure class="widget wide">
+  <div id="w-sides"></div>
+  <div class="w-controls" id="w-sides-ctl"></div>
+  <figcaption><b>Figure 4.10</b> Three ways to switch a 12 V load (a motor or LED strip) from a 3.3 V GPIO. Choose a topology, then toggle the GPIO. The low-side N-channel switch just works. A P-channel connected directly to the GPIO can never turn off. Adding a small NPN level shifter fixes it. Watch the gate-to-source voltage readout in each case.</figcaption>
+</figure>
+
+<div class="ex" data-id="logic-sort" data-kind="sort">
+  <div class="q">Your ESP32 drives the gate directly from 3.3 V to switch 2 A. Sort these MOSFETs by their datasheet specs.</div>
+  <div class="bins">
+    <div data-bin="ok">✅ Fine at 3.3 V</div>
+    <div data-bin="no">❌ Needs higher gate drive</div>
+  </div>
+  <ul class="items">
+    <li data-bin="ok">\(R_{DS(on)}\) = 40 mΩ max at \(V_{GS}\) = 2.5 V</li>
+    <li data-bin="no">\(R_{DS(on)}\) = 17 mΩ max at \(V_{GS}\) = 10 V; \(V_{GS(th)}\) = 2.0–4.0 V</li>
+    <li data-bin="ok">\(R_{DS(on)}\) = 30 mΩ max at \(V_{GS}\) = 1.8 V</li>
+    <li data-bin="no">\(V_{GS(th)}\) = 1.0–2.5 V, \(R_{DS(on)}\) specified only at \(V_{GS}\) = 4.5 V and 10 V</li>
+    <li data-bin="no">\(V_{GS(th)}\) = 2.0 V typical, no other information</li>
+  </ul>
+  <div class="explain">Only an \(R_{DS(on)}\) guarantee at or below your gate voltage counts. A threshold of "2 V typical" says nothing about carrying 2 A at 3.3 V, and "specified at 4.5 V" means the 3.3 V behaviour is not guaranteed (it may work on your bench and fail on the next batch).</div>
+</div>
+
+<div class="ex" data-id="pfet-mc" data-kind="mc">
+  <div class="q">A P-channel MOSFET switches 12 V to a LED strip on the high side. Its gate is wired straight to an ESP32 pin. What happens?</div>
+  <ol class="opts">
+    <li>It works normally: high turns it off, low turns it on</li>
+    <li data-correct>It is on in both states, because even at 3.3 V the gate is 8.7 V below the source</li>
+    <li>It never turns on, because P-channel parts need a positive gate voltage</li>
+    <li>The ESP32 pin is fine, but the LED strip runs at 3.3 V</li>
+  </ol>
+  <div class="explain">For a P-MOSFET, what matters is \(V_{GS} = V_G - V_S\). With the source at 12 V, both 0 V and 3.3 V on the gate give a large negative \(V_{GS}\) (−12 V and −8.7 V), so it is on either way. Worse, 12 V can flow back into the ESP32 pin through its protection diodes if the gate is pulled up. Use a level-shifting transistor and a gate pull-up to the 12 V rail.</div>
+</div>
+</section>
+
+<section>
+<h2 id="hbridge">H-bridges: running a motor both ways</h2>
+
+<p>A brushed DC motor spins one way or the other depending on which direction current flows through it. A single switch can only turn it on and off. To reverse it, you need four switches arranged like the letter H, with the motor as the crossbar: two <b>high-side</b> switches connect each motor terminal to the supply, and two <b>low-side</b> switches connect each terminal to ground.</p>
+
+<ul>
+  <li><b>Forward</b>: top-left and bottom-right closed. Current flows left to right through the motor.</li>
+  <li><b>Reverse</b>: top-right and bottom-left closed. Current flows right to left.</li>
+  <li><b>Brake</b> (slow decay): both low-side switches closed (or both high-side). The motor terminals are shorted together. A spinning motor acts as a generator, its back-EMF drives current around the short, and the resulting torque stops it quickly.</li>
+  <li><b>Coast</b> (fast decay): all switches open. The motor freewheels to a stop (after any inductive current dies away through the body diodes).</li>
+  <li><b>Shoot-through</b>: both switches in the <em>same leg</em> closed. That connects the supply straight to ground through two milliohm-scale MOSFETs. Hundreds of amps flow for as long as it lasts. This is the H-bridge's cardinal sin.</li>
+</ul>
+
+<figure class="widget wide">
+  <div id="w-hb"></div>
+  <div class="w-controls" id="w-hb-ctl"></div>
+  <figcaption><b>Figure 4.11</b> An interactive H-bridge. Click the four switches. Make the motor spin forward, then reverse, then brake. Then close both switches in one leg to see shoot-through (don't do this with real parts). The status line tells you what state the bridge is in.</figcaption>
+</figure>
+
+<div class="ex" data-id="hb-task" data-kind="task">
+  <div class="q">In Figure 4.11, make the motor spin in <b>reverse</b> (current flowing right to left), without any shoot-through.</div>
+  <div class="explain">Close Q3 (top right) and Q2 (bottom left), with Q1 and Q4 open. Current flows from the supply through Q3, right to left through the motor, then down through Q2 to ground.</div>
+</div>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: dead time is a memory barrier</span>
+<p>Turning a MOSFET off takes time (its gate has to discharge), while turning the other one on can be quick. If firmware switches leg A from "high on" to "low on" in one instruction, there is a window where both conduct, like two threads that both think they hold a lock. Drivers insert <b>dead time</b>, a few hundred nanoseconds where both switches in a leg are off, the hardware equivalent of releasing one lock, waiting for that to be visible, and only then acquiring the other. During dead time the motor's current keeps flowing through the body diodes, so nothing is lost.</p>
+</aside>
+
+<div class="ex" data-id="hb-order" data-kind="order">
+  <div class="q">Your bridge is running forward (Q1 and Q4 on). Put the steps for safely reversing in order.</div>
+  <ol class="items">
+    <li>Turn Q1 and Q4 off</li>
+    <li>Wait the dead time (the motor current freewheels through the body diodes)</li>
+    <li>Turn Q3 and Q2 on</li>
+    <li>Ramp the PWM duty up gradually, so the reversal current stays within limits</li>
+  </ol>
+  <div class="explain">Break before make, then soft-start. Slamming a spinning motor into reverse at full duty momentarily applies nearly twice the supply voltage across the winding (supply plus back-EMF), so the current spike can exceed the stall current.</div>
+</div>
+
+<h3>Use a driver IC</h3>
+<p>Building an H-bridge from discrete MOSFETs is a good learning project and a great way to blow up MOSFETs. For small robots, an integrated driver does it all: the four MOSFETs, gate drive (including the charge pump for the high side), dead time, current limiting, thermal shutdown and undervoltage lockout.</p>
+<table>
+  <tr><th>Driver</th><th>Motor supply</th><th>Current per channel</th><th>Notes</th></tr>
+  <tr><td><b>DRV8833</b> (TI)</td><td>2.7–10.8 V</td><td>about 1.5 A RMS, 2 A peak</td><td>Two H-bridges. Inputs IN1/IN2 per motor: 10 = forward, 01 = reverse, 11 = brake, 00 = coast. PWM one input for speed. Ideal for 1S–2S LiPo robots with small motors.</td></tr>
+  <tr><td><b>TB6612FNG</b> (Toshiba)</td><td>up to 13.5 V (logic 2.7–5.5 V)</td><td>1.2 A average, 3.2 A peak</td><td>Two bridges. IN1/IN2 set direction, a separate PWM pin sets speed, STBY enables. Classic breakout board.</td></tr>
+  <tr><td>DRV8871 (TI)</td><td>6.5–45 V</td><td>3.6 A peak</td><td>One bridge with adjustable current limit (one resistor). Good for bigger 12–24 V motors.</td></tr>
+  <tr><td>L298N</td><td>up to 46 V</td><td>2 A</td><td>Old bipolar design. Drops 2–4 V in total, so a 7.4 V pack gives the motor about 5 V and the chip needs a big heatsink. Avoid in new designs.</td></tr>
+</table>
+
+<div class="ex" data-id="drv-mc" data-kind="mc">
+  <div class="q">On a DRV8833, IN1 is driven with a 70 % PWM signal and IN2 is held low. What does the motor do?</div>
+  <ol class="opts">
+    <li>Brakes 70 % of the time</li>
+    <li data-correct>Runs forward, alternating between drive (10) and coast (00), at roughly 70 % speed</li>
+    <li>Runs in reverse at 30 % speed</li>
+    <li>Shoot-through for 70 % of each period</li>
+  </ol>
+  <div class="explain">Each PWM period alternates between drive (IN1=1, IN2=0) and coast (IN1=0, IN2=0). Holding IN1 high and PWM-ing IN2 instead alternates between drive and brake ("slow decay"), which gives a more linear speed response. Driver chips make shoot-through impossible from the inputs.</div>
+</div>
+</section>
+
+<section>
+<h2 id="opamp">Op-amps: precision through feedback</h2>
+
+<p>An <b>operational amplifier</b> is a chip with two inputs, an inverting input (−) and a non-inverting input (+), and one output. It amplifies the difference between them by an enormous factor, the <b>open-loop gain</b> \(A\), typically \(10^5\) to \(10^6\):</p>
+<div class="formula">
+$$V_{out} = A\,(V_+ - V_-)\quad\text{(clipped to the supply rails)}$$
+</div>
+<p>With \(A = 10^5\), a difference of 50 µV already gives 5 V out. On its own, then, an op-amp is nearly a binary device: its output slams to one rail or the other. That is exactly what a comparator does. But connect the output back to the inverting input through some resistors (<b>negative feedback</b>) and something remarkable happens. If the output rises too far, it raises \(V_-\), which reduces the difference, which pulls the output back down. The loop settles at the one output voltage where \(V_+ - V_-\) is almost exactly zero.</p>
+
+<h3>The golden rules</h3>
+<p>Horowitz and Hill boil op-amp analysis down to two rules, valid whenever there is negative feedback and the output is within its limits:</p>
+<div class="formula">
+<p style="font-size:1rem;color:var(--ink);text-align:left;max-width:none"><b>Rule 1.</b> The output does whatever is necessary to make the voltage difference between the inputs zero.<br><b>Rule 2.</b> The inputs draw no current.</p>
+</div>
+<p>Rule 2 is a property of the chip (input currents are picoamps to nanoamps). Rule 1 is a property of the <em>circuit</em>, and it holds only when there is negative feedback and the output is free to move. With these two rules, every common circuit takes two lines of algebra.</p>
+
+<div class="ex" data-id="golden-text" data-kind="text" data-answer="zero|0|0 v|0v|nothing|no current|none">
+  <div class="q">Fill in the blank. Golden rule 2: the op-amp's inputs draw ____ current.</div>
+  <div class="explain">Ideally zero, and in practice picoamps (CMOS inputs) to tens of nanoamps (bipolar inputs such as the LM358). This is what lets an op-amp buffer a high-impedance source without loading it.</div>
+</div>
+
+<h3>The four circuits you will actually use</h3>
+<p><b>Comparator.</b> No feedback. \(V_{out}\) goes high when \(V_+ > V_-\) and low otherwise. Useful for "is the battery below 3.3 V?" or "has the light level crossed a threshold?". Add a little positive feedback (a resistor from output to +) for <b>hysteresis</b>, so a noisy input near the threshold doesn't make the output chatter. Dedicated comparators (LM393, TLV3201) are faster and often have open-drain outputs, perfect for a pull-up to 3.3 V.</p>
+
+<p><b>Buffer (voltage follower).</b> Output wired straight to −, signal into +. Rule 1 says \(V_{out} = V_{in}\). It looks pointless, but the input draws nothing (Rule 2) while the output can supply milliamps. It's an impedance converter: use it after a high-resistance divider or a sensor that can't drive an ADC's sampling capacitor.</p>
+
+<p><b>Non-inverting amplifier.</b> Signal into +, and a divider from the output to ground with its midpoint on −. By Rule 1 the − input equals \(V_{in}\), and by Rule 2 no current leaves the divider, so \(V_{in} = V_{out}\,R_g/(R_f + R_g)\):</p>
+<div class="formula">
+$$G = \frac{V_{out}}{V_{in}} = 1 + \frac{R_f}{R_g}$$
+</div>
+
+<p><b>Inverting amplifier.</b> + tied to a reference (ground, or mid-supply on a single supply), signal through \(R_{in}\) into −, and \(R_f\) from output to −. Rule 1 holds − at the reference: a <b>virtual ground</b>. The input current \(V_{in}/R_{in}\) can't enter the op-amp (Rule 2), so all of it flows through \(R_f\), and the output must sit at \(-I R_f\):</p>
+<div class="formula">
+$$G = -\frac{R_f}{R_{in}}\qquad\text{(measured relative to the reference)}$$
+</div>
+
+<figure class="widget wide">
+  <div id="w-opamp"></div>
+  <div class="w-controls" id="w-opamp-ctl"></div>
+  <figcaption><b>Figure 4.12</b> An op-amp workbench on a single 5 V supply. Pick a circuit and an op-amp. The plot shows the input sine (blue) and the output (orange). Raise the gain until the output clips at the rails. Then switch to the LM358: its output can't get closer than about 1.5 V to the positive rail. Raise the frequency to see the LM358's slow slew rate turn a sine into a triangle.</figcaption>
+</figure>
+
+<div class="ex" data-id="gain-num" data-kind="num" data-answer="5.7" data-tol="1%" data-unit="">
+  <div class="q">A non-inverting amplifier has \(R_f = 47\) kΩ and \(R_g = 10\) kΩ. What is its gain?</div>
+  <div class="hint">\(G = 1 + R_f/R_g\).</div>
+  <div class="explain">\(G = 1 + 47/10 = 5.7\). A 0.5 V input gives 2.85 V out, if the op-amp can swing that high on its supply.</div>
+</div>
+
+<h3>Real op-amps</h3>
+<p>The golden rules describe an ideal device. Real ones have limits, and on a 3.3 V or 5 V robot board they bite constantly:</p>
+<ul>
+  <li><b>Output swing.</b> The output can only get so close to each supply rail. A <b>rail-to-rail output</b> op-amp gets within tens of millivolts. The LM358's output can pull close to ground but only reaches about \(V_{CC} - 1.5\) V at the top.</li>
+  <li><b>Input common-mode range.</b> The range of input voltages over which the op-amp works. The LM358's includes ground (good for sensing near 0 V) but stops about 1.5–2 V below \(V_{CC}\). <b>Rail-to-rail input</b> parts accept anything between the rails.</li>
+  <li><b>Gain–bandwidth product (GBW).</b> The open-loop gain falls with frequency. With feedback, the bandwidth is roughly \(\text{GBW}/G\). A 1 MHz op-amp at a gain of 10 has about 100 kHz of bandwidth.</li>
+  <li><b>Slew rate.</b> The fastest the output can change, in V/µs. A sine of amplitude \(A\) at frequency \(f\) needs \(2\pi f A\). The LM358 manages about 0.3 V/µs, so a 2 V-amplitude sine distorts above about 25 kHz.</li>
+  <li><b>Offset voltage</b> \(V_{OS}\). Rule 1 is off by a few millivolts (the LM358 is specified up to several mV). Multiplied by a gain of 50, 3 mV of offset is 150 mV of error at the output. Precision and zero-drift parts get this into the microvolts.</li>
+  <li><b>Minimum supply.</b> The LM358 needs at least 3 V and is really happier at 5 V or more. At 3.3 V, choose a modern CMOS rail-to-rail part such as the MCP6002, TLV9002 or OPA2333.</li>
+</ul>
+<p>The LM358 is in every kit because it is cheap and robust, but for 3.3 V microcontroller work it is usually the wrong choice.</p>
+
+<h3>Current sensing with a shunt</h3>
+<p>To measure a motor's current, put a small resistor, the <b>shunt</b>, in its path and measure the voltage across it. The shunt must be small so it wastes little power and voltage: 10–100 mΩ is typical. At 2 A, a 50 mΩ shunt gives only 100 mV, a fraction of an ADC's range, so you amplify it. With a <b>low-side</b> shunt (between the load and ground), the shunt voltage is referenced to ground and a simple non-inverting amplifier works. Use a <b>Kelvin</b> (four-wire) connection: take the sense wires from the shunt's pads themselves, not from somewhere along the high-current trace.</p>
+<p>A high-side shunt (between the supply and the load) avoids disturbing the load's ground, but its voltage rides on top of the full supply. Dedicated <b>current-sense amplifiers</b> handle that: the INA180 gives an analog output, and the INA219/INA226 include an ADC and report current, voltage and power over I²C.</p>
+
+<figure class="widget wide">
+  <div id="w-isense"></div>
+  <div class="w-controls" id="w-isense-ctl"></div>
+  <figcaption><b>Figure 4.13</b> Low-side current sensing into a 12-bit, 3.3 V ADC. Choose the shunt value and amplifier gain. The readouts show the shunt voltage and power, the ADC voltage, and the resolution in milliamps per ADC step. Bigger shunts give more signal but waste power; more gain gives more resolution but clips sooner.</figcaption>
+</figure>
+
+<div class="ex" data-id="isense-task" data-kind="task">
+  <div class="q">In Figure 4.13, design for a motor that can draw up to <b>5 A</b>: at the maximum current, the ADC voltage must be between <b>2.5 V and 3.2 V</b>, and the shunt must dissipate <b>less than 0.5 W</b>. Set the motor current slider to 5 A to check.</div>
+  <div class="explain">For example 20 mΩ with a gain of 30: \(5 \times 0.02 \times 30 = 3.0\) V, and \(P = 25 \times 0.02 = 0.5\) W is too much, so try 10 mΩ with a gain of 60 (3.0 V, 0.25 W). Smaller shunts need more gain, and with it more offset error; real designs balance the two.</div>
+</div>
+
+</section>
+
+<section>
+<h2 id="datasheet">Reading a datasheet</h2>
+
+<p>Datasheets are the API documentation of hardware, written by people with very different incentives. The first page is marketing: it lists the best numbers under the friendliest conditions. The truth is in the tables and the footnotes. Learn the structure once and every datasheet becomes quicker to read.</p>
+
+<ul>
+  <li><b>Absolute maximum ratings.</b> Stress limits. Exceeding them, even briefly, may damage the part. They are <em>not</em> operating conditions: nothing is guaranteed at those values, and running continuously near them shortens life. Treat them as the edge of a cliff.</li>
+  <li><b>Recommended operating conditions.</b> The range the part is designed and tested for. Design inside it.</li>
+  <li><b>Electrical characteristics.</b> The guaranteed specs, each with a <b>test condition</b> (temperature, voltage, current) and up to three columns. <b>Min</b> and <b>max</b> are guaranteed, by test or by design. <b>Typ</b> is what an average part does at 25 °C, with no promise. Design to min/max.</li>
+  <li><b>Typical performance graphs.</b> Hugely useful for intuition and for conditions the tables skip, but they show typical parts. Never design to a graph's value without margin.</li>
+  <li><b>Thermal information.</b> \(\theta_{JA}\), \(\theta_{JC}\), with the board conditions they assume (usually a generous copper area you may not have).</li>
+  <li><b>Application information and layout guidelines.</b> Often the most valuable pages. The reference circuit was built and measured by the people who designed the chip.</li>
+</ul>
+
+<figure class="widget wide">
+  <div id="w-ds">
+  <div class="ds-sheet">
+    <div class="ds-title"><b>XN3402</b><span>30 V N-channel enhancement-mode MOSFET · SOT-23 <button type="button" class="ds-mark" data-n="1">1</button></span></div>
+    <h4>Absolute maximum ratings (\(T_A = 25\) °C unless noted) <button type="button" class="ds-mark" data-n="2">2</button></h4>
+    <table>
+      <tr><th>Parameter</th><th>Symbol</th><th>Limit</th></tr>
+      <tr><td>Drain–source voltage</td><td>\(V_{DS}\)</td><td>30 V</td></tr>
+      <tr><td>Gate–source voltage</td><td>\(V_{GS}\)</td><td>±12 V <button type="button" class="ds-mark" data-n="3">3</button></td></tr>
+      <tr><td>Continuous drain current, \(T_A\) = 25 °C / 70 °C</td><td>\(I_D\)</td><td>5.8 A / 4.6 A <button type="button" class="ds-mark" data-n="4">4</button></td></tr>
+      <tr><td>Power dissipation, \(T_A\) = 25 °C</td><td>\(P_D\)</td><td>1.4 W</td></tr>
+      <tr><td>Junction temperature</td><td>\(T_J\)</td><td>−55 to 150 °C</td></tr>
+    </table>
+    <h4>Thermal</h4>
+    <table>
+      <tr><td>Junction-to-ambient, on 1 in² 2 oz copper pad</td><td>\(R_{\theta JA}\)</td><td>90 °C/W <button type="button" class="ds-mark" data-n="5">5</button></td></tr>
+    </table>
+    <h4>Electrical characteristics (\(T_J = 25\) °C)</h4>
+    <table>
+      <tr><th>Parameter</th><th>Conditions</th><th>Min</th><th>Typ</th><th>Max</th></tr>
+      <tr><td>Gate threshold \(V_{GS(th)}\) <button type="button" class="ds-mark" data-n="6">6</button></td><td>\(V_{DS} = V_{GS}\), \(I_D\) = 250 µA</td><td>0.65</td><td>1.05</td><td>1.45 V</td></tr>
+      <tr><td rowspan="3">On-resistance \(R_{DS(on)}\) <button type="button" class="ds-mark" data-n="7">7</button></td><td>\(V_{GS}\) = 10 V, \(I_D\) = 5 A</td><td></td><td>19</td><td>24 mΩ</td></tr>
+      <tr><td>\(V_{GS}\) = 4.5 V, \(I_D\) = 5 A</td><td></td><td>23</td><td>28 mΩ</td></tr>
+      <tr><td>\(V_{GS}\) = 2.5 V, \(I_D\) = 4 A</td><td></td><td>30</td><td>40 mΩ</td></tr>
+      <tr><td>Total gate charge \(Q_g\) <button type="button" class="ds-mark" data-n="8">8</button></td><td>\(V_{GS}\) = 4.5 V, \(V_{DS}\) = 15 V</td><td></td><td>6</td><td>—</td></tr>
+      <tr><td>Body diode \(V_{SD}\)</td><td>\(I_S\) = 1 A</td><td></td><td>0.7</td><td>1.0 V</td></tr>
+    </table>
+    <p style="margin:.2em 0;font-size:.82rem;color:var(--muted)">Note: pulse test, pulse width ≤ 300 µs, duty cycle ≤ 2 %. <button type="button" class="ds-mark" data-n="9">9</button></p>
+  </div>
+  <div class="ds-note" id="ds-note">Click a numbered marker to see what an experienced engineer reads into that line.</div>
+  </div>
+  <figcaption><b>Figure 4.14</b> An annotated datasheet excerpt for a fictional (but realistic) small logic-level MOSFET. Click each orange marker in turn. The values resemble real SOT-23 parts such as the AO3400A.</figcaption>
+</figure>
+
+<div class="ex" data-id="ds-mc" data-kind="mc">
+  <div class="q">The XN3402's absolute maximum \(V_{DS}\) is 30 V. Which supply is a sensible choice for a motor switched by it?</div>
+  <ol class="opts">
+    <li>A 28 V supply, since it is below 30 V</li>
+    <li>A 30 V supply, since that's the rating</li>
+    <li data-correct>A 12 V supply (3S LiPo), leaving margin for inductive spikes and ringing</li>
+    <li>Any supply, as long as a flyback diode is fitted</li>
+  </ol>
+  <div class="explain">Absolute maximum is a cliff edge, and real circuits add spikes on top of the supply (inductive kick, ringing, hot-plug overshoot). A common rule is to keep the steady-state voltage at or below 50–80 % of \(V_{DS}\) max.</div>
+</div>
+
+<div class="ex" data-id="ds-multi" data-kind="multi">
+  <div class="q">Your design runs the XN3402 at 3.3 V gate drive, 3 A, in a hot enclosure. Which conclusions are justified by the excerpt? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>Use about 40 mΩ (the 2.5 V max) as a conservative \(R_{DS(on)}\), then scale it up for temperature</li>
+    <li>Use 19 mΩ, the best number on the page</li>
+    <li data-correct>The 90 °C/W thermal resistance assumes a 1 in² copper pad, so a tiny pad will run hotter</li>
+    <li>The 5.8 A rating means 3 A will run cool on any board</li>
+    <li data-correct>A threshold of 1.05 V typical tells you very little about the resistance at 3.3 V</li>
+  </ol>
+  <div class="explain">Use the guaranteed (max) number at a gate voltage at or below yours, then derate for temperature: \(40 \times 1.5 = 60\) mΩ, so \(P = 9 \times 0.06 = 0.54\) W, and on a 90 °C/W board that is about 49 °C of rise. The 5.8 A figure assumes the ideal copper pad and a 25 °C ambient.</div>
+</div>
+</section>
+
+<section>
+<h2 id="lab">Lab: an ESP32 drives a motor with a MOSFET</h2>
+
+<aside class="callout lab"><span class="ct">🔧 Lab 4: low-side MOSFET motor drive, with and without a flyback diode</span>
+<p><b>Parts:</b> ESP32 dev board, logic-level N-MOSFET specified at 2.5 V (AO3400A on an SOT-23 adapter, or IRLZ44N if you accept "mostly works" at 3.3 V), small brushed DC motor (a "130" or TT gear motor), 1N5819 or SS34 Schottky, 100 Ω and 100 kΩ resistors, 470 µF electrolytic, a 5–6 V supply (4×AA or bench supply with 1 A limit), oscilloscope.</p>
+<ol>
+  <li><b>Build</b> the low-side switch of Figure 4.10: motor from +6 V to the drain, source to ground, GPIO 18 → 100 Ω → gate, 100 kΩ from gate to source. Connect the ESP32's ground to the motor supply's ground. Put the 470 µF across the motor supply near the MOSFET. <em>Leave the flyback diode out for now.</em></li>
+  <li><b>Code</b> a slow PWM ramp:
+<pre><code>// Arduino-ESP32 core 3.x
+const int PIN = 18;
+void setup() { ledcAttach(PIN, 20000, 10); }      // 20 kHz, 10-bit
+void loop() {
+  for (int d = 0; d &lt;= 1023; d += 8) { ledcWrite(PIN, d); delay(20); }
+  for (int d = 1023; d &gt;= 0; d -= 8) { ledcWrite(PIN, d); delay(20); }
+}</code></pre>
+  (On the older 2.x core, use <code>ledcSetup(0, 20000, 10); ledcAttachPin(PIN, 0); ledcWrite(0, d);</code>.)</li>
+  <li><b>Scope the drain</b> (probe tip on the drain, ground clip on the source, 10× probe). At 50 % duty, look at the moment the MOSFET turns off. Without a diode you should see a spike far above 6 V, often clamped at the MOSFET's avalanche voltage (around 30–40 V for a 30 V part), followed by ringing. Use a short ground spring if you can; a long ground lead adds its own ringing. Keep this test brief.</li>
+  <li><b>Add the Schottky</b> across the motor (cathode to +6 V). Repeat. The drain should now stop at about 6.4 V when the MOSFET turns off.</li>
+  <li><b>Probe the gate</b> on channel 2. Find the Miller plateau. Swap the 100 Ω gate resistor for 1 kΩ, and then 10 kΩ, and watch the plateau stretch and the drain edges slow. Touch the MOSFET (carefully) after a minute at 10 kΩ: is it warmer?</li>
+  <li><b>Measure</b> the drain voltage with the multimeter at 100 % duty and divide by the motor current to get \(R_{DS(on)}\) at 3.3 V gate drive. Compare with the datasheet.</li>
+</ol>
+<p><b>Going further:</b> replace the single MOSFET with a DRV8833 or TB6612 breakout, drive both directions, and compare coast-mode PWM with brake-mode PWM at low duty cycles. Add a 0.1 Ω shunt in the ground return and amplify it with an MCP6002 to read motor current on an ADC pin.</p>
+</aside>
+
+<aside class="callout warn"><span class="ct">⚠️ Grounds and supplies</span>
+<p>Never power the motor from the ESP32 board's 3.3 V or 5 V pin, even a small one: the stall current and noise will reset the board. The motor gets its own supply, the grounds join at one point, and Chapter 5 explains how to arrange the power so it doesn't brown out.</p>
+</aside>
+
+<aside class="callout ref"><span class="ct">📚 Go deeper</span>
+<ul>
+  <li><b>Horowitz &amp; Hill, <i>The Art of Electronics</i> (3rd ed.)</b>: Ch. 1 §1.6 (diodes and diode circuits), Ch. 2 (bipolar transistors; the switch and the Ebers–Moll view), Ch. 3 (field-effect transistors, especially the power-MOSFET switching sections), Ch. 4 (op-amps and the golden rules).</li>
+  <li><b>Hayes &amp; Horowitz, <i>Learning the Art of Electronics</i></b>: the diode, transistor, op-amp and MOSFET-switch labs.</li>
+  <li><b>Scherz &amp; Monk, <i>Practical Electronics for Inventors</i> (4th ed.)</b>: Ch. 4 (Semiconductors: diodes, transistors) and Ch. 8 (Operational Amplifiers).</li>
+  <li><b>Kuphaldt, <i>Lessons in Electric Circuits</i>, Vol. III (Semiconductors)</b>: the chapters on diodes and rectifiers, bipolar junction transistors, insulated-gate FETs, and operational amplifiers.</li>
+  <li><b>MIT 6.002</b> (Agarwal, OCW): the lectures on the MOSFET switch (S and SR models), amplifiers and op-amp abstraction.</li>
+  <li><b>TI SLUA618</b>, "Fundamentals of MOSFET and IGBT Gate Driver Circuits" (L. Balogh): gate charge, Miller plateau and driver design.</li>
+  <li><b>TI SLOD006, <i>Op Amps for Everyone</i></b> (R. Mancini, ed.): single-supply op-amp design in depth.</li>
+  <li><b>Nexperia AN11158</b>, "Understanding power MOSFET data sheet parameters".</li>
+  <li>For the device physics behind Figures 4.1–4.3: any introductory semiconductor-devices text, for example Pierret's <i>Semiconductor Device Fundamentals</i>, Ch. 2–6.</li>
+</ul>
+</aside>
+</section>
+
+</main>
+<script src="../assets/vendor/katex/katex.min.js"></script>
+<script src="../assets/vendor/katex/auto-render.min.js"></script>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/ch04-semis.js"></script>
+</body>
+</html>

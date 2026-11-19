@@ -1,0 +1,564 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3 · Capacitors, Inductors & Frequency — Sparks & Circuits</title>
+<meta name="description" content="RC and RL transients, debouncing and power-on reset, sinusoids and RMS, impedance and phasors, RC filters and Bode plots, PWM filtering, decoupling, real capacitors, resonance, parasitics and the oscilloscope.">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+  .ch3-table td.num, .ch3-table th.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  .ch3-note { font-size: .88rem; color: var(--muted); margin: 6px 0 0; }
+  /* local fixes: keep KaTeX's hidden MathML inside scrolling tables/displays; let wide controls wrap on phones */
+  main table, .katex-display { position: relative; }
+  .w-seg { flex-wrap: wrap; max-width: 100%; }
+  .w-select { max-width: 100%; min-width: 0; }
+  .w-select select { max-width: 100%; min-width: 0; text-overflow: ellipsis; }
+</style>
+</head>
+<body data-book="adult" data-chapter="ch03-ac">
+<main class="chapter">
+
+<header class="chapter-head">
+  <p class="kicker">Chapter 3</p>
+  <h1>Capacitors, Inductors &amp; Frequency</h1>
+  <p class="lede">Resistors only care about <em>now</em>. Capacitors and inductors care about <em>change</em>, and that one difference brings in time and frequency. It explains why buttons bounce, why every chip needs a little capacitor next to it, how a PWM pin can fake an analog voltage, why a motor wire rings like a bell, and what an oscilloscope is really showing you.</p>
+</header>
+
+<section>
+<h2 id="recap">Components that care about change</h2>
+
+<p>In <a href="ch01-physics.html">Chapter 1</a> you met the physics: a capacitor stores energy in the electric field between two plates, and an inductor stores energy in the magnetic field around a coil. For circuit work, all of that boils down to two rules, each the mirror image of the other.</p>
+
+<div class="formula">
+$$i_C = C\,\frac{dv_C}{dt} \qquad\qquad v_L = L\,\frac{di_L}{dt}$$
+<p>A capacitor's current is proportional to how fast its voltage changes. An inductor's voltage is proportional to how fast its current changes.</p>
+</div>
+
+<p>Read them as plain English. For a capacitor of \(C\) farads: to change the voltage across it by 1 V every second, you must push \(C\) amps into it. A steady voltage, however large, needs no current at all. That's why a capacitor is an open circuit at DC. For an inductor of \(L\) henries: to change the current through it by 1 A every second, you must apply \(L\) volts across it. A steady current, however large, needs no voltage, so an (ideal) inductor is a short circuit at DC.</p>
+
+<p>The derivative \(\frac{dv}{dt}\) is just the slope of the voltage-versus-time graph (see <a href="appA-math.html">Appendix A</a> if derivatives are rusty). Two consequences are worth tattooing somewhere:</p>
+<ul>
+  <li><b>A capacitor's voltage cannot jump.</b> An instantaneous jump has infinite slope, which would need infinite current. So a capacitor acts as a short-term "voltage memory": right after any switching event, it has the same voltage it had just before.</li>
+  <li><b>An inductor's current cannot jump.</b> An instantaneous change would need infinite voltage. An inductor acts as a short-term "current memory". Try to stop its current abruptly, and it will produce whatever voltage it takes to keep the current flowing for a moment. That's the spark when you unplug a motor.</li>
+</ul>
+
+<p>The energy stored follows from integrating power (\(p = vi\)) as the component charges up:</p>
+$$E_C = \tfrac{1}{2} C V^2 \qquad\qquad E_L = \tfrac{1}{2} L I^2$$
+<p>A 1000 µF capacitor at 12 V holds \(0.5 \times 10^{-3} \times 144 = 72\) mJ. That's small, but delivered in a microsecond it's tens of kilowatts, which is enough to weld a screwdriver tip. A relay coil of 0.5 H carrying 50 mA holds 0.6 mJ, enough to destroy a transistor if it has nowhere else to go.</p>
+
+<aside class="callout math"><span class="ct">∑ Combining C and L</span>
+<p>Capacitors in <b>parallel add</b> (more plate area): \(C = C_1 + C_2\). In series they combine like resistors in parallel: \(1/C = 1/C_1 + 1/C_2\). Inductors behave like resistors: series add, parallel combine as reciprocals (as long as their magnetic fields don't couple to each other). The capacitor is the "odd one out" because it's characterised by how <em>easily</em> it accepts charge, which is like a conductance.</p>
+</aside>
+
+<figure class="widget">
+  <div id="f-ddt"></div>
+  <figcaption><b>Figure 3.1</b> \(i = C\,dv/dt\) made visible. The top trace is the voltage you force across a 1 µF capacitor; the bottom trace is the current that must flow. Try each waveform. A triangle needs a square-wave current. A square wave with fast edges needs huge, brief current spikes: shrink the rise time and watch them grow. Switch to "inductor" to see the mirror image, \(v = L\,di/dt\).</figcaption>
+</figure>
+
+<div class="ex" data-id="cap-num" data-kind="num" data-answer="0.05" data-tol="1%" data-unit="A">
+  <div class="q">A 10 µF capacitor is charged from 0 to 5 V at a constant rate over 1 ms. What current flows during the ramp?</div>
+  <div class="hint">\(i = C\,\Delta V/\Delta t\) when the slope is constant.</div>
+  <div class="explain">\(10 \times 10^{-6} \times 5/0.001 = 0.05\) A = 50 mA. Do it in 1 µs and it's 50 A, which is why connecting a discharged capacitor bank straight across a battery makes a spark, and why "inrush current" limits exist.</div>
+</div>
+</section>
+
+<section>
+<h2 id="transients">RC and RL transients</h2>
+
+<h3>Charging a capacitor through a resistor</h3>
+<p>Connect a voltage source \(V\) to a resistor \(R\) in series with an uncharged capacitor \(C\). At the instant you close the switch, the capacitor's voltage is still 0 (it can't jump), so the full \(V\) appears across the resistor and the current is \(V/R\). As charge piles onto the plates, \(v_C\) rises, the resistor's share of the voltage shrinks, the current falls, and the charging slows down. The capacitor approaches \(V\) but, in principle, never quite gets there.</p>
+
+<p>Turn that story into an equation. KVL around the loop gives \(V = iR + v_C\), and the capacitor rule gives \(i = C\,dv_C/dt\). So</p>
+$$RC\,\frac{dv_C}{dt} = V - v_C$$
+<p>In words: the rate of change is proportional to the distance from the target. Any quantity that behaves this way (a cooling cup of coffee, a debt paid off as a fixed percentage, an exponential moving average in your code) follows an exponential approach. You can check by substitution that the solution starting from \(v_C(0) = 0\) is</p>
+<div class="formula">
+$$v_C(t) = V\left(1 - e^{-t/\tau}\right), \qquad i(t) = \frac{V}{R}\,e^{-t/\tau}, \qquad \tau = RC$$
+<p>The RC charging curve. \(\tau\) (tau) is the time constant, in seconds when R is in ohms and C in farads.</p>
+</div>
+
+<p>Useful landmarks: after one \(\tau\) the capacitor has covered \(1 - e^{-1} = 63\%\) of the distance; after \(2\tau\), 86 %; after \(3\tau\), 95 %; after \(5\tau\), 99.3 %, which engineers call "done". Discharging through a resistor is the same curve upside down: \(v_C = V_0\,e^{-t/\tau}\), falling to 37 % after one \(\tau\).</p>
+
+<p>The general recipe covers every first-order circuit, RC or RL, charging or discharging. Identify the initial value, the final value and \(\tau\), then</p>
+<div class="formula">
+$$x(t) = x_{final} + \left(x_{initial} - x_{final}\right) e^{-t/\tau}$$
+<p>Solving for time: \(t = \tau \ln\dfrac{x_{initial} - x_{final}}{x(t) - x_{final}}\), the time to reach a given value.</p>
+</div>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: the exponential moving average</span>
+<p>If you've written <code>avg += alpha * (sample - avg)</code>, you've built a digital RC low-pass filter. Each step closes a fixed fraction of the gap to the input, exactly like \(dv_C = (V - v_C)\,dt/RC\). The equivalent time constant is \(\tau = \Delta t/\alpha\) for small \(\alpha\). The widgets in this chapter that simulate circuits do exactly this update in a loop.</p>
+</aside>
+
+<figure class="widget wide">
+  <div id="f-rc"></div>
+  <figcaption><b>Figure 3.2</b> A live RC circuit. Click the switch to charge from the 5 V source; click the other switch to discharge through the same resistor. The plots record \(v_C\) and the current, with markers at multiples of \(\tau\). Choose \(R\) and \(C\) to change \(\tau\) (playback runs in real time when \(\tau\) is around a second, and is slowed or sped up otherwise; the readout says which). Watch the current dots: fast at first, then slowing to a crawl.</figcaption>
+</figure>
+
+<div class="ex" data-id="rc-task" data-kind="task">
+  <div class="q">In Figure 3.2, pick \(R\) and \(C\) so that \(\tau\) is <b>1 s ± 5 %</b>, then charge the capacitor for at least one time constant.</div>
+  <div class="explain">For example 10 kΩ × 100 µF = 1 s, or 100 kΩ × 10 µF. At the \(1\tau\) marker the capacitor sits at 63 % of 5 V = 3.16 V, and the current has fallen to 37 % of its starting value. The product is all that matters, so the same \(\tau\) can be made with a big R and small C (low current, but sensitive to leakage and loading) or a small R and big C (more current, bigger part).</div>
+</div>
+
+<div class="ex" data-id="rc-num" data-kind="num" data-answer="0.006931" data-tol="2%" data-unit="s">
+  <div class="q">A 1 µF capacitor charges through 10 kΩ from 0 V towards 5 V. How long until it reaches 2.5 V?</div>
+  <div class="hint">\(\tau = 10\) ms. Use \(t = \tau \ln\frac{0 - 5}{2.5 - 5}\).</div>
+  <div class="explain">\(t = \tau \ln 2 = 0.693 \times 10\,\text{ms} = 6.93\) ms. "Half way takes 0.69 τ" is a handy fact: it's the same math as half-lives in radioactive decay.</div>
+</div>
+
+<h3>The inductor's mirror image</h3>
+<p>Put an inductor \(L\) in series with a resistor \(R\) (often the coil's own winding resistance) across \(V\). At switch-on the current is zero (it can't jump), so the full \(V\) appears across the inductor. The current ramps up with slope \(V/L\) and settles at \(V/R\), along the same exponential curve with time constant</p>
+<div class="formula">
+$$\tau = \frac{L}{R}, \qquad i(t) = \frac{V}{R}\left(1 - e^{-t/\tau}\right), \qquad v_L(t) = V e^{-t/\tau}$$
+<p>The RL time constant: a bigger inductance or a smaller resistance means slower change.</p>
+</div>
+
+<p>Switching <em>off</em> is where things get exciting. A relay coil or motor carrying current \(I_0\) is disconnected by a transistor or a switch. The inductor insists that \(I_0\) keep flowing, and the only path left is through the opening switch. So the inductor's voltage rises (\(v = L\,di/dt\) with a huge, negative \(di/dt\)) until <em>something</em> conducts: the air gap arcs, or the transistor breaks down. Hundreds of volts from a 12 V circuit are typical. This "inductive kick" is the number one killer of transistors driving relays, solenoids and motors.</p>
+<p>The cure is to give the current somewhere to go: a <b>flyback diode</b> (also called a freewheeling or catch diode) across the coil, pointing "backwards" so it doesn't conduct normally. When the switch opens, the coil current simply circulates through the diode and decays gently with \(\tau = L/R\), and the switch only sees the supply voltage plus one diode drop. The price is that the current (and so the relay's release, or a motor's braking) decays more slowly. Chapter 4 shows faster alternatives, such as a Zener in series with the diode.</p>
+
+<figure class="widget wide">
+  <div id="f-rl"></div>
+  <figcaption><b>Figure 3.3</b> An RL load (a relay coil: 0.1 H, 100 Ω) switched from 12 V. Press <b>Run</b> to close the switch, let the current build, then open it at the dashed line. Without the flyback diode, the voltage across the opening switch spikes to around a thousand volts (modelled here as the switch "arcing" at 10 kΩ). Tick the diode and run it again: the spike is clamped to 12.7 V, and the current circulates through the diode instead.</figcaption>
+</figure>
+
+<div class="ex" data-id="rl-multi" data-kind="multi">
+  <div class="q">A MOSFET switches a 12 V relay coil. Which statements are true? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>Without protection, the drain voltage can spike far above 12 V when the MOSFET turns off</li>
+    <li data-correct>A flyback diode goes across the coil, with its cathode on the +12 V side</li>
+    <li>The flyback diode conducts all the time while the relay is on</li>
+    <li data-correct>With a plain diode, the coil current decays with time constant \(L/R\) after switch-off</li>
+    <li>The spike happens when the MOSFET turns <em>on</em></li>
+  </ol>
+  <div class="explain">The diode is reverse-biased while the coil is energised (its cathode is at +12 V, its anode at the drain, near 0 V). At turn-off the coil's voltage reverses, the diode conducts and catches the current. The kick happens at turn-<em>off</em>, because that's when \(di/dt\) is large and negative.</div>
+</div>
+</section>
+
+<section>
+<h2 id="timing">RC timing in practice: debouncing and power-on reset</h2>
+
+<h3>Why buttons bounce</h3>
+<p>A pushbutton is two pieces of springy metal slapped together. On contact they bounce, making and breaking the connection several times over one to a few milliseconds before settling. A microcontroller sampling in microseconds sees each bounce as a separate press. Your "increment on press" code counts three, seven or twelve presses. Every developer who has written button code has met this bug.</p>
+<p>There are two classic fixes. In <b>software</b>, ignore changes for a few milliseconds after the first edge, or require the input to be stable for N consecutive samples. That's cheap and usually fine. In <b>hardware</b>, an RC filter slows the edges so the bounces get smoothed out. But slowing an edge creates a new problem: the input now crosses the logic threshold slowly, and any noise on a slow edge makes the input flip back and forth around the threshold several times. The cure for that is a <b>Schmitt trigger</b>, a buffer with <em>hysteresis</em>: it switches high only when the input rises above an upper threshold \(V_{T+}\), and switches low only when it falls below a lower threshold \(V_{T-}\). In between, it remembers its previous state.</p>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: hysteresis is a state machine</span>
+<p>A plain threshold is a stateless function: <code>out = in &gt; 1.65</code>. A Schmitt trigger is a two-state machine: <code>if (out == LOW &amp;&amp; in &gt; VT_plus) out = HIGH; else if (out == HIGH &amp;&amp; in &lt; VT_minus) out = LOW;</code>. You've written the same thing as a thermostat with a dead band, or as an autoscaling policy that scales up at 80 % CPU but only scales down at 40 %, so it doesn't flap.</p>
+</aside>
+
+<figure class="widget wide">
+  <div id="f-bounce"></div>
+  <figcaption><b>Figure 3.4</b> A bouncing button through an RC filter into two kinds of input. Top: the raw switch voltage (red) and the RC-filtered voltage (blue), with the Schmitt thresholds dashed. Bottom: the output of a plain threshold input and of a Schmitt-trigger input. Press the button in the schematic (or "New press") for a different bounce pattern. Adjust \(R\) and \(C\): too little filtering passes the bounces, and too much makes the button sluggish.</figcaption>
+</figure>
+
+<div class="ex" data-id="bounce-task" data-kind="task">
+  <div class="q">In Figure 3.4, choose \(R\) and \(C\) so that the <b>Schmitt output switches exactly once</b>, within <b>20 ms</b> of the press. Check that it still works for a few different "New press" patterns.</div>
+  <div class="explain">A time constant of roughly 1–5 ms works well here (e.g. 10 kΩ × 220 nF = 2.2 ms): long enough that the brief bounce-openings barely lift the filtered voltage, short enough to respond quickly. Notice that the plain threshold input may still chatter as the slow, slightly noisy edge drifts through its single threshold. Many MCU inputs (the AVR in the Uno, for example) include a Schmitt trigger; otherwise use a 74HC14 or 74LVC1G17.</div>
+</div>
+
+<h3>Power-on reset</h3>
+<p>When you plug in a battery, the supply doesn't jump to 3.3 V; it ramps up over microseconds to milliseconds as the regulator starts and the bulk capacitors charge. A microcontroller that starts executing while its supply is still at 2 V can misread its flash, corrupt its state or lock up. So chips are held in <b>reset</b> until power is stable. Most modern MCUs have internal power-on-reset and brown-out circuits. Many also have an enable or reset pin, and the classic extra safety net is an RC on that pin: a resistor to VDD and a capacitor to ground. The pin rises with time constant \(RC\), so the chip comes out of reset a predictable delay after the supply arrives. Espressif's hardware design guidelines, for example, recommend 10 kΩ and 1 µF on the ESP32's EN (CHIP_PU) pin for exactly this reason. A diode across the resistor (cathode to VDD) quickly discharges the capacitor when power is removed, so a fast power cycle still gives a full reset.</p>
+
+<figure class="widget">
+  <div id="f-por"></div>
+  <figcaption><b>Figure 3.5</b> RC reset delay on an enable pin. The supply (orange) ramps up over the chosen rise time; the EN pin (blue) charges through \(R\) into \(C\). The chip leaves reset when EN crosses 75 % of VDD (dashed). Make the supply ramp slower than the RC delay and see the chip start before the supply has finished rising, which is exactly what the RC is meant to prevent.</figcaption>
+</figure>
+
+<div class="ex" data-id="por-num" data-kind="num" data-answer="0.01386" data-tol="2%" data-unit="s">
+  <div class="q">An enable pin has 10 kΩ to a 3.3 V supply (which appears instantly) and 1 µF to ground. The chip starts when the pin reaches 75 % of VDD. How long after power-up does it start?</div>
+  <div class="hint">\(t = \tau \ln\frac{0 - V}{0.75V - V} = \tau \ln 4\).</div>
+  <div class="explain">\(\tau = 10\) ms, so \(t = 10\,\text{ms} \times \ln 4 = 13.9\) ms. Note the answer doesn't depend on the supply voltage, only on the threshold as a fraction of it.</div>
+</div>
+</section>
+
+<section>
+<h2 id="sinusoids">Sinusoids, frequency, phase and RMS</h2>
+
+<p>So far, signals have been steps. The other great family of test signals is the sine wave:</p>
+<div class="formula">
+$$v(t) = V_p \sin(2\pi f t + \varphi) = V_p \sin(\omega t + \varphi)$$
+<p>\(V_p\): peak amplitude (V). \(f\): frequency (Hz, cycles per second). \(\omega = 2\pi f\): angular frequency (rad/s). \(\varphi\): phase (where in its cycle the wave is at \(t = 0\)).</p>
+</div>
+<p>The period is \(T = 1/f\). Peak-to-peak amplitude is \(V_{pp} = 2V_p\). Phase is often quoted in degrees (360° per cycle). A phase difference \(\Delta\varphi\) between two waves of the same frequency corresponds to a time shift \(\Delta t = \frac{\Delta\varphi}{360°}\,T\).</p>
+
+<h3>Why sine waves are special</h3>
+<p>Why do engineers obsess over sines rather than, say, square waves? Because a sine wave going into any linear circuit (resistors, capacitors, inductors, op-amps in their linear range) comes out as a sine wave of the <em>same frequency</em>. Only its amplitude and phase change. Derivatives and integrals of sines are sines (shifted by 90°). And by Fourier's theorem, any repetitive waveform is a sum of sines (a square wave is a fundamental plus odd harmonics at 3f, 5f, 7f… with amplitudes 1/3, 1/5, 1/7…). Combine those facts with superposition (Chapter 2) and you can understand a circuit's response to <em>anything</em> by knowing how it treats each frequency on its own.</p>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: sines are eigenvectors</span>
+<p>If you've met linear algebra, here is the punchline: sinusoids (more precisely, complex exponentials \(e^{j\omega t}\)) are the <b>eigenfunctions</b> of linear time-invariant systems. A circuit maps \(e^{j\omega t}\) to \(H(\omega)\,e^{j\omega t}\), and the "eigenvalue" \(H(\omega)\) is a complex number, the circuit's frequency response. Decomposing a signal into frequencies is a change of basis that diagonalises the circuit. The FFT you might have called in a signal-processing library is that change of basis.</p>
+</aside>
+
+<h3>RMS: the "equivalent DC" value</h3>
+<p>What does "230 V AC" mean, when the voltage swings between +325 V and −325 V? It means the <b>root-mean-square</b> value: the DC voltage that would deliver the same average power to a resistor. Power in a resistor is \(v^2/R\), so you average \(v^2\) over a cycle and take the square root:</p>
+$$V_{rms} = \sqrt{\frac{1}{T}\int_0^T v(t)^2\,dt}$$
+<p>For a sine wave, \(\sin^2\) averages to exactly 1/2 over a cycle (it's \(\tfrac12 - \tfrac12\cos 2\omega t\), and the cosine averages to zero), so</p>
+<div class="formula">
+$$V_{rms} = \frac{V_p}{\sqrt 2} \approx 0.707\,V_p \quad \text{(sine only)}$$
+<p>For other shapes it's different: a square wave switching between 0 and V with duty cycle D has \(V_{rms} = V\sqrt{D}\) but an <em>average</em> of \(VD\).</p>
+</div>
+<p>That last point matters for PWM: a motor driven at 25 % duty from 12 V gets an average of 3 V but an RMS of 6 V. Heating in a resistive element follows the RMS; a DC motor's speed, roughly, follows the average. Cheap multimeters assume a sine wave when measuring AC; "true RMS" meters do the real calculation, and the difference shows up on anything that isn't a sine.</p>
+
+<figure class="widget">
+  <div id="f-sine"></div>
+  <figcaption><b>Figure 3.6</b> Two sine waves of the same frequency. Change amplitude, frequency and the phase of the second wave. Tick "show v²" to see the squared waveform (shaded) and its average, the mean square; its square root is the RMS value, the dashed line at 0.707 of the peak.</figcaption>
+</figure>
+
+<div class="ex" data-id="rms-num" data-kind="num" data-answer="8.485" data-tol="1%" data-unit="V">
+  <div class="q">A transformer's output is a sine wave with a peak of 12 V. What is its RMS voltage?</div>
+  <div class="hint">\(V_{rms} = V_p/\sqrt2\).</div>
+  <div class="explain">\(12/1.414 = 8.49\) V. Going the other way catches people out: a "12 V AC" transformer (12 V RMS) produces peaks of 17 V, so after rectification you get about 16 V DC, not 12.</div>
+</div>
+
+<div class="ex" data-id="phase-num" data-kind="num" data-answer="45" data-tol="1%" data-unit="°">
+  <div class="q">Two 1 kHz sine waves are displayed on a scope. The second one reaches its peak 125 µs after the first. What is the phase difference in degrees?</div>
+  <div class="hint">One period is 1 ms = 360°.</div>
+  <div class="explain">\(125\,\mu\text{s}/1\,\text{ms} \times 360° = 45°\). The second wave <em>lags</em> by 45°. You'll see this exact number again: it's the phase lag of an RC low-pass filter at its cutoff frequency.</div>
+</div>
+</section>
+
+<section>
+<h2 id="impedance">Impedance and phasors</h2>
+
+<p>In Chapter 2, resistance related voltage to current. For sine waves we'd like the same convenience for capacitors and inductors. The trouble is that their current isn't proportional to their voltage at each instant: a capacitor's current depends on the voltage's <em>slope</em>. For a sine, though, the slope is just another sine, shifted by a quarter cycle. If \(v = V_p \sin\omega t\) across a capacitor, then</p>
+$$i = C\frac{dv}{dt} = \omega C V_p \cos\omega t = \omega C V_p \sin(\omega t + 90°)$$
+<p>The current has amplitude \(\omega C V_p\), and it <b>leads</b> the voltage by 90°: it peaks a quarter cycle earlier, when the voltage is changing fastest. So the ratio of amplitudes is \(V_p/I_p = 1/(\omega C)\), which behaves like a resistance that depends on frequency. For an inductor, the same calculation gives an amplitude ratio of \(\omega L\), with the current <b>lagging</b> the voltage by 90°.</p>
+
+<h3>Complex numbers keep the books</h3>
+<p>We need to track two things at once (amplitude ratio and phase shift), and complex numbers do exactly that. (<a href="appA-math.html">Appendix A</a> has the full toolkit; here's the essence.) Represent a sinusoid by a complex number, its <b>phasor</b>, whose length is the amplitude and whose angle is the phase. Think of it as an arrow rotating at \(\omega\) radians per second; the real signal is its shadow on one axis. Differentiating \(e^{j\omega t}\) multiplies it by \(j\omega\), and multiplying by \(j\) is a 90° rotation. So with phasors, calculus becomes algebra, and we can define the <b>impedance</b> \(Z = V/I\) of each component as a complex number (engineers write \(j\) for \(\sqrt{-1}\), since \(i\) is taken by current):</p>
+<div class="formula">
+$$Z_R = R \qquad Z_C = \frac{1}{j\omega C} = \frac{-j}{\omega C} \qquad Z_L = j\omega L$$
+<p>Impedance: Ohm's law for sine waves. The magnitude \(|Z|\) is the amplitude ratio; the angle is the phase of voltage relative to current.</p>
+</div>
+<p>The magnitudes tell the frequency story at a glance:</p>
+<ul>
+  <li>\(|Z_C| = 1/(2\pi f C)\) falls as frequency rises. At DC it's infinite (open circuit); at high frequency a capacitor is nearly a short. A 100 nF capacitor is 1.6 kΩ at 1 kHz, 16 Ω at 100 kHz and 0.16 Ω at 10 MHz.</li>
+  <li>\(|Z_L| = 2\pi f L\) rises with frequency. At DC it's a short; at high frequency it blocks. A 10 µH inductor is 0.06 Ω at 1 kHz and 630 Ω at 10 MHz.</li>
+</ul>
+<p>And the payoff: <b>everything from Chapter 2 still works</b> with impedances in place of resistances. Series impedances add, parallel ones combine as product over sum, dividers divide, Thevenin holds. You just do the arithmetic with complex numbers.</p>
+
+<figure class="widget">
+  <div id="f-zf"></div>
+  <figcaption><b>Figure 3.7</b> Impedance magnitude versus frequency on log–log axes. A resistor is flat, a capacitor is a line falling one decade per decade, and an inductor rises one decade per decade. Where the capacitor's line crosses the resistor's is the RC corner frequency \(1/(2\pi RC)\); where the capacitor and inductor cross is the LC resonance. Move the sliders and watch the crossings move.</figcaption>
+</figure>
+
+<figure class="widget">
+  <div id="f-phasor"></div>
+  <figcaption><b>Figure 3.8</b> Phasors. Left: the voltage (blue) and current (orange) as arrows rotating counter-clockwise. Right: their projections onto the vertical axis, traced out over time, which are the actual waveforms. Pick a component: for a resistor the arrows are aligned; for a capacitor the current is 90° ahead; for an inductor it's 90° behind; for R and C in series it's somewhere in between, set by \(\omega RC\).</figcaption>
+</figure>
+
+<div class="ex" data-id="zc-num" data-kind="num" data-answer="1.592" data-tol="2%" data-unit="Ω">
+  <div class="q">What is the impedance magnitude of a 100 nF capacitor at 1 MHz?</div>
+  <div class="hint">\(|Z| = 1/(2\pi f C)\).</div>
+  <div class="explain">\(1/(2\pi \times 10^6 \times 10^{-7}) = 1.59\,\Omega\). At 1 MHz a decoupling capacitor is a low-impedance path to ground, which is the whole point of it. (As you'll see shortly, a real one has some inductance too, which takes over at higher frequencies.)</div>
+</div>
+
+<div class="ex" data-id="imp-sort" data-kind="sort">
+  <div class="q">How does each ideal component behave at the extremes of frequency?</div>
+  <div class="bins">
+    <div data-bin="open">Like an open circuit</div>
+    <div data-bin="short">Like a short circuit</div>
+    <div data-bin="same">Same as at any frequency</div>
+  </div>
+  <ul class="items">
+    <li data-bin="open">Capacitor at DC</li>
+    <li data-bin="short">Capacitor at very high frequency</li>
+    <li data-bin="short">Inductor at DC</li>
+    <li data-bin="open">Inductor at very high frequency</li>
+    <li data-bin="same">Resistor</li>
+  </ul>
+  <div class="explain">\(|Z_C| = 1/\omega C\) goes from ∞ to 0 as frequency rises; \(|Z_L| = \omega L\) goes from 0 to ∞. These two limits let you sanity-check any circuit in seconds: redraw it with caps open and inductors shorted to get the DC behaviour, then the other way round for the high-frequency behaviour.</div>
+</div>
+</section>
+
+<section>
+<h2 id="filters">RC filters, Bode plots and filtering PWM</h2>
+
+<h3>The RC low-pass filter</h3>
+<p>Put a resistor in series and a capacitor to ground, and take the output across the capacitor. It's a voltage divider, but the bottom "resistor" is \(Z_C\), which shrinks as frequency rises. Low frequencies see a big \(Z_C\) and pass through almost untouched; high frequencies see a small \(Z_C\) and are shunted to ground. Apply the divider formula with impedances:</p>
+$$H(f) = \frac{V_{out}}{V_{in}} = \frac{Z_C}{R + Z_C} = \frac{\frac{1}{j\omega C}}{R + \frac{1}{j\omega C}} = \frac{1}{1 + j\omega RC}$$
+<p>(multiply top and bottom by \(j\omega C\)). This complex number tells you everything. Its magnitude is the amplitude ratio, and its angle is the phase shift:</p>
+<div class="formula">
+$$|H| = \frac{1}{\sqrt{1 + (f/f_c)^2}}, \qquad \varphi = -\arctan\frac{f}{f_c}, \qquad f_c = \frac{1}{2\pi RC}$$
+<p>The first-order low-pass filter. \(f_c\) is the cutoff (corner, or −3 dB) frequency, where the resistor's and capacitor's impedances have equal magnitude.</p>
+</div>
+<p>Read off the three regimes:</p>
+<ul>
+  <li>\(f \ll f_c\): \(|H| \approx 1\), \(\varphi \approx 0\). The signal passes.</li>
+  <li>\(f = f_c\): \(|H| = 1/\sqrt2 = 0.707\) and \(\varphi = -45°\). Since power goes as amplitude squared, the output power is half: the "half-power point".</li>
+  <li>\(f \gg f_c\): \(|H| \approx f_c/f\). Each tenfold increase in frequency divides the output by ten, and the phase approaches −90°.</li>
+</ul>
+
+<aside class="callout math"><span class="ct">∑ Decibels in thirty seconds</span>
+<p>Ratios spanning many orders of magnitude are easier to handle as logarithms. For amplitude ratios, the <b>decibel</b> is \(20\log_{10}|H|\). So ×10 is +20 dB, ×0.1 is −20 dB, ×2 is about +6 dB, ×0.5 about −6 dB, and ×0.707 is −3 dB (which is where "−3 dB frequency" comes from). Cascaded stages multiply, so their decibels add. The full story, including why power ratios use 10 log instead of 20 log, is in <a href="appA-math.html">Appendix A</a>.</p>
+</aside>
+
+<p>A <b>Bode plot</b> shows \(|H|\) in dB and \(\varphi\) in degrees against frequency on a log axis. On those axes, a first-order low-pass is two straight lines: flat at 0 dB up to \(f_c\), then falling at −20 dB per decade. The real curve hugs these asymptotes except near the corner, where it's 3 dB below. Engineers sketch Bode plots from asymptotes in seconds.</p>
+
+<h3>The RC high-pass filter</h3>
+<p>Swap R and C: series capacitor, resistor to ground, output across the resistor. Now low frequencies are blocked (the capacitor is nearly open) and high ones pass:</p>
+$$H(f) = \frac{R}{R + \frac{1}{j\omega C}} = \frac{j\omega RC}{1 + j\omega RC}, \qquad |H| = \frac{f/f_c}{\sqrt{1 + (f/f_c)^2}}, \qquad \varphi = 90° - \arctan\frac{f}{f_c}$$
+<p>Same \(f_c\), mirror-image response. You'll find high-pass filters as <b>AC coupling</b>: a series capacitor that blocks a DC offset but passes the signal, as in audio inputs, the scope's AC-coupling setting, or a microphone feeding an ADC that's biased at mid-supply.</p>
+
+<figure class="widget wide">
+  <div id="f-bode"></div>
+  <figcaption><b>Figure 3.9</b> Bode plot of an RC filter. Switch between low-pass and high-pass, set \(R\) and \(C\), and move the probe frequency. Dashed lines are the straight-line asymptotes; the vertical line marks \(f_c\). The gain at \(f_c\) is always −3 dB and the phase is ±45°. Hover for exact values.</figcaption>
+</figure>
+
+<div class="ex" data-id="fc-num" data-kind="num" data-answer="1591.5" data-tol="1%" data-unit="Hz">
+  <div class="q">What is the cutoff frequency of an RC filter with \(R = 1\) kΩ and \(C = 100\) nF?</div>
+  <div class="hint">\(f_c = 1/(2\pi RC)\), and \(RC = 10^{-4}\) s.</div>
+  <div class="explain">\(1/(2\pi \times 10^{-4}) = 1.59\) kHz. The numbers \(\tau = RC\) and \(f_c = 1/(2\pi\tau)\) describe the same circuit in the time and frequency domains. A fast time constant means a high cutoff.</div>
+</div>
+
+<p>Figure 3.10 shows what the Bode plot means on a real oscilloscope. The input is a sine wave; the output is the same frequency, smaller and later.</p>
+
+<figure class="widget wide">
+  <div id="f-scope-rc"></div>
+  <figcaption><b>Figure 3.10</b> A 10 kΩ / 10 nF low-pass filter (\(f_c \approx 1.59\) kHz) on a simulated scope. Yellow: input, 2 V peak. Cyan: output. The timebase follows the frequency so you always see two cycles. Sweep the frequency: below \(f_c\) the output tracks the input; above it the output shrinks and lags towards a quarter cycle behind.</figcaption>
+</figure>
+
+<div class="ex" data-id="bode-task" data-kind="task">
+  <div class="q">In Figure 3.10, find the frequency where the output amplitude is <b>70.7 %</b> of the input (within ±5 % in frequency). What is the phase lag there?</div>
+  <div class="explain">That's \(f_c = 1/(2\pi \times 10\,\text{k}\Omega \times 10\,\text{nF}) = 1.59\) kHz, where the lag is 45°, an eighth of a cycle. The −3 dB point and the 45° point coincide for every first-order filter.</div>
+</div>
+
+<h3>Filtering PWM into an analog voltage</h3>
+<p>Most microcontrollers have no real DAC, but they all have PWM: a square wave switching between 0 and \(V_{DD}\) with an adjustable duty cycle \(D\). Its average is \(D \cdot V_{DD}\). A square wave is its DC average plus harmonics at the PWM frequency \(f_{PWM}\), \(2f_{PWM}\), \(3f_{PWM}\) and so on. A low-pass filter with \(f_c \ll f_{PWM}\) passes the DC and strongly attenuates the harmonics, leaving a voltage near \(D \cdot V_{DD}\) plus a small leftover <b>ripple</b>.</p>
+<p>How much ripple? During the high part of the cycle (\(D/f_{PWM}\) seconds), the capacitor sits near the average \(DV\), so about \(V(1-D)/R\) flows into it and it charges by \(\Delta V = I\,\Delta t/C\):</p>
+<div class="formula">
+$$\Delta V_{pp} \approx \frac{V\,D(1-D)}{f_{PWM}\,RC}$$
+<p>Valid when \(f_{PWM} \gg f_c\). Worst at 50 % duty, where \(D(1-D) = 1/4\).</p>
+</div>
+<p>Now the trade-off. Less ripple needs a bigger \(RC\). But the filter's settling time (to 1 % of a new value, \(\approx 4.6\,RC\)) grows with \(RC\), so the output responds sluggishly to duty-cycle changes. At the Arduino Uno's default 490 Hz, a 50 mV ripple at 5 V requires \(RC \gtrsim 51\) ms, which means a quarter-second settling time. The better move is to raise the PWM frequency: at 20 kHz (easy on an ESP32's LEDC peripheral), the same ripple needs only \(RC \approx 1.25\) ms. A second RC stage (or an active filter) steepens the roll-off to −40 dB/decade.</p>
+
+<figure class="widget wide">
+  <div id="f-pwm"></div>
+  <figcaption><b>Figure 3.11</b> PWM through an RC filter, simulated numerically from switch-on. Top: the PWM wave (faint) and the filter output. Bottom: a zoom on the last few PWM periods, showing the ripple. Adjust the duty cycle, PWM frequency, R and C, and compare the simulated ripple with the formula. The settling readout is the time to get within 1 % of the final average.</figcaption>
+</figure>
+
+<div class="ex" data-id="pwm-task" data-kind="task">
+  <div class="q">In Figure 3.11, at about <b>50 % duty</b>, get the ripple below <b>50 mV peak-to-peak</b> while keeping the 1 % settling time under <b>50 ms</b>. (Hint: you may need to change something other than R and C.)</div>
+  <div class="explain">At 490 Hz it's impossible: 50 mV of ripple needs \(RC \gtrsim 51\) ms, but 50 ms settling needs \(RC \lesssim 11\) ms. Raise the PWM frequency to 5–20 kHz and it becomes easy (e.g. 20 kHz with 10 kΩ × 470 nF: \(RC\) = 4.7 ms, ripple ≈ 13 mV, settling ≈ 22 ms). This is the core tension in all filtering: attenuation versus response time.</div>
+</div>
+
+<div class="ex" data-id="pwm-num" data-kind="num" data-answer="0.0255" data-tol="5%" data-unit="V">
+  <div class="q">An Uno's 490 Hz PWM (5 V, 50 % duty) is filtered by 10 kΩ and 10 µF. Estimate the peak-to-peak ripple.</div>
+  <div class="hint">\(RC = 0.1\) s. Use \(V D(1-D)/(f\,RC)\).</div>
+  <div class="explain">\(5 \times 0.25/(490 \times 0.1) = 25.5\) mV. The settling time is \(4.6 \times 0.1 = 0.46\) s, fine for setting a reference voltage, far too slow for audio.</div>
+</div>
+</section>
+
+<section>
+<h2 id="decoupling">Decoupling, and what real capacitors are like</h2>
+
+<h3>Why every chip wants 100 nF right next to it</h3>
+<p>A digital chip doesn't draw a smooth current. Every clock edge, thousands of transistors switch at once and briefly gulp current, in spikes lasting nanoseconds. An ESP32 transmitting Wi-Fi adds bursts of hundreds of milliamps on top. That current has to come from the regulator, through PCB traces or wires that look like nothing on the schematic. But every conductor has <b>inductance</b>, roughly 1 nH per millimetre of trace or wire. Five centimetres of trace is about 50 nH. Now apply \(v = L\,di/dt\): a 100 mA spike rising in 5 ns through 50 nH needs \(50\,\text{nH} \times 0.1\,\text{A}/5\,\text{ns} = 1\) V. That volt is lost across the trace, so the chip's supply pin dips by up to a volt for a few nanoseconds, then rings. That's enough to corrupt logic levels, upset the ADC, or trip the brown-out detector.</p>
+<p>A <b>decoupling capacitor</b> (or bypass capacitor) placed right at the supply pin is a local reservoir. The fast spike is drawn from the capacitor through a tiny loop with little inductance, while the slow trace only has to deliver the <em>average</em> current to refill it. In frequency terms: the capacitor is a low impedance to ground at high frequencies, so high-frequency current circulates locally instead of through the long supply path. And in the other direction, it keeps noise generated by this chip from spreading along the rail to its neighbours.</p>
+
+<figure class="widget wide">
+  <div id="f-decouple"></div>
+  <figcaption><b>Figure 3.12</b> A simulated supply rail. A regulator feeds a chip through a trace with inductance \(L_{trace}\); the chip draws 100 mA spikes, 10 ns wide, every 50 ns (bottom plot). Without decoupling, the rail at the chip's pin (top) droops and rings. Turn on the 100 nF capacitor and watch the rail flatten. Then increase "cap distance" (each mm adds about 1 nH in series with the capacitor) to see why it must be <em>close</em>. The faint grey trace is the other case, for comparison.</figcaption>
+</figure>
+
+<aside class="callout tip"><span class="ct">💡 Decoupling rules of thumb</span>
+<ul>
+  <li>One 100 nF ceramic (X7R or X5R, 0402 or 0603) per supply pin, placed as close as possible, with short, wide connections and a via straight to the ground plane.</li>
+  <li>A bulk capacitor (10–100 µF) near where power enters the board, and a few µF near chips with big current bursts (ESP32 modules: Espressif's reference designs put 10 µF plus 100 nF at the module's supply pin).</li>
+  <li>What matters is the <b>loop area</b> of the path pin → capacitor → ground → back to the chip's ground pin. A small loop means low inductance.</li>
+  <li>Read the datasheet: chips with analog sections (ADCs, radios) often ask for specific values and placement.</li>
+</ul>
+</aside>
+
+<h3>Real capacitors aren't ideal</h3>
+<p>A real capacitor is better modelled as an ideal capacitor in series with an <b>equivalent series resistance</b> (ESR) and an <b>equivalent series inductance</b> (ESL), from its electrodes, leads and terminations. That makes it a series RLC circuit. At low frequencies it looks capacitive; at its <b>self-resonant frequency</b>, \(f_{SRF} = 1/(2\pi\sqrt{L_{ESL}C})\), the capacitive and inductive parts cancel and only the ESR is left; above the SRF, it behaves like an inductor. A 100 nF 0603 capacitor with about 0.7 nH of ESL resonates around 19 MHz. That's why designs sometimes add smaller capacitors (1–10 nF) for higher frequencies, and why the mounting inductance (vias, trace stubs) matters as much as the part itself.</p>
+
+<figure class="widget">
+  <div id="f-realcap"></div>
+  <figcaption><b>Figure 3.13</b> Impedance of a real capacitor (solid) versus an ideal one (dashed). Pick a capacitor type; then adjust its ESR and ESL. The V-shaped curve bottoms out at the self-resonant frequency, at a depth set by the ESR. Tick "add 10 µF in parallel" to see how a bulk capacitor extends the low-impedance range downwards, and the anti-resonance bump where the two meet.</figcaption>
+</figure>
+
+<table class="ch3-table">
+  <tr><th>Type</th><th>Typical values</th><th>Strengths</th><th>Watch out for</th></tr>
+  <tr><td>MLCC, Class 1 (C0G/NP0)</td><td>1 pF – ~100 nF</td><td>Very stable with temperature and voltage, low loss</td><td>Small values only. Use for timing, filters, oscillators.</td></tr>
+  <tr><td>MLCC, Class 2 (X7R, X5R)</td><td>100 pF – 100 µF</td><td>Tiny, cheap, very low ESR/ESL. The default for decoupling.</td><td><b>Loses capacitance with DC bias</b>, ±15 % over temperature, can crack if the board flexes, some are microphonic</td></tr>
+  <tr><td>MLCC, Y5V/Z5U</td><td>—</td><td>Cheap</td><td>Can lose 80 % of capacitance with temperature and bias. Avoid.</td></tr>
+  <tr><td>Aluminium electrolytic</td><td>1 µF – 10 mF+</td><td>Large capacitance and voltage for the money</td><td>Polarised; high ESR (0.05–several Ω); dries out with time and heat (lifetime rated in hours at 85/105 °C)</td></tr>
+  <tr><td>Aluminium polymer</td><td>10 µF – 1 mF</td><td>Low ESR, long life</td><td>Lower voltage ratings, cost</td></tr>
+  <tr><td>Tantalum (MnO₂)</td><td>0.1 µF – 1 mF</td><td>Stable, compact</td><td>Polarised; can fail short and burn on surges. Derate voltage by ~50 %.</td></tr>
+  <tr><td>Film</td><td>1 nF – 10 µF</td><td>Stable, low loss, self-healing</td><td>Bulky. Use in audio, snubbers, mains.</td></tr>
+</table>
+
+<h3>The MLCC DC-bias trap</h3>
+<p>Class 2 ceramics use a ferroelectric dielectric (barium titanate) whose permittivity drops when a DC field is applied. The thinner the dielectric layers, the stronger the field for a given voltage, so the effect is worst in small packages and low voltage ratings. A 10 µF, 6.3 V, 0603 X5R part on a 5 V rail can easily deliver only a third of its marked value. Manufacturers publish DC-bias curves (Murata's SimSurfing and TDK's and Samsung's online tools, for instance). Use them, or choose a larger package or a higher voltage rating.</p>
+
+<figure class="widget">
+  <div id="f-bias"></div>
+  <figcaption><b>Figure 3.14</b> Illustrative DC-bias curves for three 10 µF capacitors. These are representative shapes, not data for a specific part: always look up the real curve. Slide the DC voltage and read the effective capacitance of each.</figcaption>
+</figure>
+
+<div class="ex" data-id="mlcc-mc" data-kind="mc">
+  <div class="q">A regulator's datasheet requires "at least 4.7 µF effective output capacitance". The rail is 5 V. Which choice is most likely to meet it?</div>
+  <ol class="opts">
+    <li>A 4.7 µF 6.3 V X5R in 0402</li>
+    <li>A 10 µF 6.3 V X5R in 0603</li>
+    <li data-correct>A 10 µF 25 V X7R in 1206</li>
+    <li>A 4.7 µF Y5V in 0805</li>
+  </ol>
+  <div class="hint">Which capacitor's dielectric sees the weakest field at 5 V, and which loses the least to temperature?</div>
+  <div class="explain">The 25 V rating and the large package mean thicker layers and much less DC-bias loss, so it typically keeps well over half of its 10 µF at 5 V. The small 6.3 V parts can drop to 30–50 % of their nominal value, and Y5V is unreliable over temperature anyway. This exact mistake makes regulators oscillate and audio sound wrong.</div>
+</div>
+
+<div class="ex" data-id="srf-text" data-kind="text" data-answer="self-resonant frequency|self resonant frequency|srf|self-resonance|self resonance|resonant frequency|resonance">
+  <div class="q">Above a certain frequency, a real capacitor's impedance starts rising again and it behaves like an inductor. What is that frequency called?</div>
+  <div class="explain">The self-resonant frequency (SRF), \(1/(2\pi\sqrt{L_{ESL}C})\). At the SRF the impedance equals the ESR, its minimum. Above it, the part is effectively an inductor, so a decoupling capacitor is most effective around and below its SRF.</div>
+</div>
+</section>
+
+<section>
+<h2 id="resonance">Resonance, ringing and parasitics</h2>
+
+<p>An inductor and a capacitor together can do something neither can do alone: <b>oscillate</b>. Charge a capacitor and connect it across an inductor. The capacitor pushes current through the inductor; the inductor's current builds up, and when the capacitor is empty, the inductor keeps the current going (it can't stop instantly), charging the capacitor the other way. Energy sloshes back and forth between the electric field and the magnetic field, like a mass on a spring, at the <b>resonant frequency</b>:</p>
+<div class="formula">
+$$f_0 = \frac{1}{2\pi\sqrt{LC}}$$
+<p>LC resonance: where \(|Z_L| = |Z_C|\) and their impedances cancel.</p>
+</div>
+<p>Resistance drains energy on every swing, so the oscillation decays. How fast depends on how the resistance compares with the <b>characteristic impedance</b> \(Z_0 = \sqrt{L/C}\). For a series RLC circuit, two equivalent measures:</p>
+<ul>
+  <li>The <b>quality factor</b> \(Q = Z_0/R\). Roughly, the number of cycles it takes for the ringing to die down to a few percent of its initial size (precisely, to \(e^{-\pi} \approx 4\%\)). A guitar string has a high Q; a car's suspension, a low one.</li>
+  <li>The <b>damping ratio</b> \(\zeta = R/(2Z_0) = 1/(2Q)\). \(\zeta < 1\): underdamped, rings. \(\zeta = 1\): critically damped, the fastest response with no overshoot. \(\zeta > 1\): overdamped, sluggish.</li>
+</ul>
+<p>For a step input, an underdamped circuit overshoots by \(e^{-\pi\zeta/\sqrt{1-\zeta^2}}\) of the step. With \(\zeta = 0.1\) that's 73 %. A step of 8.4 V could briefly read 14.5 V.</p>
+
+<figure class="widget wide">
+  <div id="f-ring"></div>
+  <figcaption><b>Figure 3.15</b> Step response of a series RLC circuit: a 1 V step drives \(L\) and \(R\) into \(C\), and the plot shows the capacitor voltage. Adjust \(L\), \(C\) and \(R\). Low R rings for many cycles (the dashed envelope shows the exponential decay); raising R towards \(2\sqrt{L/C}\) kills the ringing. The readouts show \(f_0\), \(Z_0\), \(Q\), \(\zeta\) and the overshoot.</figcaption>
+</figure>
+
+<div class="ex" data-id="ring-task" data-kind="task">
+  <div class="q">In Figure 3.15, make the circuit <b>critically damped</b> (\(\zeta\) between 0.95 and 1.05). What resistance did you need, compared to \(\sqrt{L/C}\)?</div>
+  <div class="explain">Critical damping needs \(R = 2\sqrt{L/C} = 2Z_0\). With the default 10 µH and 1 µF, \(Z_0 = 3.16\,\Omega\), so \(R \approx 6.3\,\Omega\). This is the idea behind <b>snubbers</b> and series damping resistors: add just enough resistance, in the right place, to absorb the ringing energy.</div>
+</div>
+
+<div class="ex" data-id="res-num" data-kind="num" data-answer="159155" data-tol="1%" data-unit="Hz">
+  <div class="q">A 10 µH inductor and a 100 nF capacitor form an LC circuit. What is its resonant frequency?</div>
+  <div class="hint">\(LC = 10^{-5} \times 10^{-7} = 10^{-12}\), so \(\sqrt{LC} = 10^{-6}\) s.</div>
+  <div class="explain">\(f_0 = 1/(2\pi \times 10^{-6}) = 159\) kHz. You'll see LC pairs like this as the output filter of a buck converter (Chapter 5), which is designed to resonate far below its switching frequency.</div>
+</div>
+
+<h3>Parasitics: every wire is an inductor</h3>
+<p>Here's the uncomfortable truth behind much of "mysterious" electronics. Every conductor has inductance (about 1 nH per mm for a wire or trace far from its return path). Every pair of conductors has capacitance between them (a few pF between adjacent breadboard rows; around 10 pF for a scope probe tip; tens of pF for a long cable). Every component has parasitic Ls and Cs. These are <b>parasitics</b>: elements you didn't draw, but that are there anyway. They form LC circuits with high Q (wires have low resistance), and any fast edge excites them.</p>
+<ul>
+  <li><b>Hot-plugging a battery.</b> A LiPo connected through 50 cm of wire (roughly 0.5 µH) to a board with 10 µF of low-ESR ceramics is a series RLC circuit with \(Z_0 \approx 0.2\,\Omega\) and very little damping. The input can ring up to nearly <em>twice</em> the battery voltage, enough to kill a regulator rated just above the nominal input. Linear Technology's Application Note 88, "Ceramic Input Capacitors Can Cause Overvoltage Transients", is the classic write-up. Fixes: an electrolytic (whose ESR damps it) in parallel, a TVS diode, or a soft-start circuit.</li>
+  <li><b>Motor and gate-drive wires</b> ring on every PWM edge, radiating noise into nearby sensor and I²C lines. Twist the wires (a smaller loop means less inductance and radiation), keep them short, and add a snubber or a small gate resistor (Chapter 4).</li>
+  <li><b>Your scope probe's ground lead</b> is a loop of about 150 nH; with the probe's ~10 pF it resonates around 130 MHz. Measure a fast edge with the long ground clip and you see ringing that isn't really in the circuit. More on this next.</li>
+  <li><b>Long I²C wires</b> add capacitance, slowing rising edges through the pull-up resistors, exactly an RC time constant. That's why I²C has a bus capacitance limit (400 pF in the standard modes), and Chapter 6 sizes pull-ups from it.</li>
+</ul>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "it's DC, so frequency doesn't matter"</span>
+<p>A circuit "running on DC" is full of high frequencies. A 1 MHz square wave with 2 ns edges has significant content up to about \(0.35/t_{rise} \approx 175\) MHz, whatever its repetition rate. Motor brushes arc, regulators switch at hundreds of kHz, and MCU clocks run at hundreds of MHz. The edge speed, not the clock rate, sets the frequencies your parasitics will see.</p>
+</aside>
+</section>
+
+<section>
+<h2 id="scope">The oscilloscope: seeing voltage over time</h2>
+
+<p>A multimeter gives you one number. An oscilloscope gives you a graph of voltage against time, refreshed many times a second. It is to electronics what a debugger with a timeline is to software. Everything in this chapter (time constants, ripple, ringing, phase) is invisible to a multimeter and obvious on a scope. The front panel looks intimidating, but it's organised into three groups of controls.</p>
+
+<h3>Vertical: volts per division</h3>
+<p>The screen is a grid, typically 10 divisions wide and 8 tall. The <b>V/div</b> knob sets how many volts one vertical division represents (in a 1-2-5 sequence: 10 mV, 20 mV, 50 mV, 100 mV…). The <b>position</b> knob moves the trace up and down. <b>Coupling</b> chooses DC (show everything, including the DC level) or AC (block the DC with a series capacitor, a high-pass filter, so a small ripple riding on a large DC voltage can be zoomed into). To see 20 mV of ripple on a 3.3 V rail, use AC coupling at 10 mV/div; with DC coupling at that sensitivity the trace would sit hundreds of divisions off the screen.</p>
+
+<h3>Horizontal: time per division</h3>
+<p>The <b>time/div</b> knob sets the sweep speed. At 1 ms/div the screen shows 10 ms. For a periodic signal, aim to show two to five cycles. For a single event, like a button press, power-up or a brown-out, set the timebase to fit the event's duration.</p>
+
+<h3>Trigger: making the picture stand still</h3>
+<p>This is the control beginners skip, and then they see a smeared, jittering mess. The scope draws a new sweep many times a second. If each sweep starts at a random point in the waveform, successive sweeps don't line up. The <b>trigger</b> tells the scope to start each sweep (more precisely, to place time zero) at the moment the signal crosses a <b>level</b> in a chosen direction (<b>slope</b>: rising or falling). Every sweep then lines up on the same feature of the waveform, and the picture stands still. In <b>Auto</b> mode the scope sweeps anyway if no trigger arrives (so you always see something); in <b>Normal</b> mode it waits; in <b>Single</b> mode it captures one event and stops, which is ideal for catching a glitch at power-up.</p>
+
+<h3>Probes: ×1, ×10 and the ground lead</h3>
+<p>A scope input is 1 MΩ in parallel with about 15 pF. A standard passive probe on its <b>×10</b> setting adds a 9 MΩ resistor (compensated by a small adjustable capacitor) in the probe body, so the circuit sees 10 MΩ and around 10–15 pF instead of 1 MΩ plus the cable's ~100 pF. It also divides the signal by 10, which the scope must be told about (or it will display one tenth of the real voltage). Use ×10 by default: it loads your circuit far less and has much more bandwidth (often hundreds of MHz versus a few MHz at ×1). Use ×1 only for tiny signals. Before using a probe, <b>compensate</b> it: connect it to the scope's square-wave calibration output and adjust the small trimmer until the corners are square (not rounded, not overshooting).</p>
+<p>The ground lead is part of the measurement loop. A 15 cm ground clip encloses a loop with a lot of inductance, which resonates with the probe's capacitance and picks up magnetic fields from nearby switching currents. On fast edges, it shows ringing that isn't there. For anything fast, remove the clip and use the short spring ground that came with the probe, touching ground right next to the signal point.</p>
+
+<aside class="callout warn"><span class="ct">⚠️ The scope's ground is earth</span>
+<p>On a mains-powered bench scope, every probe's ground clip is connected to mains earth through the power cord. Clip it to anything that is not at earth potential and you create a short circuit through the scope. On battery and USB projects this usually doesn't matter, but if your board is powered from a laptop charger, or worse, connects to anything mains-powered, think before you clip. And never connect two ground clips to two different voltages: they are the same node inside the scope.</p>
+</aside>
+
+<figure class="widget wide">
+  <div id="f-scope"></div>
+  <figcaption><b>Figure 3.16</b> A simulated oscilloscope. Choose a signal, then use V/div, time/div, position, coupling and the trigger to get a clean, stable picture. In Auto mode without a valid trigger level, the trace rolls and jitters, just like a real scope. Mismatch the probe and channel attenuation settings to see a reading that's off by ten. On the "fast edge" signal, compare the long ground clip with the spring tip. On "3.3 V rail", find the ripple.</figcaption>
+</figure>
+
+<div class="ex" data-id="scope-task" data-kind="task">
+  <div class="q">In Figure 3.16, display the <b>Arduino PWM</b> signal properly: triggered in <b>Normal</b> mode, probe and channel settings matched, <b>2–4 full periods</b> across the screen, and the whole waveform on screen and at least <b>4 divisions</b> tall.</div>
+  <div class="explain">490 Hz has a period of 2.04 ms, so 500 µs/div (5 ms across) shows about 2.5 periods. The 0–5 V swing at 1 V/div is 5 divisions, but the screen only reaches ±4 divisions from the centre, so move the trace down with the position control (about −2.5 div). The trigger level must sit between 0 and 5 V, e.g. 2.5 V, rising edge.</div>
+</div>
+
+<div class="ex" data-id="scope-order" data-kind="order">
+  <div class="q">You want to look at an unknown signal on a test point. Put the steps in a sensible order.</div>
+  <ol class="items">
+    <li>Set the probe to ×10 and tell the channel it's a ×10 probe</li>
+    <li>Compensate the probe on the calibration output</li>
+    <li>Connect the ground (spring tip for fast signals), then the probe tip</li>
+    <li>Press Auto-set, or set V/div and time/div to rough values</li>
+    <li>Set the trigger level and slope so the trace stands still</li>
+    <li>Refine the scales and read off amplitude, period and shape</li>
+  </ol>
+  <div class="explain">Configure the probe chain first (attenuation and compensation), then connect ground before the tip, then get something on screen, then stabilise it with the trigger, then zoom. Auto-set is a fine starting point on a real scope, but learn to do it by hand: Auto-set guesses wrong on anything unusual, like a rare glitch or a small ripple on a big DC level.</div>
+</div>
+</section>
+
+<section>
+<h2 id="lab">Lab: an RC filter on Arduino PWM</h2>
+
+<aside class="callout lab"><span class="ct">🔧 Lab: scope a PWM filter</span>
+<p><b>You need:</b> an Arduino Uno or Nano, 10 kΩ and 1 kΩ resistors, capacitors of 100 nF, 1 µF and 10 µF, a breadboard, your multimeter and an oscilloscope with a ×10 probe (a cheap scope is fine; even a USB scope or a sound-card scope will show the slow parts).</p>
+<ol>
+  <li><b>Predict first.</b> For 10 kΩ with each capacitor, compute \(\tau = RC\), \(f_c = 1/(2\pi RC)\) and the expected peak-to-peak ripple at 50 % duty and 490 Hz, \(\Delta V \approx 5 \times 0.25/(490\,RC)\). Write the numbers down.</li>
+  <li><b>Build:</b> pin 9 → 10 kΩ → node → capacitor → GND. Probe channel 1 on pin 9 and channel 2 on the node, with both grounds on Arduino GND.</li>
+  <li><b>Upload:</b>
+<pre><code>void setup() { pinMode(9, OUTPUT); }
+void loop() {
+  analogWrite(9, 128);   // ~50 % duty at ~490 Hz on pin 9
+}</code></pre></li>
+  <li><b>Look at the raw PWM</b> on channel 1: trigger on the rising edge at about 2.5 V, 1 V/div, 500 µs/div. Measure the frequency and duty cycle with the scope's measurement menu. (Is it exactly 490 Hz? The Uno's timer gives 16 MHz / 64 / 510 ≈ 490.2 Hz.)</li>
+  <li><b>Look at the filter output</b> on channel 2. With 100 nF (\(\tau = 1\) ms), you'll see a shark-fin wave: clearly visible exponential charge and discharge segments. Can you read \(\tau\) off the screen? (Time from the start of a rising segment to 63 % of its final rise, if it had time to finish.)</li>
+  <li><b>Switch to AC coupling</b> on channel 2 and zoom in (10–50 mV/div) to measure the ripple with 1 µF and 10 µF. Compare with your predictions.</li>
+  <li><b>Measure the settling time:</b> change the sketch to alternate <code>analogWrite(9, 0)</code> and <code>analogWrite(9, 200)</code> every 2 s, trigger in Normal mode on channel 2, and watch the output step. Check that it takes about 4.6 τ to get within 1 %.</li>
+  <li><b>Load it:</b> connect a 1 kΩ resistor from the output to GND. The DC level drops to about \(2.5 \times 1/(10+1) \approx 0.23\) V. That's Chapter 2's loading lesson again: the filter's output impedance is 10 kΩ. A unity-gain op-amp buffer (Chapter 4) fixes it.</li>
+  <li><b>Probe-loading bonus:</b> set channel 2 to ×1 on the probe and the scope, with 10 kΩ and 100 nF, and compare the waveform with ×10. At these speeds you'll barely see a difference. Now probe a 100 kHz signal or a fast edge, and you will.</li>
+</ol>
+<p><b>No scope?</b> Your multimeter on DC volts shows the average (about 2.5 V) and, on most meters, AC volts shows a rough idea of the ripple. You'll miss the shapes, which is the reason to get a scope.</p>
+</aside>
+
+<h3>Chapter summary</h3>
+<ul>
+  <li>\(i = C\,dv/dt\) and \(v = L\,di/dt\). A capacitor's voltage and an inductor's current can't jump; a capacitor is open at DC, an inductor is short at DC.</li>
+  <li>First-order circuits move exponentially from an initial to a final value with \(\tau = RC\) or \(L/R\): 63 % after one τ, "done" after about 5 τ.</li>
+  <li>Interrupting an inductor's current produces a large voltage spike; a flyback diode gives the current a path.</li>
+  <li>RC filtering plus a Schmitt trigger debounces buttons; an RC on an enable pin delays start-up until the supply is stable.</li>
+  <li>Sinusoids pass through linear circuits unchanged in shape. RMS is the power-equivalent DC value: \(V_p/\sqrt2\) for a sine only.</li>
+  <li>Impedance generalises resistance: \(Z_C = 1/(j\omega C)\), \(Z_L = j\omega L\). All the DC tools work with complex impedances.</li>
+  <li>The RC low-pass \(H = 1/(1 + j\omega RC)\) has \(f_c = 1/(2\pi RC)\), −3 dB and −45° at \(f_c\), and −20 dB/decade above it. PWM plus a low-pass makes a crude DAC, trading ripple against settling time.</li>
+  <li>Supply traces are inductors; decoupling capacitors supply fast current locally. Real capacitors have ESR, ESL and a self-resonant frequency, and Class 2 MLCCs lose capacitance under DC bias.</li>
+  <li>L and C resonate at \(f_0 = 1/(2\pi\sqrt{LC})\); damping depends on R compared with \(Z_0 = \sqrt{L/C}\). Parasitic L and C are everywhere and ring on fast edges.</li>
+  <li>An oscilloscope needs V/div, time/div and, above all, a trigger. Use ×10 probes and short ground connections.</li>
+</ul>
+
+<aside class="callout ref"><span class="ct">📚 Go deeper</span>
+<ul>
+  <li><b>Horowitz &amp; Hill, <i>The Art of Electronics</i> (3rd ed.), Chapter 1 "Foundations"</b>, sections 1.4–1.7: capacitors and RC circuits, differentiators and integrators, inductors and transformers, impedance and reactance, and the RC filters with their phasor treatment.</li>
+  <li><b>Hayes &amp; Horowitz, <i>Learning the Art of Electronics</i>, Chapter 2 (RC circuits)</b> and its lab, which has you scope exactly these transients and filters.</li>
+  <li><b>MIT 6.002 <i>Circuits and Electronics</i> (Agarwal, MIT OpenCourseWare)</b>: the lectures on capacitors and first-order transients, second-order (RLC) circuits, and sinusoidal steady state and frequency response. Agarwal &amp; Lang's textbook, chapters 9–14, follows the same arc.</li>
+  <li><b>Kuphaldt, <i>Lessons in Electric Circuits</i></b>, Volume I ch. 13 "Capacitors", ch. 15 "Inductors" and ch. 16 "RC and L/R Time Constants"; Volume II (AC) on reactance and impedance, filters and resonance.</li>
+  <li><b>Scherz &amp; Monk, <i>Practical Electronics for Inventors</i> (4th ed.), Chapter 2 "Theory"</b> (the capacitor, inductor, AC and filter sections) and Chapter 3 on real capacitor types.</li>
+  <li><b>EEVblog</b> (Dave Jones): his oscilloscope tutorial and probe videos, and his videos on capacitor ESR and MLCC DC-bias derating.</li>
+  <li><b>Linear Technology Application Note 88</b>, "Ceramic Input Capacitors Can Cause Overvoltage Transients", for hot-plug ringing; <b>Espressif's ESP32 hardware design guidelines</b> for the EN-pin RC and decoupling recommendations.</li>
+</ul>
+</aside>
+</section>
+
+</main>
+<script src="../assets/vendor/katex/katex.min.js"></script>
+<script src="../assets/vendor/katex/auto-render.min.js"></script>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/ch03-ac.js"></script>
+</body>
+</html>

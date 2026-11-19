@@ -1,0 +1,715 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2 · DC Circuit Analysis — Sparks & Circuits</title>
+<meta name="description" content="Kirchhoff's laws, series and parallel, voltage dividers and loading, Thevenin and Norton, input and output impedance, superposition, nodal analysis, power ratings, E-series, bridges and measuring.">
+<link rel="stylesheet" href="../assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="../assets/css/book.css">
+<style>
+  .ch2-table td.num, .ch2-table th.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  .ch2-mat { overflow-x: auto; padding: 6px 0; text-align: center; }
+  .ch2-es { display: grid; gap: 8px; }
+  .ch2-es input[type=text] { font: inherit; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 110px; }
+  .ch2-es .row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: .92rem; }
+  .ch2-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ch2-chips span { font: .85rem var(--mono); background: var(--surface2); border-radius: 6px; padding: 2px 7px; }
+  .ch2-chips span.best { background: var(--good-bg); color: var(--good); font-weight: 700; }
+  .ch2-note { font-size: .88rem; color: var(--muted); margin: 6px 0 0; }
+  .ch2-hidden { display: none; }
+  /* local fixes: keep KaTeX's hidden MathML inside scrolling tables/displays; let wide controls wrap on phones */
+  main table, .katex-display, .ch2-mat { position: relative; }
+  .w-seg { flex-wrap: wrap; max-width: 100%; }
+  .w-select { max-width: 100%; min-width: 0; }
+  .w-select select { max-width: 100%; min-width: 0; text-overflow: ellipsis; }
+</style>
+</head>
+<body data-book="adult" data-chapter="ch02-dc">
+<main class="chapter">
+
+<header class="chapter-head">
+  <p class="kicker">Chapter 2</p>
+  <h1>DC Circuit Analysis</h1>
+  <p class="lede">Ohm's law tells you about one resistor. Real boards have dozens of parts wired into a web of nodes and loops. This chapter gives you the handful of tools that let you predict every voltage and current in such a web, and the one concept, impedance at an interface, that decides whether two pieces of a circuit will cooperate when you connect them.</p>
+</header>
+
+<section>
+<h2 id="topology">Circuits are graphs: nodes, branches and loops</h2>
+
+<p>As a developer you already think in graphs: dependency graphs, call graphs, network topologies. A circuit is also a graph, and naming its parts precisely is the first step to analysing it. A circuit diagram has three kinds of structure.</p>
+
+<ul>
+  <li>A <b>node</b> is a set of points that are joined by ideal wire. Every point on one node has the same voltage, because an ideal wire has zero resistance and so no voltage drop along it. A node is <em>not</em> a dot on the drawing. A long wire with three bends and two solder dots is still one node.</li>
+  <li>A <b>branch</b> is a single two-terminal element (a resistor, a source, a diode) that connects two nodes. Each branch carries one current.</li>
+  <li>A <b>loop</b> is any closed path through branches that comes back to where it started without visiting a node twice. A <b>mesh</b> is a loop with no other loop inside it, like a window pane.</li>
+</ul>
+
+<p>The schematic in Figure 2.1 is drawn the way you will usually see circuits drawn: lots of wire, lots of corners. Click through the nodes and notice how much wire belongs to each one.</p>
+
+<figure class="widget">
+  <div id="f-nodes"></div>
+  <figcaption><b>Figure 2.1</b> Pick a node to highlight every piece of wire that belongs to it, along with its voltage. The bottom wire, all of it, is one node: ground. Then pick a mesh to see the two independent loops. Count: how many nodes, how many branches?</figcaption>
+</figure>
+
+<p>Counting matters because it tells you how many equations you need. If a circuit has \(n\) nodes and \(b\) branches, then:</p>
+<ul>
+  <li>You can write \(n-1\) independent current equations (one per node, minus one, because the last one is implied by the others).</li>
+  <li>You can write \(b-n+1\) independent loop equations. For a circuit that can be drawn flat on paper without crossings, that is exactly the number of meshes.</li>
+</ul>
+<p>Figure 2.1 has \(n=4\) nodes (A, B, C and ground) and \(b=5\) branches (the source and four resistors). That gives \(3\) node equations and \(5-4+1=2\) loop equations, which is enough to find all five branch currents. Together they always give exactly as many independent equations as unknowns. This is not luck. It is a theorem of graph theory (the number of independent cycles of a connected graph is \(b-n+1\)), and it is why circuit simulators can solve any linear circuit you throw at them.</p>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: the netlist</span>
+<p>SPICE and KiCad do not store pictures; they store a <b>netlist</b>, a list of parts and which named nets (nodes) each pin connects to. That is an adjacency list. The schematic drawing is just a rendering of it. When you get confused by a messy schematic, rewrite it as a netlist: <code>R1: A–B, R2: B–GND, ...</code>. The drawing can lie about topology (two wires that cross without a dot are <em>not</em> connected); the netlist cannot.</p>
+</aside>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: "ground" is where current goes to disappear</span>
+<p>Ground is just the node we have agreed to call 0 V, the reference for all other voltages. It is not a sink. Every electron that flows "into ground" flows back out of it to the negative terminal of the source. Current always travels in a complete loop; ground is part of the loop, not the end of it. On a PCB, forgetting this is how you get noisy sensors (Chapter 9 makes a big deal of return currents).</p>
+</aside>
+
+<div class="ex" data-id="loops-count" data-kind="num" data-answer="3" data-tol="0" data-unit="">
+  <div class="q">A circuit has 6 branches and 4 nodes. How many independent loop (KVL) equations does it have?</div>
+  <div class="hint">Use \(b - n + 1\).</div>
+  <div class="explain">\(6 - 4 + 1 = 3\). Together with the \(n - 1 = 3\) node equations, that's 6 equations for the 6 unknown branch currents.</div>
+</div>
+</section>
+
+<section>
+<h2 id="kirchhoff">Kirchhoff's two laws</h2>
+
+<p>Two laws do almost all the work in circuit analysis. Gustav Kirchhoff wrote them down in 1845, but they are really two conservation laws from physics wearing circuit clothes.</p>
+
+<h3>KCL: what flows in flows out</h3>
+<p><b>Kirchhoff's current law</b>: the sum of currents entering any node is zero (counting currents leaving as negative):</p>
+<div class="formula">
+$$\sum_{k} I_k = 0 \quad\text{at every node}$$
+<p>Equivalently: total current in = total current out.</p>
+</div>
+<p>Why is it true? Charge is conserved, and a node, being just a piece of metal, can't store any meaningful amount of it. If more charge flowed into a node than out, charge would pile up there, and the node's voltage would shoot up (by \(V = Q/C\) with the node's tiny self-capacitance of a picofarad or so) until the excess current stopped. In a steady DC circuit, that settling has long since happened. So the currents balance. (In <a href="ch01-physics.html">Chapter 1</a> you met the field picture behind this: a little extra surface charge appears exactly where it's needed to steer the current around corners and balance the flows.)</p>
+
+<p>KCL is also a statement about <em>surfaces</em>: draw any closed bubble around part of a circuit, and the net current through the bubble is zero. That's handy. Draw a bubble around an entire Arduino board: whatever current goes in through the 5 V pin must come out through the GND pins, including the current that left through a GPIO pin to light an LED and came back via ground.</p>
+
+<h3>KVL: what goes up comes down</h3>
+<p><b>Kirchhoff's voltage law</b>: the sum of voltage differences around any closed loop is zero:</p>
+<div class="formula">
+$$\sum_{\text{loop}} V_k = 0$$
+<p>Rises through sources are balanced by drops across the loads.</p>
+</div>
+<p>Why? A voltage is a difference in electric potential, which is energy per unit charge (Chapter 1). If you carry a test charge around a loop and come back to the starting point, you're back at the same potential, so the energy gained and lost along the way must cancel. It's like walking around a hilly park and returning to your car: whatever you climbed, you also descended. Each node has a single well-defined "height". Walking around a loop is just adding up height differences, so it must sum to zero.</p>
+
+<aside class="callout physics"><span class="ct">⚛️ When KVL fails</span>
+<p>KVL relies on the electric field being <em>conservative</em>, so that potential is single-valued. That's exactly true when no changing magnetic flux threads the loop. If it does, Faraday's law adds an induced EMF around the loop and "voltage between two points" starts to depend on the path you take with your probe leads. At DC this never happens. At high frequencies and with fast edges it does, and we hide it inside the circuit models by drawing it as an inductor (Chapter 3). The textbook way to state it: KVL and KCL hold in the <b>lumped-element</b> approximation, where every part is much smaller than the wavelength of the signals involved. MIT 6.002 builds the whole course on this "lumped matter discipline".</p>
+</aside>
+
+<h3>Signs without tears</h3>
+<p>Most errors in hand analysis are sign errors. A disciplined recipe avoids them:</p>
+<ol>
+  <li><b>Guess</b> a direction for every unknown branch current and draw an arrow. You can guess wrong. If you do, the answer simply comes out negative.</li>
+  <li>For resistors, use the <b>passive sign convention</b>: current enters the terminal you mark +. Then \(V = IR\) with the sign you'd expect, and the power \(P = VI\) is positive (absorbed).</li>
+  <li>For KCL, pick "into the node = +" and stick to it.</li>
+  <li>For KVL, walk the loop in one direction. Going from − to + across something counts as a <em>rise</em> (+), going from + to − counts as a <em>drop</em> (−).</li>
+</ol>
+
+<h3>Worked example: two sources, one shared resistor</h3>
+<p>Here is the classic two-source circuit. A 9 V source feeds node X through \(R_1 = 1\,\text{k}\Omega\). A 5 V source feeds it through \(R_3 = 1\,\text{k}\Omega\). And \(R_2 = 2\,\text{k}\Omega\) goes from X to ground. Think "a 9 V wall adapter and a 5 V battery both connected to the same load through some wiring resistance". What is the voltage at X, and which way do the currents flow?</p>
+
+<p>Call the node voltage \(V_X\). Define the three currents as flowing <em>into</em> X through \(R_1\) and \(R_3\) (call them \(I_1\) and \(I_3\)), and <em>out of</em> X down through \(R_2\) (\(I_2\)). Ohm's law gives each in terms of \(V_X\):</p>
+$$I_1 = \frac{9 - V_X}{1\,\text{k}}, \qquad I_3 = \frac{5 - V_X}{1\,\text{k}}, \qquad I_2 = \frac{V_X}{2\,\text{k}}$$
+<p>KCL at X says \(I_1 + I_3 = I_2\):</p>
+$$\frac{9 - V_X}{1\,\text{k}} + \frac{5 - V_X}{1\,\text{k}} = \frac{V_X}{2\,\text{k}}$$
+<p>Multiply through by \(2\,\text{k}\Omega\): \(18 - 2V_X + 10 - 2V_X = V_X\), so \(5V_X = 28\) and \(V_X = 5.6\,\text{V}\). Then \(I_1 = 3.4\) mA, \(I_2 = 2.8\) mA and \(I_3 = (5 - 5.6)/1\text{k} = -0.6\) mA.</p>
+<p>The negative sign is the interesting part. Current flows <em>out</em> of X into the 5 V source, entering its + terminal. The 5 V source is <em>absorbing</em> power, \(5 \times 0.6\,\text{mA} = 3\,\text{mW}\). If it were a rechargeable battery, it would be charging; if it were a non-rechargeable cell or a regulator that can't sink current, you'd have a problem. This exact situation is why you can't just wire a USB 5 V supply and a battery pack to the same rail without a diode or a power-path chip (Chapter 5).</p>
+<p>Now check KVL around the left loop (9 V source, \(R_1\), \(R_2\)), walking clockwise: \(+9 - (1\,\text{k})(3.4\,\text{mA}) - (2\,\text{k})(2.8\,\text{mA}) = 9 - 3.4 - 5.6 = 0\). ✓</p>
+
+<figure class="widget">
+  <div id="f-kcl"></div>
+  <figcaption><b>Figure 2.2</b> The two-source circuit, solved live. Dots show conventional current; they reverse when a current changes sign. The readouts check KCL at node X and KVL around both loops. Raise \(V_2\) slowly until the dots in \(R_3\) stop, then keep going and watch \(V_2\) switch from <em>absorbing</em> power to <em>supplying</em> it.</figcaption>
+</figure>
+
+<div class="ex" data-id="kvl-task" data-kind="task">
+  <div class="q">In Figure 2.2, keep \(V_1 = 9\) V and adjust \(V_2\) (and \(R_2\) if you like) until <b>no current flows through \(R_3\)</b> (less than 0.05 mA either way).</div>
+  <div class="explain">With \(I_3 = 0\), \(R_3\) drops no voltage, so \(V_X = V_2\). The rest of the circuit is then just a voltage divider of \(V_1\) through \(R_1\) and \(R_2\): \(V_2 = V_1 R_2/(R_1+R_2)\). With the default \(R_2 = 2\) kΩ that's \(9 \times 2/3 = 6\) V. This "null" trick is how bridges and potentiometric measurements work: when no current flows, the measuring branch disturbs nothing.</div>
+</div>
+<div class="ex" data-id="kvl-myth" data-kind="mc">
+  <div class="q">An LED and a resistor are in series across 5 V. A student says: "The resistor uses up some of the current, so less current reaches the LED." What's wrong?</div>
+  <ol class="opts">
+    <li>Nothing; resistors convert current into heat</li>
+    <li data-correct>Current isn't used up: by KCL the same current flows through every element of a series loop. What the resistor "uses up" is <em>voltage</em> (energy per charge)</li>
+    <li>It depends on whether the resistor comes before or after the LED</li>
+    <li>The resistor only reduces current if it is on the + side</li>
+  </ol>
+  <div class="explain">Charges are not consumed; energy is. Each coulomb gives up some energy in the resistor (a voltage drop) and the rest in the LED, then returns to the source. Since there is only one path, the current is identical everywhere, so the order of series parts doesn't matter for the current.</div>
+</div>
+</section>
+
+<section>
+<h2 id="series-parallel">Series, parallel and the current divider</h2>
+
+<h3>Series: resistances add</h3>
+<p>Two elements are in <b>series</b> if they share a node that nothing else connects to. Then, by KCL, the same current \(I\) flows through both. By KVL their voltages add: \(V = IR_1 + IR_2 = I(R_1 + R_2)\). So from the outside the pair behaves like one resistor:</p>
+<div class="formula">
+$$R_{\text{series}} = R_1 + R_2 + \dots + R_n$$
+<p>Series resistances add. The total is always <em>larger</em> than the largest.</p>
+</div>
+
+<h3>Parallel: conductances add</h3>
+<p>Two elements are in <b>parallel</b> if they connect between the same pair of nodes. Then, by KVL, they have the same voltage \(V\) across them. By KCL their currents add: \(I = V/R_1 + V/R_2\). The cleanest way to write this uses <b>conductance</b> \(G = 1/R\) (unit: siemens, S), which measures how easily current flows:</p>
+<div class="formula">
+$$G_{\text{par}} = G_1 + G_2 + \dots \qquad\Longleftrightarrow\qquad \frac{1}{R_{\text{par}}} = \frac{1}{R_1} + \frac{1}{R_2} + \dots$$
+<p>Parallel conductances add. Each path you add gives the current another way through.</p>
+</div>
+<p>For exactly two resistors, combine the fractions and you get the formula everyone memorises, "product over sum":</p>
+$$R_1 \parallel R_2 = \frac{1}{\frac{1}{R_1} + \frac{1}{R_2}} = \frac{R_1 R_2}{R_1 + R_2}$$
+<p>(The \(\parallel\) symbol is shorthand for "in parallel with".) Useful special cases:</p>
+<ul>
+  <li>Two equal resistors: \(R \parallel R = R/2\). And \(n\) equal resistors in parallel give \(R/n\).</li>
+  <li>Very different resistors: if \(R_2 \gg R_1\), then \(R_1 \parallel R_2 \approx R_1\). A 1 kΩ in parallel with 1 MΩ is 999 Ω. The big one barely matters.</li>
+</ul>
+
+<aside class="callout tip"><span class="ct">💡 The intuition: parallel is always smaller than the smallest</span>
+<p>Adding a parallel path can only make it <em>easier</em> for current to flow, never harder. So \(R_1 \parallel R_2\) is always less than both \(R_1\) and \(R_2\). Use this as a sanity check: if your parallel calculation gives something bigger than the smallest resistor, you've made an error. Mathematically: \(\frac{R_1 R_2}{R_1 + R_2} = R_1 \cdot \frac{R_2}{R_1+R_2}\), and the fraction is always less than 1.</p>
+</aside>
+
+<figure class="widget">
+  <div id="f-par"></div>
+  <figcaption><b>Figure 2.3</b> \(R_1 \parallel R_2\) as \(R_2\) sweeps from 10 Ω to 100 kΩ (log–log axes). Move \(R_1\). The parallel combination (blue) always hugs the <em>smaller</em> of the two (dashed). When the two are equal, the result is exactly half. Hover to read values.</figcaption>
+</figure>
+
+<h3>Reducing a ladder</h3>
+<p>Many networks can be simplified by repeatedly spotting series and parallel pairs and collapsing them, working from the end farthest from the source. Take a 12 V source driving \(R_1 = 1\,\text{k}\Omega\) in series with a combination of \(R_2 = 3\,\text{k}\Omega\) in parallel with (\(R_3 = 1\,\text{k}\Omega\) in series with \(R_4 = 2\,\text{k}\Omega\)).</p>
+<ol>
+  <li>\(R_3 + R_4 = 3\,\text{k}\Omega\) (series).</li>
+  <li>\(3\,\text{k} \parallel 3\,\text{k} = 1.5\,\text{k}\Omega\) (parallel, equal values).</li>
+  <li>\(R_1 + 1.5\,\text{k} = 2.5\,\text{k}\Omega\) total, so the source supplies \(12/2.5\text{k} = 4.8\) mA.</li>
+  <li>Unwind: the parallel block has \(4.8\,\text{mA} \times 1.5\,\text{k} = 7.2\) V across it. Each 3 kΩ path gets \(7.2/3\text{k} = 2.4\) mA. So \(R_4\) has \(2.4\,\text{mA} \times 2\,\text{k} = 4.8\) V across it.</li>
+</ol>
+<p>Not every circuit reduces like this (bridges don't, as we'll see). For those, nodal analysis always works.</p>
+<h3>The current divider</h3>
+<p>When a current \(I\) arrives at two parallel resistors, how does it split? Both resistors see the same voltage \(V = I\,(R_1 \parallel R_2)\), so</p>
+$$I_1 = \frac{V}{R_1} = I\,\frac{R_2}{R_1 + R_2}, \qquad I_2 = I\,\frac{R_1}{R_1 + R_2}$$
+<div class="formula">
+$$I_k = I\,\frac{G_k}{G_1 + G_2 + \dots}$$
+<p>Current divides in proportion to conductance: the <em>smaller</em> resistor takes the <em>larger</em> share.</p>
+</div>
+<p>Note the "crossed" form for two resistors: \(I_1\) has \(R_2\) on top. It's the opposite of the voltage divider (next section), which is a common source of slips. The conductance form has no such trap: each branch takes its fraction of the total conductance.</p>
+<p>A practical consequence: never put LEDs directly in parallel with a single shared resistor. Two "identical" LEDs have slightly different forward voltages, and because a diode's current rises exponentially with voltage, the one with the lower \(V_F\) takes most of the current. It runs hot, its \(V_F\) drops further as it heats, and it hogs even more. Give each LED its own resistor, so each branch gets its own current-setting element.</p>
+
+<div class="ex" data-id="cdiv-num" data-kind="num" data-answer="0.010" data-tol="1%" data-unit="A">
+  <div class="q">A 30 mA current splits between a 100 Ω and a 200 Ω resistor in parallel. How much flows through the <b>200 Ω</b>?</div>
+  <div class="hint">\(I_{200} = I \cdot \frac{R_{\text{other}}}{R_1 + R_2}\), or think in conductances: 10 mS vs 5 mS.</div>
+  <div class="explain">\(30\,\text{mA} \times 100/300 = 10\) mA. The 100 Ω gets the other 20 mA. Check: both see \(V = 30\,\text{mA} \times 66.7\,\Omega = 2\) V, and \(2/200 = 10\) mA. ✓</div>
+</div>
+
+<div class="ex" data-id="par-multi" data-kind="multi">
+  <div class="q">You have a 470 Ω resistor between two nodes. Which of these will <em>lower</em> the resistance between those nodes? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>Adding a 1 MΩ resistor in parallel</li>
+    <li>Adding a 10 Ω resistor in series</li>
+    <li data-correct>Adding a 470 Ω resistor in parallel</li>
+    <li>Replacing it with two 470 Ω in series</li>
+    <li data-correct>Adding a wire (0 Ω) in parallel</li>
+  </ol>
+  <div class="explain">Any parallel path lowers the total, even a huge resistor (470 Ω ∥ 1 MΩ ≈ 469.8 Ω). A wire in parallel shorts it to 0 Ω. Anything in series raises it.</div>
+</div>
+</section>
+
+<section>
+<h2 id="divider">The voltage divider, and why it is not a power supply</h2>
+
+<p>Two resistors in series across a voltage make the single most common sub-circuit in electronics. You will see it reading battery voltages, setting regulator outputs, biasing transistors, scaling sensor signals and turning a potentiometer's position into a number.</p>
+
+<h3>Deriving the divider</h3>
+<p>Put \(R_1\) on top (from \(V_{in}\) to the output node) and \(R_2\) on the bottom (from the output to ground). With nothing else attached to the output, the same current flows through both: \(I = V_{in}/(R_1 + R_2)\). The output voltage is the drop across \(R_2\):</p>
+<div class="formula">
+$$V_{out} = I R_2 = V_{in}\,\frac{R_2}{R_1 + R_2}$$
+<p>The unloaded voltage divider: the output is the fraction of the total resistance that sits between the output and ground.</p>
+</div>
+<p>The ratio is what matters, not the absolute values: 1 kΩ/1 kΩ, 10 kΩ/10 kΩ and 1 MΩ/1 MΩ all give exactly half. So why ever choose one over another? Because of two competing costs:</p>
+<ul>
+  <li><b>Small resistors</b> waste current. A 1 kΩ + 1 kΩ divider across 5 V burns 2.5 mA, all the time, doing nothing useful.</li>
+  <li><b>Large resistors</b> make a "weak" output that sags as soon as anything draws current from it. That's <b>loading</b>.</li>
+</ul>
+
+<h3>Loading: the divider meets the real world</h3>
+<p>The formula above assumed nothing is connected to \(V_{out}\). Now attach a load \(R_L\) (the input of whatever you're feeding). \(R_L\) is in parallel with \(R_2\), so the bottom of the divider becomes \(R_2 \parallel R_L\), which is smaller than \(R_2\):</p>
+$$V_{out} = V_{in}\,\frac{R_2 \parallel R_L}{R_1 + R_2 \parallel R_L}$$
+<p>If \(R_L \gg R_2\), then \(R_2 \parallel R_L \approx R_2\) and nothing much changes. If \(R_L\) is comparable to or smaller than \(R_2\), the output collapses. Try it.</p>
+
+<figure class="widget wide">
+  <div id="f-load"></div>
+  <figcaption><b>Figure 2.4</b> A 9 V divider feeding a load. Close the switch to connect \(R_L\), then sweep it. The plot shows \(V_{out}\) versus \(R_L\) for your \(R_1, R_2\); the dashed line is the unloaded value, and the shaded band is "within 10 % of unloaded". Notice that the knee of the curve sits near \(R_1 \parallel R_2\), not near \(R_2\).</figcaption>
+</figure>
+
+<p>A neat way to see where the knee is: from the load's point of view, the divider looks like an ideal source of \(V_{in} R_2/(R_1+R_2)\) in series with a resistance \(R_1 \parallel R_2\). (That's the Thevenin equivalent, coming in the next section.) The load and that internal resistance form <em>another</em> divider. The output stays within about 10 % of its unloaded value as long as</p>
+<div class="formula">
+$$R_L \gtrsim 10\,(R_1 \parallel R_2)$$
+<p>The "10× rule" for loading. For 1 % accuracy, you need about 100×.</p>
+</div>
+
+<aside class="callout warn"><span class="ct">⚠️ A divider is not a power supply</span>
+<p>The classic beginner move: "I have 12 V and need 5 V for my Arduino, so I'll use a divider." The Arduino draws 50–200 mA, and the current changes as code runs. Its effective resistance is tens of ohms and constantly changing. For the divider to hold 5 V you'd need divider resistors of a few ohms, wasting amps and watts, and the output would still wobble with the load. Dividers are for <b>signals</b> (feeding high-impedance inputs that draw almost nothing). To make a <b>supply</b>, use a regulator: a circuit that actively adjusts itself to hold the voltage regardless of load (Chapter 5).</p>
+</aside>
+
+<div class="ex" data-id="div-num" data-kind="num" data-answer="3.837" data-tol="1%" data-unit="V">
+  <div class="q">A 12 V source feeds a divider with \(R_1 = 10\) kΩ on top and \(R_2 = 4.7\) kΩ on the bottom. What is the unloaded output?</div>
+  <div class="hint">\(V_{out} = 12 \times \frac{4.7}{10 + 4.7}\).</div>
+  <div class="explain">\(12 \times 4.7/14.7 = 3.84\) V. Its output resistance is \(10\text{k} \parallel 4.7\text{k} = 3.2\) kΩ, so by the 10× rule it can drive loads of about 32 kΩ or more before sagging more than ~10 %.</div>
+</div>
+
+<div class="ex" data-id="load-task" data-kind="task">
+  <div class="q">In Figure 2.4, connect the load and set \(R_L \approx 1\) kΩ (between 950 Ω and 1.05 kΩ). Then choose \(R_1\) and \(R_2\) so that \(V_{out}\) is between <b>4.0 and 5.0 V</b>. Look at how much current the divider wastes.</div>
+  <div class="explain">You need the divider's own resistance to be small compared to 1 kΩ. With both resistors equal, that means about 250 Ω or less, which draws around 18 mA from 9 V just to make a 4.5 V "rail" for a 4.5 mA load. Real designs use a regulator, or a buffer (an op-amp follower, Chapter 4) between a high-impedance divider and the load.</div>
+</div>
+
+<h3>Design study: a battery monitor for an ADC</h3>
+<p>Every battery-powered robot should know its battery voltage, so it can shut down gracefully before the LiPo is over-discharged. The microcontroller's ADC can only measure up to its reference voltage (5 V on an Uno, roughly 3.1 V on an ESP32-S3 with its widest attenuation setting), but a 2S LiPo reaches 8.4 V fully charged. A divider scales it down. Four things have to be right:</p>
+<ol>
+  <li><b>Range.</b> At the <em>maximum</em> battery voltage, the ADC pin must stay below full scale, with some margin. For 8.4 V into a 3.1 V full scale, the ratio must be below 0.37. A ratio of 1/3 (e.g. \(R_1 = 200\) kΩ, \(R_2 = 100\) kΩ) gives 2.8 V, leaving headroom for a charger's overshoot.</li>
+  <li><b>Drain.</b> The divider is connected across the battery 24/7, including when the robot is "off" if it sits before the power switch. Current \(= 8.4\,\text{V}/300\,\text{k}\Omega = 28\,\mu\text{A}\). Over a month (720 h) that's \(28\,\mu\text{A} \times 720\,\text{h} \approx 20\,\text{mAh}\), negligible for a 2200 mAh pack. A 10 k + 5 k divider would draw 560 µA, or 400 mAh a month, which is enough to kill a small pack sitting on a shelf over a summer.</li>
+  <li><b>Source impedance.</b> An ADC is not a pure infinite resistance. Inside, a switch connects the pin to a small <em>sampling capacitor</em> (a few pF) for a short time, and that capacitor must charge to the pin voltage before the conversion. It charges through the divider's output resistance, \(R_1 \parallel R_2 = 66.7\) kΩ here. The ATmega328P datasheet asks for a source impedance of 10 kΩ or less; ESP32 documentation is vaguer, but the same physics applies. Too high, and readings come out low and depend on what channel was read previously.</li>
+  <li><b>Leakage.</b> Input pins also leak a little current (the ATmega328P specifies up to ±1 µA). Through 66.7 kΩ that's up to ±67 mV of error, about 2 %.</li>
+</ol>
+<p>The standard fix for points 3 and 4 is a capacitor of about 100 nF from the ADC pin to ground. The sampling capacitor then charges from the 100 nF reservoir instead of through the resistor. Charge sharing between a few pF and 100 nF changes the voltage by roughly one part in ten thousand, and the reservoir refills through the divider with a time constant of \(66.7\,\text{k}\Omega \times 100\,\text{nF} \approx 7\) ms. That's plenty fast for a battery that changes over minutes. (You'll understand time constants properly in Chapter 3.)</p>
+
+<figure class="widget wide">
+  <div id="f-batt"></div>
+  <figcaption><b>Figure 2.5</b> Battery-monitor designer. Pick a battery and a microcontroller, then choose \(R_1\) and \(R_2\). The readouts show the ADC voltage at full charge, the drain on the battery, the source impedance the ADC sees, and the battery-voltage resolution per ADC count. Readouts turn red when a requirement is violated.</figcaption>
+</figure>
+
+<div class="ex" data-id="batt-task" data-kind="task">
+  <div class="q">In Figure 2.5, design a monitor for a <b>2S LiPo</b> on the <b>ESP32-S3</b>: full-charge ADC voltage between 2.5 V and 3.1 V, divider current below 30 µA, and a source impedance the ADC can handle (≤ 10 kΩ, or use the capacitor).</div>
+  <div class="explain">For example \(R_1 = 220\) kΩ and \(R_2 = 100\) kΩ: \(8.4 \times 100/320 = 2.63\) V, \(8.4/320\,\text{k} = 26\,\mu\)A, and a 69 kΩ source impedance, which is fine with the 100 nF capacitor. Low drain and low source impedance pull in opposite directions; the capacitor lets you have both, as long as you only need slow readings.</div>
+</div>
+
+<div class="ex" data-id="drain-num" data-kind="num" data-answer="0.01407" data-tol="3%" data-unit="Ah" data-placeholder="e.g. 3.5m">
+  <div class="q">A divider of 330 kΩ (top) and 100 kΩ (bottom) is permanently across a full 2S LiPo (8.4 V). How much charge does it drain from the battery in 30 days? Give the answer in amp-hours (type <code>m</code> for milli).</div>
+  <div class="hint">\(I = 8.4/430\,\text{k}\). Then multiply by \(30 \times 24 = 720\) hours.</div>
+  <div class="explain">\(I = 19.5\,\mu\text{A}\); \(19.5\,\mu\text{A} \times 720\,\text{h} = 14\) mAh. (It's actually a bit less, since the battery voltage drops as it discharges.) For an even lower drain, switch the divider with a MOSFET (Chapter 4) so it only draws current while you're measuring.</div>
+</div>
+
+<h3>Potentiometers: a divider with a knob</h3>
+<p>A <b>potentiometer</b> ("pot") is a resistive track with a sliding contact, the <b>wiper</b>. Connect the two ends across \(V_{in}\) and ground, and the wiper is the output of a divider whose ratio you set by turning the knob. If the wiper is a fraction \(x\) of the way up the track (from 0 to 1), the bottom resistance is \(xR_{pot}\), the top is \((1-x)R_{pot}\), and unloaded \(V_{out} = xV_{in}\): perfectly linear in position.</p>
+<p>Hooked to an ADC, that's a joystick axis, a servo tester knob or a robot-arm position sensor (hobby servos contain exactly this: a pot on the output shaft). Loading applies here too, with a twist. The pot's output resistance changes with position: it's \(xR_{pot} \parallel (1-x)R_{pot}\), zero at the ends and largest (\(R_{pot}/4\)) in the middle. So a load bends the straight line into a sag that is worst near the middle.</p>
+
+<figure class="widget">
+  <div id="f-pot"></div>
+  <figcaption><b>Figure 2.6</b> A 10 kΩ pot driving a load \(R_L\). Drag the wiper position and the load. The dashed line is the ideal \(V_{out} = xV_{in}\); the solid curve is the loaded response. With \(R_L = 10\,R_{pot}\), the worst-case error is under 1.5 % of full scale; with \(R_L = R_{pot}\), mid-travel is off by 10 % of full scale and the worst point (around two-thirds of the travel) by 12 %.</figcaption>
+</figure>
+
+<aside class="callout tip"><span class="ct">💡 Pot practicalities</span>
+<ul>
+  <li>For an ADC input, 10 kΩ linear ("B" taper in most Asian catalogues, "A" in some others) is the standard choice: low enough source impedance for the ADC, and only 0.5 mA at 5 V.</li>
+  <li><b>Log/audio taper</b> pots change resistance exponentially with rotation, to match the ear's response to volume. Don't use one for a position sensor.</li>
+  <li>Using a pot as a variable resistor (a <b>rheostat</b>, only wiper and one end connected) is fine for small currents. But near the end of the track, all the current goes through a tiny sliver of resistive material. Small trim pots are often rated at 0.1–0.5 W for the <em>whole track</em>, and much less for a sliver. Don't set motor speed this way.</li>
+  <li>Wipers are mechanical contacts: they're noisy, especially as they wear. Average several ADC samples, and expect the last few percent at each end to be "dead".</li>
+</ul>
+</aside>
+
+<div class="ex" data-id="pot-mc" data-kind="mc">
+  <div class="q">A 100 kΩ pot feeds a 10 kΩ load. Where along the travel is the loaded output most wrong?</div>
+  <ol class="opts grid2">
+    <li>At the bottom end (\(x = 0\))</li>
+    <li>At the top end (\(x = 1\))</li>
+    <li data-correct>Somewhere in the upper middle</li>
+    <li>The error is the same everywhere</li>
+  </ol>
+  <div class="hint">At the ends, the wiper is connected directly to a source or to ground through zero resistance. Where is the pot's output resistance largest?</div>
+  <div class="explain">At both ends the output resistance is zero, so loading does nothing. The pot's own output resistance peaks at mid-travel, and the error in volts peaks a little above the middle (where there is more voltage to lose). Drag Figure 2.6 to \(R_L = 0.1\,R_{pot}\) to see a dramatic sag.</div>
+</div>
+</section>
+
+<section>
+<h2 id="thevenin">Thevenin, Norton and maximum power</h2>
+
+<p>Here is one of the most useful ideas in all of circuit theory. Take <em>any</em> network of resistors and ideal sources, as complicated as you like, and pick two terminals to look into. As far as anything connected to those terminals can tell, the whole network behaves exactly like:</p>
+<ul>
+  <li>a single ideal voltage source \(V_{th}\) in series with a single resistor \(R_{th}\) (the <b>Thevenin equivalent</b>), or equally</li>
+  <li>a single ideal current source \(I_N\) in parallel with a single resistor \(R_N = R_{th}\) (the <b>Norton equivalent</b>).</li>
+</ul>
+
+<aside class="callout physics"><span class="ct">⚛️ Why must this be true?</span>
+<p>A network of resistors and sources is <b>linear</b>: every voltage and current is a sum of terms proportional to the sources. So if you connect a test current \(I\) out of the two terminals, the terminal voltage must be a straight-line function of \(I\): \(V = a - bI\). The intercept \(a\) is the voltage with no current drawn, \(V_{th}\). The slope \(b\) is a resistance, \(R_{th}\). A straight line has only two parameters, so <em>two numbers</em> describe the whole network's behaviour at that port. That's all the theorem says. (It stops being exact for non-linear parts like diodes, but it's still the right way to think about them over a small operating range.)</p>
+</aside>
+
+<h3>Finding \(V_{th}\) and \(R_{th}\)</h3>
+<p>The straight-line picture gives you three recipes. Use whichever two are easiest:</p>
+<ol>
+  <li><b>Open-circuit voltage:</b> with nothing connected, the terminal voltage is \(V_{th}\).</li>
+  <li><b>Short-circuit current:</b> short the terminals with a wire; the current is \(I_N = V_{th}/R_{th}\).</li>
+  <li><b>Kill the sources:</b> replace every ideal voltage source with a wire (it holds 0 V across itself) and every ideal current source with an open circuit (it passes 0 A), then calculate the resistance seen looking into the terminals. That's \(R_{th}\).</li>
+</ol>
+<p>In the lab, recipes 1 and 2 are measurable. Measure the open-circuit voltage with a high-impedance voltmeter. Then, rather than a dead short (which may be dangerous for a battery), connect a known load and see how far the voltage drops: \(R_{th} = R_L\,(V_{oc}/V_L - 1)\). That's exactly how you measure a battery's internal resistance. For example, a 2S pack reads 8.20 V open-circuit and 7.80 V with a 2.0 Ω power resistor across it. The load current is \(7.80/2.0 = 3.9\) A, and the missing 0.40 V is dropped inside the pack, so \(R_{th} = 0.40/3.9 \approx 0.10\,\Omega\). That's why the voltage of a robot battery dips every time the motors kick in.</p>
+
+<h3>Worked example</h3>
+<p>A 12 V source drives a divider of \(R_1 = 4\,\text{k}\Omega\) and \(R_2 = 12\,\text{k}\Omega\), and the output comes out through a series \(R_3 = 2\,\text{k}\Omega\) to terminals A–B.</p>
+<ul>
+  <li>\(V_{th}\): with A–B open, no current flows in \(R_3\), so A sits at the divider voltage: \(12 \times 12/(4+12) = 9\) V.</li>
+  <li>\(R_{th}\): short the 12 V source. Looking in from A–B, you see \(R_3\) in series with (\(R_1 \parallel R_2\)): \(2\,\text{k} + 3\,\text{k} = 5\) kΩ.</li>
+  <li>Norton: \(I_N = 9\,\text{V}/5\,\text{k}\Omega = 1.8\) mA, in parallel with 5 kΩ.</li>
+</ul>
+<p>Now the question "what voltage do I get across a 10 kΩ load?" takes one line: \(9 \times 10/(5+10) = 6\) V. No need to re-solve the original network for every load.</p>
+
+<figure class="widget wide">
+  <div id="f-thev"></div>
+  <figcaption><b>Figure 2.7</b> The worked example, live. Switch between the original network and its Thevenin and Norton equivalents; the load readings don't change, because to the load the three circuits are indistinguishable. Sweep \(R_L\) and watch the plot: load voltage rises towards \(V_{th}\), current falls from \(I_N\), and the power delivered peaks at one particular load.</figcaption>
+</figure>
+
+<h3>Maximum power transfer</h3>
+<p>Which load resistance extracts the most power from a source with internal resistance \(R_{th}\)? The load power is</p>
+$$P_L = I^2 R_L = \left(\frac{V_{th}}{R_{th} + R_L}\right)^2 R_L$$
+<p>At \(R_L = 0\) the current is large but the voltage is zero; at \(R_L = \infty\) the voltage is full but the current is zero. Both give zero power, so there's a peak in between. To find it, take the derivative with respect to \(R_L\) and set it to zero (the quotient rule; see <a href="appA-math.html">Appendix A</a> if derivatives are rusty):</p>
+$$\frac{dP_L}{dR_L} = V_{th}^2\,\frac{(R_{th}+R_L)^2 - 2R_L(R_{th}+R_L)}{(R_{th}+R_L)^4} = 0 \;\Rightarrow\; R_{th} + R_L = 2R_L$$
+<div class="formula">
+$$R_L = R_{th} \quad\Rightarrow\quad P_{max} = \frac{V_{th}^2}{4R_{th}}$$
+<p>Maximum power transfer: match the load to the source resistance.</p>
+</div>
+<p>For the worked example that's \(81/(4 \times 5000) = 4.05\) mW into a 5 kΩ load.</p>
+
+<aside class="callout myth"><span class="ct">⚠️ Misconception: you should always match impedances</span>
+<p>At the matched point, exactly as much power is burned inside the source as reaches the load: the efficiency is only 50 %. That's what you want when the source is weak and fixed (an antenna, a tiny sensor, a guitar pickup) and you just need as much signal as possible. It's also why RF systems standardise on 50 Ω and match everything to it, which avoids reflections too (Chapter 9). For <b>power delivery</b>, it's a disaster. You want the source resistance as <em>small</em> as possible compared to the load, so almost all the energy ends up in the load. A LiPo with 20 mΩ internal resistance driving a 2 Ω motor delivers 99 % of its energy to the motor. "Matched", it would deliver 50 % and cook itself.</p>
+</aside>
+
+<div class="ex" data-id="thev-task" data-kind="task">
+  <div class="q">In Figure 2.7, find the load resistance that extracts the maximum power (within 5 %).</div>
+  <div class="explain">\(R_L = R_{th} = 5\) kΩ, delivering \(V_{th}^2/4R_{th} = 4.05\) mW. At that point \(V_L = V_{th}/2 = 4.5\) V and \(I_L = I_N/2 = 0.9\) mA: the load gets half the voltage and half the short-circuit current.</div>
+</div>
+
+<div class="ex" data-id="thev-num" data-kind="num" data-answer="1000" data-tol="1%" data-unit="Ω">
+  <div class="q">A 10 V source feeds a divider of two 1 kΩ resistors, and the midpoint connects to the output terminal through a 500 Ω resistor. What is \(R_{th}\) looking into the output terminal (relative to ground)?</div>
+  <div class="hint">Replace the 10 V source with a wire. The two 1 kΩ resistors are now in parallel, and that combination is in series with the 500 Ω.</div>
+  <div class="explain">\(1\text{k} \parallel 1\text{k} = 500\,\Omega\), plus 500 Ω in series = 1 kΩ. With \(V_{th} = 5\) V, the Norton current is 5 mA.</div>
+</div>
+</section>
+
+<section>
+<h2 id="impedance">Output and input impedance: the key to connecting stages</h2>
+
+<p>If you take one idea from this chapter, take this one. Every real signal source (a sensor, a GPIO pin, a regulator, a battery, an op-amp) can be described at its output by its Thevenin equivalent. The \(R_{th}\) is called its <b>output impedance</b>, \(Z_{out}\). Every real input (an ADC pin, a meter, a motor driver's control pin, a speaker) can be described by the resistance it presents, its <b>input impedance</b>, \(Z_{in}\). (We say <em>impedance</em> rather than resistance because in Chapter 3 these will become frequency-dependent. At DC, impedance is just resistance.)</p>
+<p>Connect a source to an input and you've built a voltage divider, whether you meant to or not:</p>
+<div class="formula">
+$$V_{in} = V_{source}\,\frac{Z_{in}}{Z_{out} + Z_{in}}$$
+<p>The fraction of the signal that actually arrives. For a good voltage connection, \(Z_{in} \gg Z_{out}\).</p>
+</div>
+<p>This is why the 10× rule from the divider section is universal. Design every voltage interface so that the input impedance is at least 10 times (preferably 100 times or more) the output impedance driving it. Then each stage can be designed on its own, and connecting them changes things by only a few percent.</p>
+
+<aside class="callout dev"><span class="ct">👩‍💻 Developer's analogy: interfaces and contracts</span>
+<p>Output and input impedance are the electrical <b>API contract</b> between modules. "This sensor outputs 0–3 V <em>with 10 kΩ output impedance</em>" is like "this function returns a list <em>and may block for 2 s</em>": the second half of the sentence is the part that bites you in integration. A datasheet that gives you only the voltage is like documentation that gives you only the return type. High \(Z_{in}\) with low \(Z_{out}\) is a loosely coupled interface: the caller doesn't change the callee's behaviour. When \(Z_{in}\) is comparable to \(Z_{out}\), the modules are tightly coupled, and you can't reason about either one alone. A buffer amplifier (Chapter 4) is an adapter that turns a high-\(Z_{out}\) source into a low-\(Z_{out}\) one, like a caching proxy in front of a slow service.</p>
+<p>Where the analogy breaks: in software, a well-designed API isolates perfectly. In electronics, every connection is a little bit coupled, and you choose how much error you'll tolerate.</p>
+</aside>
+
+<p>Some typical numbers worth knowing:</p>
+<table class="ch2-table">
+  <tr><th>Source</th><th class="num">\(Z_{out}\)</th><th>Input</th><th class="num">\(Z_{in}\)</th></tr>
+  <tr><td>Lab power supply, regulator output</td><td class="num">mΩ</td><td>Digital CMOS input (DC)</td><td class="num">≫ 1 MΩ</td></tr>
+  <tr><td>LiPo cell (small/large)</td><td class="num">5–100 mΩ</td><td>Handheld DMM (V range)</td><td class="num">10 MΩ</td></tr>
+  <tr><td>Microcontroller GPIO driving high/low</td><td class="num">~20–50 Ω</td><td>Oscilloscope input</td><td class="num">1 MΩ</td></tr>
+  <tr><td>Op-amp output (Chapter 4)</td><td class="num">&lt; 1 Ω (with feedback)</td><td>Op-amp input</td><td class="num">MΩ to TΩ</td></tr>
+  <tr><td>Function generator</td><td class="num">50 Ω</td><td>AVR ADC (wants source)</td><td class="num">≤ 10 kΩ source</td></tr>
+  <tr><td>Internal pull-up resistor (ESP32/AVR)</td><td class="num">~30–50 kΩ</td><td>Headphones</td><td class="num">16–300 Ω</td></tr>
+</table>
+
+<figure class="widget wide">
+  <div id="f-iface"></div>
+  <figcaption><b>Figure 2.8</b> Any source driving any input is a divider between \(Z_{out}\) and \(Z_{in}\). Pick a real-world pairing from the menu, or set your own. The plot shows the fraction of the signal that arrives versus the ratio \(Z_{in}/Z_{out}\) (log axis); the green region is the "10× or better" zone. Note the internal pull-up: it's a fine logic "1" for a CMOS input and useless as a power source.</figcaption>
+</figure>
+
+<p>There's a mirror-image rule for <b>current</b> interfaces. If a source is meant to deliver a current (a Norton source, like a photodiode or a current-loop transmitter), you want the input to have <em>low</em> impedance, \(Z_{in} \ll Z_{out}\), so the current goes into the input rather than into the source's own internal parallel resistance. That's the current divider, again. Voltage interfaces want a high input impedance; current interfaces want a low one.</p>
+
+<div class="ex" data-id="iface-sort" data-kind="sort">
+  <div class="q">Sort each connection: will the input load the source noticeably (more than ~10 % error), or is it a clean voltage interface?</div>
+  <div class="bins">
+    <div data-bin="ok">✅ Clean (Zin ≫ Zout)</div>
+    <div data-bin="bad">❌ Loads the source</div>
+  </div>
+  <ul class="items">
+    <li data-bin="ok">Regulator output (0.05 Ω) → ESP32 board (≈ 33 Ω at 100 mA)</li>
+    <li data-bin="bad">Internal pull-up (40 kΩ) → LED + 1 kΩ resistor</li>
+    <li data-bin="ok">Divider with \(R_{th}\) = 5 kΩ → DMM (10 MΩ)</li>
+    <li data-bin="bad">Divider with \(R_{th}\) = 5 MΩ → DMM (10 MΩ)</li>
+    <li data-bin="ok">Function generator (50 Ω) → scope (1 MΩ)</li>
+    <li data-bin="bad">Function generator (50 Ω) → 50 Ω terminated cable</li>
+  </ul>
+  <div class="explain">The last one is deliberate: RF systems <em>match</em> 50 Ω to 50 Ω and accept half the voltage, because at high frequencies reflections matter more (and the generator's display assumes a 50 Ω load, which is why it reads "wrong" into a scope). The pull-up case is why you can't power anything from an input's pull-up resistor.</div>
+</div>
+</section>
+
+<section>
+<h2 id="superposition-nodal">Superposition and nodal analysis</h2>
+
+<h3>Superposition: one source at a time</h3>
+<p>Linearity has a second gift. In a circuit made of resistors and independent sources, the voltage at any node (or current in any branch) is the <b>sum of the contributions from each source acting alone</b>. To find one source's contribution, kill all the others (voltage sources become wires, current sources become open circuits) and solve the simpler circuit. Then add up.</p>
+<p>Let's redo the two-source example from Figure 2.2 this way.</p>
+<ul>
+  <li><b>9 V alone</b> (5 V source replaced by a wire): \(R_2\) and \(R_3\) are now in parallel, \(2\,\text{k} \parallel 1\,\text{k} = 667\,\Omega\). Node X is a divider: \(9 \times 667/(1000 + 667) = 3.6\) V.</li>
+  <li><b>5 V alone</b> (9 V source replaced by a wire): by symmetry, \(R_1 \parallel R_2 = 667\,\Omega\), and \(V_X = 5 \times 667/1667 = 2.0\) V.</li>
+  <li><b>Both:</b> \(3.6 + 2.0 = 5.6\) V, matching what KCL gave us. ✓</li>
+</ul>
+
+<figure class="widget">
+  <div id="f-super"></div>
+  <figcaption><b>Figure 2.9</b> Superposition, live. Choose which sources are active; a "killed" voltage source is drawn as a plain wire. The table adds up the contributions of each source and compares them with the full solution. Change \(V_1\) or \(V_2\): each column scales on its own, because each contribution is proportional to its own source.</figcaption>
+</figure>
+
+<p>Superposition is more than a hand-calculation trick. It's how engineers <em>think</em> about signals riding on bias voltages. A sensor output might be "1.65 V DC bias plus a 10 mV signal plus 50 mV of noise from the motor". In a linear circuit you can analyse each piece separately: the DC operating point, the signal gain and the noise path. Chapter 3 uses this to treat a complicated waveform as a sum of sine waves.</p>
+
+<aside class="callout myth"><span class="ct">⚠️ Superposition doesn't apply to power</span>
+<p>Voltages and currents superpose; power does not, because power is quadratic (\(P = I^2R\)). With \(I = I_a + I_b\), the power is \(R(I_a + I_b)^2 = RI_a^2 + RI_b^2 + 2RI_aI_b\), and the cross term doesn't disappear. Find the total current first, then square it. Superposition also fails for non-linear parts such as diodes and transistors, except approximately for small signals around an operating point.</p>
+</aside>
+
+<div class="ex" data-id="super-order" data-kind="order">
+  <div class="q">Put the steps of a superposition analysis in order.</div>
+  <ol class="items">
+    <li>Pick one independent source to keep active</li>
+    <li>Replace other voltage sources with shorts and current sources with opens</li>
+    <li>Solve the simplified circuit for the quantity you want</li>
+    <li>Repeat for each source in turn</li>
+    <li>Add the contributions (with signs) to get the total</li>
+  </ol>
+  <div class="explain">Each step is mechanical, which is the point: superposition turns one hard problem into several easy ones. It only works for linear elements, and for voltages and currents, not power.</div>
+</div>
+
+<h3>Nodal analysis: the method that always works</h3>
+<p>Series/parallel reduction runs out of steam on anything with a bridge or several sources. <b>Nodal analysis</b> is the systematic method. It is what circuit simulators do, and it never fails for linear circuits:</p>
+<ol>
+  <li>Choose a ground (reference) node. Label every other node's voltage: \(v_1, v_2, \dots\). These are the unknowns.</li>
+  <li>At each non-ground node, write KCL: the sum of currents leaving the node through every element is zero. For a resistor between nodes \(a\) and \(b\), the current leaving \(a\) is \((v_a - v_b)/R = G(v_a - v_b)\). Current sources contribute known numbers.</li>
+  <li>That's \(n-1\) linear equations in \(n-1\) unknowns. Write them as a matrix equation and solve.</li>
+</ol>
+
+<p>Take this circuit: a 5 V source with \(R_1 = 1\) kΩ feeds node 1; \(R_2 = 2\) kΩ goes from node 1 to ground; \(R_3 = 1\) kΩ connects node 1 to node 2; \(R_4 = 2\) kΩ goes from node 2 to ground; and a current source pushes \(I_s = 1\) mA into node 2 (think of a sensor that outputs a current). Using conductances \(G_k = 1/R_k\) in mS:</p>
+$$\text{Node 1:}\quad G_1(v_1 - 5) + G_2 v_1 + G_3(v_1 - v_2) = 0$$
+$$\text{Node 2:}\quad G_3(v_2 - v_1) + G_4 v_2 = I_s$$
+<p>Collect terms in \(v_1\) and \(v_2\):</p>
+$$\begin{pmatrix} G_1 + G_2 + G_3 & -G_3 \\ -G_3 & G_3 + G_4 \end{pmatrix} \begin{pmatrix} v_1 \\ v_2 \end{pmatrix} = \begin{pmatrix} 5\,G_1 \\ I_s \end{pmatrix} \;\Rightarrow\; \begin{pmatrix} 2.5 & -1 \\ -1 & 1.5 \end{pmatrix} \begin{pmatrix} v_1 \\ v_2 \end{pmatrix} = \begin{pmatrix} 5 \\ 1 \end{pmatrix}$$
+<p>(with G in mS, so the right-hand side comes out in mA). Notice the pattern, which you can write down by inspection once you see it:</p>
+<ul>
+  <li>The <b>diagonal</b> entry for node \(k\) is the sum of all conductances touching node \(k\).</li>
+  <li>The <b>off-diagonal</b> entry \((j,k)\) is minus the conductance directly connecting nodes \(j\) and \(k\). So the matrix is symmetric.</li>
+  <li>The <b>right-hand side</b> is the current injected into each node by sources. A voltage source \(V\) behind a resistor \(R\) injects \(V/R\), which is just the Norton equivalent again.</li>
+</ul>
+<p>Solve the 2×2 system with Cramer's rule (see <a href="appA-math.html">Appendix A</a>). The determinant is \(2.5 \times 1.5 - (-1)(-1) = 2.75\), so</p>
+$$v_1 = \frac{5 \times 1.5 - (-1)(1)}{2.75} = 3.09\,\text{V}, \qquad v_2 = \frac{2.5 \times 1 - (-1)(5)}{2.75} = 2.73\,\text{V}$$
+<p>Check node 2: \((2.73 - 3.09)/1\text{k} + 2.73/2\text{k} = -0.36 + 1.36 = 1.0\) mA, which is \(I_s\). ✓</p>
+
+<figure class="widget wide">
+  <div id="f-nodal"></div>
+  <figcaption><b>Figure 2.10</b> The nodal equations, built live. Change any component and watch the conductance matrix \(\mathbf{G}\), the source vector \(\mathbf{i}\) and the solution \(\mathbf{v}\) update. Changing \(R_3\) affects four matrix entries (it touches both nodes); changing \(R_2\) affects only one. That's the "stamp" pattern simulators use.</figcaption>
+</figure>
+
+<aside class="callout dev"><span class="ct">👩‍💻 How the simulator in this book works</span>
+<p>Every live circuit in this book is solved by <code>W.solveDC</code>, about 40 lines of JavaScript that implement <b>Modified Nodal Analysis</b> (MNA), the same formulation SPICE uses. It loops over the netlist and "stamps" each element into a matrix:</p>
+<pre><code>// resistor between nodes a and b, conductance g = 1/R
+A[a][a] += g;  A[b][b] += g;
+A[a][b] -= g;  A[b][a] -= g;
+// current source pushing I into node b (out of node a)
+z[a] -= I;     z[b] += I;</code></pre>
+<p>Plain nodal analysis can't handle an ideal voltage source between two nodes, because its current isn't determined by its voltage. MNA fixes that by adding the source's <em>current</em> as an extra unknown and its voltage equation \(v_a - v_b = V\) as an extra row. Then the solver runs Gaussian elimination with partial pivoting, which is \(O(n^3)\) and fine for a few dozen nodes. Diodes are handled by guessing on/off states and re-solving until the guesses are consistent. Real SPICE does the same for non-linear parts with Newton–Raphson iteration, and for time-varying circuits it repeats the whole solve at every time step. You can read the code in <code>assets/js/widgets.js</code>.</p>
+</aside>
+
+<details class="deep"><summary>Deep dive: the MNA matrix for the same circuit</summary>
+<p>Treat the 5 V source as a real element between a new node 0 (its + terminal) and ground, with unknown current \(i_V\) flowing out of its + terminal. The unknowns become \((v_0, v_1, v_2, i_V)\):</p>
+$$\begin{pmatrix} G_1 & -G_1 & 0 & -1 \\ -G_1 & G_1+G_2+G_3 & -G_3 & 0 \\ 0 & -G_3 & G_3+G_4 & 0 \\ 1 & 0 & 0 & 0 \end{pmatrix} \begin{pmatrix} v_0 \\ v_1 \\ v_2 \\ i_V \end{pmatrix} = \begin{pmatrix} 0 \\ 0 \\ I_s \\ 5 \end{pmatrix}$$
+<p>The first row is KCL at node 0: the current out of node 0 through \(R_1\), \(G_1(v_0 - v_1)\), is supplied by the source, \(i_V\). The last row is the source's constraint \(v_0 = 5\). Solving gives the same \(v_1, v_2\) plus \(i_V = (5 - 3.09)/1\text{k} = 1.91\) mA, the current the source delivers. The matrix is no longer symmetric positive-definite, which is why simulators pivot during elimination.</p>
+</details>
+
+<div class="ex" data-id="mna-text" data-kind="text" data-answer="current|its current|the current|source current|the current through it|current through the source">
+  <div class="q">Modified Nodal Analysis adds one extra unknown for every ideal voltage source. What physical quantity is that unknown? (one or two words)</div>
+  <div class="explain">The current through the source. An ideal voltage source fixes the voltage but allows any current, so the current has to be solved for. That's also how <code>W.solveDC</code> reports the current a supply delivers.</div>
+</div>
+</section>
+
+<section>
+<h2 id="power-ratings">Power, ratings, tolerance and the E-series</h2>
+
+<h3>Power: where the energy goes</h3>
+<p>Power is the rate of energy transfer: voltage (joules per coulomb) times current (coulombs per second) gives joules per second, i.e. watts. For a resistor, substitute Ohm's law to get the three forms:</p>
+<div class="formula">
+$$P = VI = I^2 R = \frac{V^2}{R}$$
+<p>Use \(I^2R\) when you know the current (series parts, shunts) and \(V^2/R\) when you know the voltage (parts across a rail).</p>
+</div>
+<p>All of that power becomes heat in the resistor. The resistor's temperature rises until it sheds heat (into the PCB copper, the air and its leads) as fast as it absorbs it. Its <b>power rating</b> is the dissipation at which it reaches its maximum safe temperature, under specified conditions.</p>
+
+<h3>Ratings and derating</h3>
+<p>Every component has several limits, and a design must respect all of them at once:</p>
+<table class="ch2-table">
+  <tr><th>Package (thick-film chip)</th><th class="num">Typical power</th><th class="num">Typical max voltage</th></tr>
+  <tr><td>0402</td><td class="num">1/16 W (63 mW)</td><td class="num">50 V</td></tr>
+  <tr><td>0603</td><td class="num">1/10 W</td><td class="num">50–75 V</td></tr>
+  <tr><td>0805</td><td class="num">1/8 W</td><td class="num">150 V</td></tr>
+  <tr><td>1206</td><td class="num">1/4 W</td><td class="num">200 V</td></tr>
+  <tr><td>Through-hole carbon/metal film ("1/4 W")</td><td class="num">1/4 W</td><td class="num">250 V</td></tr>
+</table>
+<p>These are typical; your manufacturer's datasheet is the authority. Three subtleties:</p>
+<ul>
+  <li><b>Derating with temperature.</b> The rated power applies only up to an ambient temperature, typically 70 °C. Above that it falls linearly, reaching zero at the maximum operating temperature (often 155 °C). Inside a sealed robot body next to a motor driver, 70 °C is not exotic.</li>
+  <li><b>Design margin.</b> Running a part at 100 % of its rating means it's hot (a chip resistor at full rating can exceed 100 °C) and its lifetime shortens. A common rule is to stay below 50 % of the rated power, which also gives you margin for tolerance and surprises.</li>
+  <li><b>Voltage limit.</b> For high resistances, the voltage limit bites before the power limit: 1 MΩ at 75 V is only 5.6 mW, but 75 V is the most an 0603 can withstand without risking arcing across it.</li>
+</ul>
+
+<figure class="widget">
+  <div id="f-power"></div>
+  <figcaption><b>Figure 2.11</b> Resistor power check. Set the voltage across a resistor, its value, the package and the ambient temperature. The plot shows the derating curve (allowed power versus ambient) with your operating point; the readout tells you how much of the derated rating you're using. Aim to stay in the green, below 50 %.</figcaption>
+</figure>
+
+<div class="ex" data-id="power-num" data-kind="num" data-answer="0.1089" data-tol="2%" data-unit="W">
+  <div class="q">A 100 Ω resistor in an 0603 package sits directly across a 3.3 V rail (say, a "dummy load"). How much power does it dissipate?</div>
+  <div class="hint">\(P = V^2/R\).</div>
+  <div class="explain">\(3.3^2/100 = 0.109\) W, above an 0603's 0.1 W rating even at room temperature. Use an 1206 (0.25 W, giving 44 % utilisation) or a bigger value. This is how "it worked on the bench, then failed in the enclosure" happens.</div>
+</div>
+
+<h3>Tolerance and the E-series</h3>
+<p>You can't buy a 4.123 kΩ resistor off the shelf. Resistors come in <b>preferred values</b>, the IEC 60063 "E-series", chosen so that, given each part's tolerance, the series covers every possible value with no gaps. E12 has 12 values per decade, spaced by a factor of \(10^{1/12} \approx 1.21\); with ±10 % tolerance, neighbouring values just about overlap. E24 (±5 %) has 24 values per decade, spaced by \(10^{1/24} \approx 1.10\). E96 (±1 %) has 96 values per decade, spaced by about 2.4 %.</p>
+<p>Today 1 % resistors cost the same as 5 % ones, so most designs use 1 % parts. Many still stick to E12 or E24 <em>values</em>, though, because a short list of values means a shorter bill of materials and fewer reels to load at the assembly house. A useful skill is picking a <em>pair</em> of standard values that gives a required ratio. That's what the picker below does.</p>
+
+<figure class="widget">
+  <div id="f-eseries"></div>
+  <figcaption><b>Figure 2.12</b> E-series picker. Type a target resistance (e.g. <code>5.3k</code>) to find the nearest standard values in each series and their error. Below that, type a target divider ratio \(R_2/(R_1+R_2)\), or a \(V_{in}\) and \(V_{out}\), to find the best standard pairs. The ruler shows one decade of the selected series on a log scale.</figcaption>
+</figure>
+
+<div class="ex" data-id="e12-num" data-kind="num" data-answer="5600" data-tol="0.5%" data-unit="Ω">
+  <div class="q">Your calculation says 5.3 kΩ, but the kit only has E12 values. Which E12 value is closest (in percentage terms)?</div>
+  <div class="hint">E12 in the 1–10 range: 1.0, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2.</div>
+  <div class="explain">5.6 kΩ is 5.7 % high; 4.7 kΩ is 11 % low. E24 would give you 5.1 kΩ (3.8 % low) or 5.6 kΩ; E96 has 5.36 kΩ (1.1 % high).</div>
+</div>
+
+<h3>How tolerance adds up</h3>
+<p>A divider built from two ±5 % resistors doesn't give a ±5 % output by luck alone. Worst case, \(R_1\) is 5 % high and \(R_2\) is 5 % low (or vice versa), and their errors add. For a divider ratio \(k = R_2/(R_1+R_2)\), a little calculus gives the sensitivity:</p>
+$$\frac{\Delta k}{k} \approx (1-k)\left(\frac{\Delta R_2}{R_2} - \frac{\Delta R_1}{R_1}\right)$$
+<p>For a 1:1 divider (\(k = 0.5\)) with ±5 % parts, the worst case is \(0.5 \times (5\% + 5\%) = \pm 5\%\). For a 1:3 battery divider (\(k = 0.25\)), it's \(0.75 \times 10\% = \pm 7.5\%\). That's ±0.6 V on an 8.4 V battery reading, which is the difference between "fine" and "over-discharged". Two cures: use 1 % (or 0.1 %) resistors, or calibrate in firmware by measuring a known voltage once and storing a correction factor. In practice the errors are random, so most boards land well inside the worst case, as Figure 2.13 shows.</p>
+
+<figure class="widget">
+  <div id="f-mc"></div>
+  <figcaption><b>Figure 2.13</b> Monte Carlo tolerance analysis: build thousands of virtual battery-monitor dividers (220 kΩ over 100 kΩ, ratio 0.3125) with resistors uniformly spread across their tolerance, and histogram the ratio. Dashed lines show the analytic worst case. Switch tolerance and re-roll. Most boards sit well inside the worst case, but in a production run of thousands, some will be near the edges.</figcaption>
+</figure>
+</section>
+
+<section>
+<h2 id="bridge-measure">Bridges, meters and measuring without disturbing</h2>
+
+<h3>The Wheatstone bridge</h3>
+<p>Many sensors are resistors whose value changes slightly with the quantity you care about: a strain gauge changes by a fraction of a percent when its metal foil is stretched; a platinum RTD changes by 0.39 % per °C; a thermistor changes by about 4 % per °C. Put such a sensor in a divider and the output barely moves: a 0.2 % change in a 350 Ω strain gauge in a 2.5 V divider moves the output by about 2.5 mV, on top of a 2.5 V offset. Amplify that by 100 and you get 250 V of offset. Not useful.</p>
+<p>The fix is to build <b>two</b> dividers from the same supply and measure the <em>difference</em> between their outputs. That's a <b>Wheatstone bridge</b>. One divider is \(R_1\) over \(R_2\); the other is \(R_3\) over the sensor \(R_x\). The output is</p>
+$$V_{out} = V_{exc}\left(\frac{R_x}{R_3 + R_x} - \frac{R_2}{R_1 + R_2}\right)$$
+<p>When the two ratios are equal, \(R_1/R_2 = R_3/R_x\), the bridge is <b>balanced</b> and \(V_{out} = 0\) exactly, regardless of the supply voltage. Now a small sensor change \(R_x = R(1 + \delta)\) in an otherwise equal bridge gives</p>
+<div class="formula">
+$$V_{out} \approx V_{exc}\,\frac{\delta}{4}$$
+<p>Quarter-bridge output for small \(\delta\): a signal that starts at zero, ready to amplify.</p>
+</div>
+<p>The offset is gone, and so is most of the sensitivity to supply noise: if \(V_{exc}\) wobbles, both dividers wobble together and the difference stays near zero. Load cells (the sensor in every kitchen scale) are full bridges, with four gauges arranged so that two stretch and two compress, which quadruples the signal and cancels temperature effects. A load cell typically outputs 1–2 mV per volt of excitation at full load. A chip like the HX711 is a differential amplifier plus a 24-bit ADC made exactly for this.</p>
+
+<figure class="widget wide">
+  <div id="f-bridge"></div>
+  <figcaption><b>Figure 2.14</b> A 350 Ω strain-gauge quarter bridge with 5 V excitation. Strain the gauge (\(\Delta R/R\)) and compare the bridge output with a plain divider's. The plot shows the exact bridge output (solid) and the linear approximation \(V_{exc}\delta/4\) (dashed); they agree closely for the tiny changes real gauges produce. Turn on "half bridge" to add a second, opposite gauge.</figcaption>
+</figure>
+
+<div class="ex" data-id="bridge-num" data-kind="num" data-answer="0.0025" data-tol="3%" data-unit="V">
+  <div class="q">A balanced quarter bridge of 350 Ω resistors is excited with 5 V. The gauge increases by 0.7 Ω. What is the bridge output, approximately?</div>
+  <div class="hint">\(\delta = 0.7/350 = 0.002\). Then \(V_{exc}\delta/4\).</div>
+  <div class="explain">\(5 \times 0.002/4 = 2.5\) mV. The exact value is \(5(350.7/700.7 - 0.5) = 2.4975\) mV. With an amplifier gain of 128 (the HX711's highest setting), that's 0.32 V, easily measured.</div>
+</div>
+
+<h3>Measuring: voltmeters in parallel, ammeters in series</h3>
+<p>A <b>voltmeter</b> measures the difference between two nodes, so it connects <em>across</em> (in parallel with) the thing you're measuring. To disturb nothing it should draw no current, which means infinite input resistance. A real digital multimeter has about 10 MΩ.</p>
+<p>An <b>ammeter</b> measures the current through a branch, so the current must flow <em>through</em> it. You break the circuit and insert the meter in series. To disturb nothing it should drop no voltage: zero resistance. Inside, a real meter measures the voltage across a small <b>shunt resistor</b>, so it does drop some voltage.</p>
+<p>Both errors are the input/output impedance story again:</p>
+<ul>
+  <li><b>Voltmeter loading:</b> the meter's 10 MΩ appears in parallel with whatever you're probing. Measuring the midpoint of a divider made of two 10 MΩ resistors, the meter turns the bottom half into 5 MΩ, and a true 5 V reads as 3.33 V. Rule of thumb: a 10 MΩ meter is fine as long as the Thevenin resistance of the node you probe is below about 100 kΩ, where it causes at most about 1 % error.</li>
+  <li><b>Burden voltage:</b> the ammeter's shunt adds series resistance, so the circuit's current falls and the circuit's own supply voltage drops by the <b>burden voltage</b> \(I \times R_{shunt}\). Typical handheld meters have shunts of the order of 100 Ω on µA ranges, a few ohms on mA ranges and around 0.01 Ω on the 10 A range (check your meter's specifications for "burden voltage"). A sleeping ESP32 drawing 10 µA on the µA range loses only 1 mV. But when it wakes and pulls 100 mA, the burden on that range would be several volts. The meter overloads, the board browns out and resets, and you measure nothing useful. Tools like Dave Jones' µCurrent and dedicated power profilers exist exactly for this problem.</li>
+</ul>
+
+<figure class="widget">
+  <div id="f-meter"></div>
+  <figcaption><b>Figure 2.15</b> Meter loading and burden. In voltmeter mode, change the divider's resistance and the meter's input resistance and compare the reading with the true voltage. In ammeter mode, pick a range and a load; watch the burden voltage eat into the 3.3 V that actually reaches the load, and see the meter read OL when you exceed the range.</figcaption>
+</figure>
+
+<aside class="callout warn"><span class="ct">⚠️ The classic meter-killing mistake</span>
+<p>With the probes still in the current (A or mA) jack, you go to measure a battery's voltage and put the meter <em>across</em> it. The meter is now a ~0.01 Ω resistor across a battery. A LiPo will try to push hundreds of amps. If you're lucky, the meter's fuse blows (that's what it's for: buy meters with proper HRC fuses on the current inputs). Develop the habit of moving the red lead back to the V jack the moment you finish a current measurement.</p>
+</aside>
+
+<div class="ex" data-id="meter-task" data-kind="task">
+  <div class="q">In Figure 2.15 (voltmeter mode), find a setting where a <b>10 MΩ DMM</b> reads more than <b>10 % low</b>. Then think about what circuit nodes on your board are like that.</div>
+  <div class="explain">With a 10 V source and two equal resistors \(R\), the node's Thevenin resistance is \(R/2\). The reading drops below 90 % of the true value once \(R/2 \gtrsim 1.1\) MΩ, i.e. \(R \gtrsim 2.2\) MΩ. Real examples: high-value battery dividers (several hundred kΩ is fine, MΩ is not), the gate of a MOSFET with a 1 MΩ pull-down, CMOS inputs with internal weak pulls, and any "floating" pin, where the meter's 10 MΩ is the only thing defining the voltage.</div>
+</div>
+
+<div class="ex" data-id="meter-multi" data-kind="multi">
+  <div class="q">Which statements are correct? (Select all that apply.)</div>
+  <ol class="opts">
+    <li data-correct>A voltmeter should have a much higher resistance than the circuit node it measures</li>
+    <li>An ammeter should be connected across the component whose current you want</li>
+    <li data-correct>Burden voltage is the voltage dropped across the ammeter's internal shunt</li>
+    <li data-correct>A µA range is a poor choice for measuring an MCU that occasionally draws 100 mA</li>
+    <li>An oscilloscope's 1 MΩ input never loads a circuit</li>
+  </ol>
+  <div class="explain">Ammeters go in series. A 1 MΩ scope input (or 10 MΩ with a ×10 probe) certainly can load high-impedance nodes, and at high frequencies its ~15 pF of capacitance matters more (Chapter 3). Burden on a µA range for a 100 mA spike is volts, which resets the MCU.</div>
+</div>
+</section>
+
+<section>
+<h2 id="lab">Lab: a battery monitor on an Arduino</h2>
+
+<aside class="callout lab"><span class="ct">🔧 Lab: battery divider into the Arduino ADC</span>
+<p><b>You need:</b> an Arduino Uno or Nano (5 V), a 9 V battery with clip (or a 2S LiPo with a balance-lead adapter, handled carefully), 22 kΩ and 10 kΩ resistors, a 100 nF ceramic capacitor, a 220 kΩ and 100 kΩ pair for the second experiment, a breadboard and your multimeter.</p>
+<p><b>Design check first.</b> A fresh 9 V alkaline can read up to about 9.6 V. With \(R_1 = 22\) kΩ over \(R_2 = 10\) kΩ the ratio is \(10/32 = 0.3125\), so the pin sees at most 3.0 V, well under the 5 V reference. The source impedance is \(22\text{k} \parallel 10\text{k} = 6.9\) kΩ, within the ATmega328P's 10 kΩ recommendation, and the drain is \(9.6/32\text{k} = 0.3\) mA. (Fine for a lab; too much for a robot that sits on a shelf.)</p>
+<ol>
+  <li><b>Measure your parts.</b> Measure \(R_1\) and \(R_2\) with the meter and write down the real values. Measure the Arduino's 5 V pin while it's plugged into USB: it's often 4.7–5.1 V, and since the ADC uses it as the reference by default, it matters.</li>
+  <li><b>Build:</b> battery + → \(R_1\) → node → \(R_2\) → GND. Node → A0. Connect the battery − to Arduino GND (forgetting this common ground is the number one reason the reading is nonsense: a voltage needs two points). Put the 100 nF from A0 to GND.</li>
+  <li><b>Upload</b> the sketch below and open the serial monitor at 115200 baud.</li>
+  <li><b>Compare</b> the printed battery voltage with your meter's reading at the battery terminals. Compute the percentage error. Replace <code>VREF</code>, <code>R1</code> and <code>R2</code> with your measured values and see how much the error shrinks.</li>
+  <li><b>Measure the drain.</b> Put the meter (mA or µA range) in series between the battery + and \(R_1\). Compare with \(V/(R_1+R_2)\). Is the burden voltage significant here? (It isn't; why not?)</li>
+  <li><b>Break it on purpose.</b> Swap in 220 kΩ / 100 kΩ and remove the capacitor. Change the sketch to alternate <code>analogRead(A0)</code> with <code>analogRead(A1)</code>, with A1 tied to 5 V. The A0 reading now depends on A1: the sampling capacitor remembers the previous channel and can't recharge through 69 kΩ in time. Put the 100 nF back and watch the problem vanish.</li>
+</ol>
+<pre><code>// Battery monitor: divider R1 (top) / R2 (bottom) into A0
+const float R1 = 22000.0;   // replace with your measured values
+const float R2 = 10000.0;
+const float VREF = 5.00;    // measure the 5V pin and put the real value here
+
+void setup() { Serial.begin(115200); }
+
+void loop() {
+  long sum = 0;
+  for (int i = 0; i &lt; 16; i++) sum += analogRead(A0);  // average 16 samples
+  float counts = sum / 16.0;
+  float vpin = counts * VREF / 1024.0;   // ATmega: ADC = Vin * 1024 / Vref
+  float vbat = vpin * (R1 + R2) / R2;    // undo the divider
+  Serial.print("counts=");  Serial.print(counts, 1);
+  Serial.print("  Vpin=");  Serial.print(vpin, 3);
+  Serial.print("  Vbat=");  Serial.println(vbat, 3);
+  delay(500);
+}</code></pre>
+<p><b>On an ESP32</b> use a 2S-friendly ratio such as 220 kΩ / 100 kΩ with the 100 nF capacitor, connect to an ADC1 pin (ADC2 is shared with Wi-Fi), and use <code>analogReadMilliVolts(pin)</code> from the Arduino-ESP32 core, which applies the chip's factory calibration. Expect a few percent of error before your own one-point calibration.</p>
+<p><b>What to write in your notebook:</b> predicted vs measured pin voltage, the resolution in battery millivolts per ADC count (\(V_{ref}/1024 \times (R_1+R_2)/R_2 \approx 15.6\) mV here), the measured drain, and the error before and after calibration.</p>
+</aside>
+<h3>Chapter summary</h3>
+<ul>
+  <li>A circuit is a graph. Nodes are equipotential sets of wire; you get \(n-1\) KCL equations and \(b-n+1\) KVL equations, which is always enough.</li>
+  <li><b>KCL</b> (charge conservation): currents into a node sum to zero. <b>KVL</b> (energy conservation, potential is single-valued): voltages around a loop sum to zero. Both hold in the lumped approximation.</li>
+  <li>Series resistances add; parallel conductances add. Parallel is always smaller than the smallest. Current divides in proportion to conductance.</li>
+  <li>A divider's output is \(V_{in}R_2/(R_1+R_2)\) only when unloaded. Its output resistance is \(R_1 \parallel R_2\); keep loads at least 10× larger. A divider is not a power supply.</li>
+  <li>Any linear two-terminal network is a Thevenin source (\(V_{th}\), \(R_{th}\)) or a Norton source (\(I_N\), \(R_{th}\)). Maximum power transfer happens at \(R_L = R_{th}\), at 50 % efficiency, which is right for weak signals and wrong for power.</li>
+  <li>Every interface is a divider between \(Z_{out}\) and \(Z_{in}\). For voltage signals: \(Z_{in} \gg Z_{out}\).</li>
+  <li>Superposition and nodal analysis exploit linearity. Nodal analysis gives \(\mathbf{G}\mathbf{v} = \mathbf{i}\), which simulators solve, MNA-style.</li>
+  <li>Check power against <em>derated</em> ratings with margin, check voltage ratings too, pick values from the E-series, and remember that tolerances add.</li>
+  <li>Bridges turn tiny resistance changes into a signal that starts at zero. Meters load circuits: voltmeters by their input resistance, ammeters by their burden voltage.</li>
+</ul>
+
+<aside class="callout ref"><span class="ct">📚 Go deeper</span>
+<ul>
+  <li><b>Horowitz &amp; Hill, <i>The Art of Electronics</i> (3rd ed.), Chapter 1 "Foundations"</b>, sections 1.1–1.2: voltage dividers, Thevenin equivalents and the "small-signal resistance" way of thinking about sources and loads.</li>
+  <li><b>Hayes &amp; Horowitz, <i>Learning the Art of Electronics</i>, Chapter 1 (DC circuits)</b> and its first lab, which has you measure meter loading and the output impedance of a divider.</li>
+  <li><b>MIT 6.002 <i>Circuits and Electronics</i> (Agarwal, MIT OpenCourseWare)</b>, Lectures 1–3: the lumped matter discipline, KVL/KCL and the node method, superposition, and Thévenin/Norton. The companion text, Agarwal &amp; Lang, <i>Foundations of Analog and Digital Electronic Circuits</i>, chapters 2–3, covers the same ground with many worked problems.</li>
+  <li><b>Kuphaldt, <i>Lessons in Electric Circuits</i>, Volume I (DC)</b>: ch. 5 "Series and Parallel Circuits", ch. 6 "Divider Circuits and Kirchhoff's Laws", ch. 8 "DC Metering Circuits" (meter loading in detail), and ch. 10 "DC Network Analysis" (mesh, node, superposition, Thevenin, Norton).</li>
+  <li><b>Scherz &amp; Monk, <i>Practical Electronics for Inventors</i> (4th ed.), Chapter 2 "Theory"</b>: the DC sections on dividers, Kirchhoff's laws, Thevenin/Norton and resistor power ratings.</li>
+  <li><b>Microchip ATmega328P datasheet</b>, ADC chapter ("Analog Input Circuitry"), for the 10 kΩ source impedance recommendation and the sample-and-hold model; <b>Espressif's ESP-IDF ADC documentation</b> for attenuation ranges and calibration.</li>
+  <li>For burden voltage in practice: Dave Jones' (EEVblog) µCurrent design articles and his videos on multimeter burden voltage.</li>
+</ul>
+</aside>
+</section>
+
+</main>
+<script src="../assets/vendor/katex/katex.min.js"></script>
+<script src="../assets/vendor/katex/auto-render.min.js"></script>
+<script src="../assets/js/widgets.js"></script>
+<script src="../assets/js/book.js"></script>
+<script src="js/ch02-dc.js"></script>
+</body>
+</html>
